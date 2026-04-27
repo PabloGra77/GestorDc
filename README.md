@@ -247,39 +247,173 @@ gestion-documental/
 | `develop` | Integración de funcionalidades — rama base de trabajo |
 | `feature/<nombre>` | Desarrollo de cada módulo o funcionalidad nueva |
 
-### Crear una rama de feature
+### Ciclo completo de un módulo nuevo
 
 ```bash
-git checkout develop
-git pull origin develop
+# 1. Partir siempre de develop actualizado
+git checkout develop && git pull origin develop
 git checkout -b feature/expedientes
-```
 
-### Integrar a develop
+# 2. Desarrollar: entidad + servicio + controlador + DTOs + migración
 
-```bash
+# 3. Commit (entidad y migración juntos — nunca separados)
+git add .
+git commit -m "feat(expedientes): entidad, CRUD y migración inicial"
+git push -u origin feature/expedientes
+
+# 4. PR a develop → merge
 git checkout develop
-git merge --no-ff feature/expedientes -m "feat(expedientes): CRUD completo con búsqueda"
+git merge --no-ff feature/expedientes -m "feat(expedientes): CRUD completo"
 git branch -d feature/expedientes
-```
 
-### Pasar a main (release)
-
-```bash
+# 5. Probar en test, luego merge a main
 git checkout main
-git merge --no-ff develop -m "release: v1.1.0"
-git tag -a v1.1.0 -m "Versión 1.1.0 — expedientes y documentos"
+git merge --no-ff develop -m "release: v0.2.0"
+git tag -a v0.2.0 -m "Expedientes y dependencias"
+git push origin main --tags
 ```
 
 ### Convención de commits
 
 ```
-feat(módulo): descripción          # funcionalidad nueva
-fix(módulo): descripción           # corrección de bug
-refactor(módulo): descripción      # cambio sin nueva funcionalidad
-docs: descripción                  # solo documentación
-chore: descripción                 # tareas de mantenimiento (deps, config)
+feat(módulo):     nueva funcionalidad
+fix(módulo):      corrección de bug
+refactor(módulo): cambio sin nueva funcionalidad
+docs:             solo documentación
+chore:            mantenimiento (deps, config, build)
 ```
+
+---
+
+## Protocolo operativo
+
+> Esta sección resume las reglas para trabajar de forma segura con versiones,
+> base de datos, backups y despliegues. Leer antes de tocar `main` o producción.
+
+### Regla principal
+
+Código, base de datos y archivos **no se promueven a producción de la misma manera**:
+
+| Artefacto | Cómo se promueve |
+|---|---|
+| Código | Por Git (ramas → PR → merge → tag) |
+| Esquema de BD | Por migraciones TypeORM versionadas |
+| Archivos de usuarios | Volumen dedicado, respaldo independiente |
+
+**Nunca mezcles estas tres cosas.**
+
+### Ambientes
+
+| Ambiente | Base de datos | Sincronizar (`DB_SYNCHRONIZE`) |
+|---|---|---|
+| `local` (prototipado) | Local Docker | `true` (tolerable) |
+| `local` (estable) | Local Docker | `false` |
+| `test / preproducción` | BD propia de test | `false` |
+| `producción` | BD real | `false` — siempre |
+
+Nunca apuntes test a la BD de producción.
+
+### Variables de entorno por ambiente
+
+Cada ambiente tiene su propio archivo `.env` (nunca en Git):
+
+```
+services/api/.env.local
+services/api/.env.test
+services/api/.env.prod
+services/api/.env.example   ← este sí va a Git
+```
+
+Para generar secretos JWT:
+```bash
+openssl rand -hex 32
+```
+
+### Migraciones de base de datos
+
+Ver guía completa: `docs/base-datos/migraciones.md`
+
+```bash
+# Generar migración (ejecutar en el contenedor o con ts-node local)
+npm run migration:generate -- src/db/migrations/NombreMigracion
+
+# Ejecutar pendientes
+npm run migration:run
+
+# Revertir última
+npm run migration:revert
+
+# Ver estado
+npm run migration:show
+```
+
+**Regla crítica:** todo commit que cambie entidades debe incluir su migración.
+Nunca subas código que espere columnas que la BD aún no tiene.
+
+### Backups
+
+Antes de cada despliegue a producción, hacer backup manual:
+
+```bash
+bash infra/backup/backup-postgres.sh \
+  --output-dir /srv/backups/pre-release-$(date +%Y%m%d)
+```
+
+Cron diario sugerido:
+```
+0 2 * * * /srv/devapps/gestion-documental/infra/backup/backup-postgres.sh >> /var/log/gestordoc-backup.log 2>&1
+```
+
+> Un backup que nunca fue restaurado no sirve.
+> Probar la restauración en un servidor alterno al menos una vez antes de producción.
+
+### Despliegue a producción (resumen)
+
+1. Verificar checklist: `docs/despliegue/checklist-despliegue.md`
+2. Hacer backup de BD
+3. `git checkout main && git merge --no-ff develop`
+4. `docker compose up -d --build`
+5. `docker compose exec api npm run migration:run`
+6. Validar `GET /api/health` → `200 OK`
+7. Crear tag: `git tag -a v0.X.0`
+
+### Rollback
+
+Ver procedimiento completo: `docs/despliegue/checklist-rollback.md`
+
+```bash
+# Rollback de código
+git reset --hard v0.X-1.0 && docker compose up -d --build
+
+# Rollback de migración reversible
+docker compose exec api npm run migration:revert
+
+# Rollback de migración destructiva → restaurar backup pre-despliegue
+gunzip -c /srv/backups/pre-release-YYYYMMDD/gestordoc_*.sql.gz \
+  | PGPASSWORD=<clave> psql -h 127.0.0.1 -U gestordoc_app gestordoc
+```
+
+### Reglas de oro — no perder datos
+
+1. No compartas BD entre test y producción
+2. No subas secretos a Git
+3. No uses `DB_SYNCHRONIZE=true` en test ni producción
+4. No hagas cambios manuales en la BD de producción sin migración
+5. No despliegues sin backup previo
+6. No hagas push directo a `main`
+7. No separes código y migración en commits distintos
+8. No asumas que el backup sirve si nunca lo restauraste
+9. No borres columnas sin plan de rollback
+10. No promociones a producción lo que no pasó por test
+
+### Documentación operativa
+
+| Documento | Ubicación |
+|---|---|
+| Guía de migraciones | `docs/base-datos/migraciones.md` |
+| Checklist de despliegue | `docs/despliegue/checklist-despliegue.md` |
+| Checklist de rollback | `docs/despliegue/checklist-rollback.md` |
+| Protocolo VPS preproducción | `docs/seguridad/protocolo-vps-preproduccion.md` |
 
 ---
 
@@ -289,19 +423,19 @@ Los siguientes módulos ya tienen carpeta scaffolded en `services/api/src/module
 
 | Rama | Módulos | Prioridad |
 |---|---|---|
-| `feature/dependencias` | Gestión de dependencias/unidades organizacionales | Alta |
-| `feature/documentos` | Registro y metadatos de documentos | Alta |
-| `feature/expedientes` | Creación y gestión de expedientes documentales | Alta |
+| `feature/fix-mobile-ops` | Corrección de bugs en `OpsCuentaCobroScreen.tsx` | 🔴 Alta |
+| `feature/migraciones-db` | Migrar de `synchronize:true` a migraciones TypeORM | 🔴 Alta |
+| `feature/dependencias` | Gestión de dependencias/unidades organizacionales | 🟡 Alta |
+| `feature/documentos` | Registro y metadatos de documentos | 🟡 Alta |
+| `feature/expedientes` | Creación y gestión de expedientes documentales | 🟡 Alta |
 | `feature/series-trd` | Series, subseries, tipos documentales, TRD/TVD | Media |
 | `feature/flujos-tareas` | Flujos de trabajo y asignación de tareas | Media |
 | `feature/firmas` | Firma digital de documentos | Media |
 | `feature/transferencias` | Transferencias documentales primarias/secundarias | Media |
 | `feature/prestamos` | Préstamos y consultas de documentos físicos | Baja |
 | `feature/auditoria` | Log de auditoría de acciones | Baja |
-| `feature/fix-mobile-ops` | Corrección de bugs en `OpsCuentaCobroScreen.tsx` | Alta |
-| `feature/migraciones-db` | Migrar de `synchronize:true` a migraciones TypeORM | Alta |
 
-> **Nota:** `feature/fix-mobile-ops` y `feature/migraciones-db` son prioritarios antes de cualquier despliegue a producción.
+> 🔴 = prioritarios antes de cualquier despliegue estable a producción.
 
 ---
 

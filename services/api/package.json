@@ -10,7 +10,12 @@
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main.js",
     "lint": "echo \"Configurar lint después\"",
-    "test": "echo \"Configurar tests después\""
+    "test": "echo \"Configurar tests después\"",
+    "typeorm": "ts-node -e \"require('dotenv').config()\" ./node_modules/typeorm/cli.js",
+    "migration:generate": "npm run typeorm -- migration:generate -d src/db/data-source.ts",
+    "migration:run": "npm run typeorm -- migration:run -d src/db/data-source.ts",
+    "migration:revert": "npm run typeorm -- migration:revert -d src/db/data-source.ts",
+    "migration:show": "npm run typeorm -- migration:show -d src/db/data-source.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.0",
