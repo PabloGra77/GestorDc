@@ -237,6 +237,74 @@ gestion-documental/
 
 ---
 
+## Flujo de trabajo Git
+
+### Ramas
+
+| Rama | Propósito |
+|---|---|
+| `main` | Código en producción — solo recibe merges desde `develop` |
+| `develop` | Integración de funcionalidades — rama base de trabajo |
+| `feature/<nombre>` | Desarrollo de cada módulo o funcionalidad nueva |
+
+### Crear una rama de feature
+
+```bash
+git checkout develop
+git pull origin develop
+git checkout -b feature/expedientes
+```
+
+### Integrar a develop
+
+```bash
+git checkout develop
+git merge --no-ff feature/expedientes -m "feat(expedientes): CRUD completo con búsqueda"
+git branch -d feature/expedientes
+```
+
+### Pasar a main (release)
+
+```bash
+git checkout main
+git merge --no-ff develop -m "release: v1.1.0"
+git tag -a v1.1.0 -m "Versión 1.1.0 — expedientes y documentos"
+```
+
+### Convención de commits
+
+```
+feat(módulo): descripción          # funcionalidad nueva
+fix(módulo): descripción           # corrección de bug
+refactor(módulo): descripción      # cambio sin nueva funcionalidad
+docs: descripción                  # solo documentación
+chore: descripción                 # tareas de mantenimiento (deps, config)
+```
+
+---
+
+## Backlog de módulos — ramas sugeridas
+
+Los siguientes módulos ya tienen carpeta scaffolded en `services/api/src/modules/`. Cada uno debe desarrollarse en su propia rama `feature/`:
+
+| Rama | Módulos | Prioridad |
+|---|---|---|
+| `feature/dependencias` | Gestión de dependencias/unidades organizacionales | Alta |
+| `feature/documentos` | Registro y metadatos de documentos | Alta |
+| `feature/expedientes` | Creación y gestión de expedientes documentales | Alta |
+| `feature/series-trd` | Series, subseries, tipos documentales, TRD/TVD | Media |
+| `feature/flujos-tareas` | Flujos de trabajo y asignación de tareas | Media |
+| `feature/firmas` | Firma digital de documentos | Media |
+| `feature/transferencias` | Transferencias documentales primarias/secundarias | Media |
+| `feature/prestamos` | Préstamos y consultas de documentos físicos | Baja |
+| `feature/auditoria` | Log de auditoría de acciones | Baja |
+| `feature/fix-mobile-ops` | Corrección de bugs en `OpsCuentaCobroScreen.tsx` | Alta |
+| `feature/migraciones-db` | Migrar de `synchronize:true` a migraciones TypeORM | Alta |
+
+> **Nota:** `feature/fix-mobile-ops` y `feature/migraciones-db` son prioritarios antes de cualquier despliegue a producción.
+
+---
+
 ## Inicio rápido
 
 ### Prerrequisitos
