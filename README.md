@@ -29,6 +29,7 @@ gestion-documental/
 │
 ├── apps/
 │   ├── mobile/                              # React Native 0.76 + Expo SDK 52
+│   │   ├── .env.example                     # EXPO_PUBLIC_API_BASE_URL
 │   │   ├── App.tsx                          # Punto de entrada
 │   │   ├── app.json                         # Config Expo (scheme: gestordoc)
 │   │   ├── babel.config.js
@@ -61,6 +62,7 @@ gestion-documental/
 │   │           └── usuario.ts               # AuthSession { token, usuario }
 │   │
 │   └── web/                                 # React 19 + Vite 6
+│       ├── .env.example                     # VITE_API_BASE_URL
 │       ├── Dockerfile
 │       ├── index.html
 │       ├── package.json
@@ -120,13 +122,18 @@ gestion-documental/
 ├── docs/
 │   ├── api/                                 # (vacío)
 │   ├── arquitectura/                        # (vacío)
-│   ├── base-datos/                          # (vacío)
+│   ├── base-datos/
+│   │   └── migraciones.md                   # Guía completa TypeORM: comandos, flujo, naming
+│   ├── despliegue/
+│   │   ├── checklist-despliegue.md          # Checklist pre/durante/post deploy
+│   │   └── checklist-rollback.md            # Protocolo rollback código + BD
 │   ├── normativa/                           # (vacío)
 │   └── seguridad/
 │       └── protocolo-vps-preproduccion.md
 │
 ├── infra/
-│   ├── backup/                              # (vacío)
+│   ├── backup/
+│   │   └── backup-postgres.sh               # Backup con retención, logs y restore cmd
 │   ├── docker/
 │   │   ├── postgres.env                     # gitignoreado — credenciales reales
 │   │   └── postgres.env.example
@@ -167,7 +174,8 @@ gestion-documental/
             │   └── validators/              # (vacío)
             ├── config/                      # (vacío)
             ├── db/
-            │   ├── migrations/              # (vacío — usa synchronize:true en dev)
+            │   ├── data-source.ts           # DataSource para TypeORM CLI (migrations)
+            │   ├── migrations/              # (vacío — usar migration:generate)
             │   ├── policies/                # (vacío)
             │   └── seeds/                   # (vacío)
             ├── modules/
