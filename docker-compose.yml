@@ -1,0 +1,50 @@
+services:
+  api:
+    build:
+      context: ./services/api
+      dockerfile: Dockerfile
+    container_name: gestordoc-api
+    restart: unless-stopped
+    env_file:
+      - ./services/api/.env
+    ports:
+      - "127.0.0.1:3001:3001"
+    depends_on:
+      - postgres
+    networks:
+      - gestordoc-net
+
+  web:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
+    container_name: gestordoc-web
+    restart: unless-stopped
+    ports:
+      - "3002:3002"
+    depends_on:
+      - api
+    networks:
+      - gestordoc-net
+
+  postgres:
+    image: postgres:17-alpine
+    container_name: gestordoc-postgres
+    restart: unless-stopped
+    env_file:
+      - ./infra/docker/postgres.env
+    volumes:
+      - gestordoc_postgres_data:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5432:5432"
+    expose:
+      - "5432"
+    networks:
+      - gestordoc-net
+
+volumes:
+  gestordoc_postgres_data:
+
+networks:
+  gestordoc-net:
+    driver: bridge

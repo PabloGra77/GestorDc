@@ -1,0 +1,29 @@
+node_modules/
+.expo/
+dist/
+web-build/
+.env
+.env.local
+
+# Native build outputs
+android/
+ios/
+
+# Signing keys
+*.jks
+*.keystore
+*.p12
+*.mobileprovision
+
+# Expo
+.expo-shared/
+
+# Logs
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# Misc
+.DS_Store
+Thumbs.db
+*.log
