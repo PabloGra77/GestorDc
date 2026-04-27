@@ -7,6 +7,9 @@
 **/.next/
 **/.nuxt/
 
+# ── Notas privadas — NUNCA commitear ──────────────────────────────────────────
+NOTAS_PRIVADAS.md
+
 # ── Variables de entorno con secretos — NUNCA commitear ───────────────────────
 .env
 .env.local

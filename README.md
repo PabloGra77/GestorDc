@@ -534,58 +534,22 @@ Si el resultado es `FAIL`, no desplegar hasta corregir.
 
 Protocolo completo: `docs/seguridad/protocolo-vps-preproduccion.md`
 
-## Seguridad — medidas implementadas
+## Seguridad — medidas activas
 
-En la auditoría integral del proyecto se corrigieron las siguientes vulnerabilidades críticas:
+| Capa | Medida |
+|---|---|
+| Autenticación | JWT (Bearer token) · JwtAuthGuard global |
+| Cabeceras | `helmet()` global · CORS restringido a `WEB_BASE_URL` |
+| Body | Límite 1 MB — previene DoS por payload |
+| Rate limiting | 120 req/min global · 10 login · 5 reset-password |
+| Errores | `HttpExceptionFilter` — sin stack traces en respuestas |
+| Validación | `ValidationPipe` con `whitelist: true` · regex en nombres de archivo |
+| Secretos | Credenciales en `.env` y `postgres.env` — ambos gitignoreados |
+| SMTP | Inicialización lazy — la app no crashea si SMTP no está configurado |
 
-### Autenticación y autorización
+> Historial completo de vulnerabilidades corregidas: `NOTAS_PRIVADAS.md` (local, no en Git)
 
-- **JWT implementado**: `AuthModule` ahora firma tokens con `JwtModule` + `PassportModule`. Login devuelve `{ token, usuario }`.
-- **JwtAuthGuard global**: todos los endpoints administrativos (`/usuarios`, `/roles`, etc.) requieren `Authorization: Bearer <token>`.
-- **Eliminado bypass de contraseña**: se removió un bloque de "compatibilidad" que comparaba la contraseña en texto plano directamente contra el hash — permitía acceso sin credenciales válidas.
-- **JwtStrategy** (`common/auth/jwt.strategy.ts`): extrae y valida el Bearer token, carga el usuario activo de BD.
-
-### Cabeceras y transporte
-
-- `helmet()` activado globalmente en `main.ts` — previene clickjacking, sniffing, XSS headers.
-- CORS restringido a `WEB_BASE_URL` (variable de entorno) — sin origen abierto.
-- Body parser limitado a **1 MB** — previene DoS por payload enorme.
-
-### Rate limiting
-
-- `ThrottlerModule` global: 120 req/min por IP.
-- Login: 10 req/min por IP (`@Throttle`).
-- Recuperación de contraseña: 5 req/min.
-
-### Filtro de excepciones
-
-- `HttpExceptionFilter` global registrado — sanitiza respuestas de error, nunca expone stack traces ni detalles internos.
-- Errores inesperados solo se loguean en servidor, nunca en respuesta HTTP.
-
-### DTOs y validación
-
-- `archivo` en OPS documentos: `@Matches(/^[a-zA-Z0-9_\-\.]+$/)` — previene path traversal (`../../etc/passwd`).
-- `datosPlantilla`: tamaño máximo 32 KB por serialización JSON.
-- `ValidationPipe` global con `whitelist: true, forbidNonWhitelisted: true`.
-
-### Credenciales y secretos
-
-- Credenciales de PostgreSQL movidas de `docker-compose.yml` (texto plano en VCS) a `infra/docker/postgres.env` (gitignoreado).
-- `.env.example` con instrucciones claras para cada variable sensible.
-- `.gitignore` creado en raíz: ignora `.env`, `postgres.env`, `node_modules/`, `dist/`.
-
-### Frontend web
-
-- Interceptor Axios en `services/http/api.ts`: añade automáticamente `Authorization: Bearer <token>` desde `localStorage`.
-- `AuthSession` tipado incluye campo `token: string`.
-
-### Enumeración de rutas
-
-- `GET /` ya no expone el mapa completo de endpoints — responde solo `{ status: 'ok', service: 'gestordoc-api' }`.
-
-### SMTP
-
-- `AuthService` y `UsuariosService`: inicialización del transporter es **lazy** (`initMailTransporter()` retorna `null` si no hay config). La app no crashea al arrancar si SMTP no está configurado; el error se lanza solo al intentar enviar un correo.
+---
 
 ## App móvil (React Native + Expo)
 
@@ -679,150 +643,13 @@ export const API_BASE_URL = 'http://10.0.2.2:3001/api';
 
 ---
 
-## Bitácora de continuidad (OPS cuenta de cobro)
+## Módulo OPS — Cuenta de cobro
 
-Esta sección resume de forma detallada lo implementado en el flujo OPS para que cualquier persona pueda continuar el trabajo sin depender del historial del chat.
+El flujo OPS permite a auxiliares externos solicitar y verificar radicados de cuenta de cobro
+sin necesidad de cuenta en el sistema.
 
-### Objetivo funcional implementado
+**Pantalla principal:** `OpsCuentaCobroScreen` (mobile) / `OpsCuentaCobroUploadPage` (web)
 
-Se habilitó un flujo público para:
+Flujo: verificar radicado → solicitar nuevo radicado → cargar documentos → confirmación.
 
-- Solicitar radicado de cuenta de cobro OPS.
-- Verificar radicado con número de CC.
-- Cargar documentos requeridos por radicado.
-- Capturar y persistir campos de plantilla (campos marcados en verde por negocio) para futura generación de documento final.
-
-### Restricciones y lineamientos solicitados por negocio
-
-Estas son restricciones explícitas que se pidieron durante la implementación y deben mantenerse:
-
-- En login debe existir un acceso visible para verificar radicado.
-- La validación de solicitud debe permitir ingreso manual de radicado y cédula.
-- Debe existir botón Solicitar radicado desde la misma pantalla de validación.
-- Antes de crear el radicado se debe elegir el tipo de radicado.
-- El campo valor a radicar es en pesos.
-- Al escribir valor numérico, el valor en letras se debe generar automáticamente.
-- En turnos no se usa texto libre: cada turno se registra por número, fecha y ERON.
-- Todos los campos del formulario de solicitud deben ser obligatorios.
-- La vista completa debe verse ordenada, amplia y usable, no alargada ni comprimida.
-
-### Funcionalidad implementada (resumen por etapas)
-
-1) Acceso y navegación
-
-- Se agregó botón Verificar radicado en login.
-- Se habilitó la ruta pública de radicación/verificación OPS.
-
-2) Verificación de solicitud
-
-- Se permite validar por número de radicado y número de CC.
-- Si la validación es correcta, se habilita la carga de documentos solicitados.
-
-3) Solicitud de radicado
-
-- Se agregó botón Solicitar radicado en la misma página.
-- Se agregó selector de tipo de radicado (actualmente con opción de cuenta de cobro).
-- Se habilitó creación real de radicado OPS y notificación por correo (según flujo existente).
-
-4) Captura de campos de plantilla (campos verdes)
-
-Se agregaron campos para capturar los datos requeridos de plantilla:
-
-- Establecimiento.
-- Mes y año a radicar.
-- Última fecha del mes.
-- Nombre completo del auxiliar.
-- Cédula.
-- Lugar de expedición de cédula.
-- Valor a radicar en número (pesos).
-- Valor a radicar en letras (autogenerado).
-- Objeto contractual.
-- Fecha de inicio de contrato.
-- Turnos realizados.
-- Cantidad total de turnos (autocalculada).
-- EPS o afiliación.
-- Nombre de coordinadora autorizada.
-- Nota aclaratoria.
-- Teléfono de contacto.
-- Correo de contacto.
-- Confirmación de firma digital obligatoria.
-- Observaciones.
-
-5) Turnos estructurados
-
-- Se reemplazó textarea libre por filas dinámicas.
-- Cada fila exige número, fecha y ERON.
-- Se puede agregar y eliminar turnos.
-- Se valida que no existan filas incompletas.
-- Se mantiene compatibilidad enviando también formato textual consolidado.
-
-6) UX/UI del formulario completo
-
-- Se amplió layout de la página OPS para evitar aspecto estrecho/alargado.
-- Se reorganizó el formulario en grilla de 2 columnas.
-- Secciones visuales agregadas para guiar diligenciamiento:
-	- Datos personales y de radicación.
-	- Contrato y valores.
-	- Turnos, soporte y confirmaciones.
-- Mejoras de espaciado, bloques y jerarquía visual.
-
-### Persistencia y backend
-
-Para soportar el almacenamiento de datos de plantilla:
-
-- Se agregó campo `datosPlantilla` en entidad de radicados (jsonb, nullable).
-- Se extendió DTO de creación OPS para aceptar `datosPlantilla`.
-- Se actualizó servicio de radicados para guardar `datosPlantilla`.
-
-Esto deja lista la base para la siguiente fase de generación automática de documento (Word/PDF).
-
-### Archivos modificados clave
-
-Frontend:
-
-- `apps/web/src/features/auth/LoginPage.tsx`
-- `apps/web/src/features/radicaciones/OpsCuentaCobroUploadPage.tsx`
-- `apps/web/src/features/radicaciones/radicaciones.service.ts`
-- `apps/web/src/styles/global.css`
-
-Backend:
-
-- `services/api/src/modules/radicados/radicado.entity.ts`
-- `services/api/src/modules/radicados/dto/create-cuenta-cobro-ops.dto.ts`
-- `services/api/src/modules/radicados/radicados.service.ts`
-
-### Reglas de validación activas en solicitud OPS
-
-- No se puede generar radicado con campos vacíos.
-- Valor numérico y valor en letras deben existir.
-- El valor en letras se autocompleta desde el número (pesos).
-- Debe existir al menos un turno completo.
-- Cada turno requiere número, fecha y ERON.
-- Cantidad de turnos se calcula automáticamente.
-- Debe confirmarse la firma digital obligatoria.
-
-### Estado operativo observado durante despliegues
-
-- En reinicios de contenedores se observó de forma intermitente `curl: (56) Recv failure: Conexión reinicializada por la máquina remota`.
-- Este error fue transitorio durante recreación de servicios.
-- Reintentos posteriores devolvieron `HTTP/1.1 200 OK` en frontend y estado `ok` en health de API.
-
-Comandos usados de verificación:
-
-```bash
-curl -sS --retry 12 --retry-delay 1 http://127.0.0.1:3001/api/health
-curl -sS --retry 12 --retry-delay 1 -I http://127.0.0.1:3002/radicacion-cuenta-cobro-ops | head -n 1
-```
-
-### Pendiente principal (siguiente fase)
-
-Implementar generación automática del documento final (Word/PDF) usando `datosPlantilla` del radicado, con mapeo exacto de placeholders de la plantilla institucional.
-
-### Nota para continuidad del equipo
-
-Si se retoma el desarrollo, mantener estas premisas:
-
-- No relajar campos obligatorios del formulario OPS sin validación con negocio.
-- Conservar la captura estructurada de turnos (no volver a texto libre).
-- Mantener conversión automática de valor en pesos a letras.
-- Preservar el flujo completo: solicitar radicado, verificar por CC, cargar documentos.
+> Bitácora técnica completa, restricciones de negocio y bugs conocidos: `NOTAS_PRIVADAS.md` (local, no en Git)
