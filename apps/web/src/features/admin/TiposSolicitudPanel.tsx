@@ -36,6 +36,8 @@ interface CampoPlantilla {
   group?: string;
   ocr_target?: string;
   texto?: string;
+  /** Para campos tipo 'file': key del dato que la IA debe encontrar/validar dentro del adjunto */
+  validar_contra?: string;
 }
 
 interface PasoFlujo {
@@ -379,6 +381,18 @@ const BLOQUES_PREDEFINIDOS: Array<{ id: string; nombre: string; descripcion: str
       { key: 'docFacturaViaje', label: 'Adjuntar factura / recibo (avión, taxi, pickup, carro)', type: 'file', required: true, group: 'Viaje' },
     ],
   },
+];
+
+// Documentos simplificados: cada uno agrega SOLO un campo de archivo (con su
+// validación de IA por OCR). Sin campos extra. Para la columna derecha del editor.
+const DOCUMENTOS_PREDEFINIDOS: Array<{ key: string; label: string; emoji: string; ocr_target: string }> = [
+  { key: 'docCedula', label: 'Documento de identidad', emoji: '🪪', ocr_target: 'cedula' },
+  { key: 'docRut', label: 'RUT', emoji: '🧾', ocr_target: 'rut' },
+  { key: 'docEps', label: 'Certificado EPS', emoji: '🏥', ocr_target: 'eps' },
+  { key: 'docAdres', label: 'Certificado ADRES', emoji: '📄', ocr_target: 'adres' },
+  { key: 'docCuentaBancaria', label: 'Certificación bancaria', emoji: '🏦', ocr_target: 'cuenta_bancaria' },
+  { key: 'docPlanilla', label: 'Planilla seguridad social', emoji: '🛡️', ocr_target: 'planilla' },
+  { key: 'docCuentaCobro', label: 'Cuenta de cobro firmada', emoji: '✍️', ocr_target: 'cuenta_cobro' },
 ];
 
 const OCR_TARGETS = [
@@ -962,6 +976,7 @@ export function TiposSolicitudPanel() {
                     plantilla={plantillaPdf}
                     onChange={setPlantillaPdf}
                     campos={campos}
+                    onCamposChange={setCampos}
                     onInsertarConjunto={(conjuntoId, pagina) => {
                       const conjunto = BLOQUES_PREDEFINIDOS.find((b) => b.id === conjuntoId);
                       if (!conjunto) return;
@@ -1058,10 +1073,11 @@ interface EditorProps {
   plantilla: PlantillaPdf;
   onChange: (next: PlantillaPdf) => void;
   campos: CampoPlantilla[];
+  onCamposChange: (next: CampoPlantilla[]) => void;
   onInsertarConjunto: (conjuntoId: string, pagina: number) => void;
 }
 
-function PlantillaPdfEditor({ plantilla, onChange, campos, onInsertarConjunto }: EditorProps) {
+function PlantillaPdfEditor({ plantilla, onChange, campos, onCamposChange, onInsertarConjunto }: EditorProps) {
   const bloques = plantilla.bloques || [];
 
   const [seleccionadoId, setSeleccionadoId] = useState<string | null>(null);
@@ -1141,6 +1157,34 @@ function PlantillaPdfEditor({ plantilla, onChange, campos, onInsertarConjunto }:
     { key: '__ciudad', label: 'Ciudad' },
     ...campos.filter((c) => c.key && c.type !== 'texto-fijo').map((c) => ({ key: c.key, label: c.label })),
   ];
+
+  // --- Gestión de campos desde las columnas izq (datos) y der (documentos) ---
+  const datosIdx = campos.map((c, idx) => ({ c, idx })).filter((x) => x.c.type !== 'file');
+  const docsIdx = campos.map((c, idx) => ({ c, idx })).filter((x) => x.c.type === 'file');
+
+  function patchCampoIdx(idx: number, patch: Partial<CampoPlantilla>) {
+    onCamposChange(campos.map((c, i) => (i === idx ? { ...c, ...patch } : c)));
+  }
+  function eliminarCampoIdx(idx: number) {
+    onCamposChange(campos.filter((_, i) => i !== idx));
+  }
+  function keyUnica(base: string): string {
+    const existentes = new Set(campos.map((c) => c.key));
+    let i = 1;
+    let k = `${base}${i}`;
+    while (existentes.has(k)) { i++; k = `${base}${i}`; }
+    return k;
+  }
+  function agregarDato() {
+    onCamposChange([...campos, { key: keyUnica('dato'), label: 'Nuevo dato', type: 'text', required: true, group: 'Datos' }]);
+  }
+  function agregarDocumentoPredef(d: { key: string; label: string; ocr_target: string }) {
+    if (campos.some((c) => c.key === d.key)) return; // ya existe, no duplicar
+    onCamposChange([...campos, { key: d.key, label: d.label, type: 'file', required: true, group: 'Documentos', ocr_target: d.ocr_target }]);
+  }
+  function agregarDocumentoCustom() {
+    onCamposChange([...campos, { key: keyUnica('doc'), label: 'Nuevo adjunto', type: 'file', required: true, group: 'Documentos' }]);
+  }
 
   // Posición inicial para nuevo bloque: busca un Y libre debajo del último bloque de la página activa
   function nuevaPos(): { x: number; y: number; w: number } {
@@ -1291,53 +1335,6 @@ function PlantillaPdfEditor({ plantilla, onChange, campos, onInsertarConjunto }:
         <button type="button" className="bloque-rapido-btn" title="Código QR que codifica automáticamente el número de radicado de la solicitud." onClick={() => { const p = nuevaPos(); agregar({ id: nuevoId(), ...p, w: 30, tipo: 'qr-radicado', tamano: 30 }); }}>▣ QR Radicado</button>
       </div>
 
-      <div className="plantilla-conjuntos-paleta">
-        <span className="admin-help-text"><strong>📑 Conjuntos predefinidos (agregan campos al form + bloques al PDF):</strong></span>
-        {BLOQUES_PREDEFINIDOS.map((b) => (
-          <button
-            key={b.id}
-            type="button"
-            className="plantilla-conjunto-chip"
-            title={b.descripcion}
-            onClick={() => onInsertarConjunto(b.id, paginaActiva)}
-          >
-            ➕ {b.nombre}
-          </button>
-        ))}
-      </div>
-
-      {campos.length > 0 ? (
-        <div className="plantilla-campos-paleta">
-          <span className="admin-help-text"><strong>Campos del formulario (click para insertar):</strong></span>
-          {campos.filter((c) => c.key && c.type !== 'texto-fijo').map((c) => (
-            <button
-              key={c.key}
-              type="button"
-              className="plantilla-campo-chip"
-              title={`Insertar campo "${c.label}" en la página activa`}
-              onClick={() => {
-                const p = nuevaPos();
-                agregar({
-                  id: nuevoId(),
-                  ...p,
-                  tipo: 'campo',
-                  campoKey: c.key,
-                  etiqueta: `${c.label}:`,
-                  alineacion: 'izquierda',
-                });
-              }}
-            >
-              ➕ {c.label}
-            </button>
-          ))}
-        </div>
-      ) : (
-        <div className="plantilla-campos-paleta plantilla-campos-vacio">
-          <span className="admin-help-text">
-            ⓘ Aún no has definido campos del formulario en la sección 3. Defínelos arriba y aparecerán aquí para insertarlos.
-          </span>
-        </div>
-      )}
       {idsSuperpuestos.size > 0 && !ocultarOverlap ? (
         <div className="plantilla-overlap-aviso">
           <span>⚠ {idsSuperpuestos.size} bloque(s) cercanos. Puedes seguir editando.</span>
@@ -1416,10 +1413,59 @@ function PlantillaPdfEditor({ plantilla, onChange, campos, onInsertarConjunto }:
         </div>
       ) : null}
 
-      <div className="plantilla-workspace">
-        <div className="plantilla-page" ref={pageRef} style={{ width: 210 * SCALE, height: 297 * SCALE }} onClick={() => setSeleccionadoId(null)}>
-          <div className="plantilla-page-num">Página {paginaActiva} de {totalPaginas}</div>
-          {bloques.filter((b) => (b.pagina ?? 1) === paginaActiva).map((b) => {
+      <div className="plantilla-3col">
+        {/* IZQUIERDA: datos que llena el solicitante */}
+        <div className="plantilla-col-datos">
+          <div className="plantilla-col-head">
+            <strong>🧾 Datos del solicitante</strong>
+            <button type="button" className="admin-ghost-button" onClick={agregarDato}>+ Dato</button>
+          </div>
+          <p className="admin-help-text">Lo que diligencia el solicitante. Toca ↘ para colocarlo en la hoja.</p>
+          {datosIdx.length === 0 ? <p className="admin-help-text">Sin datos aún. Agrega uno con “+ Dato”.</p> : null}
+          {datosIdx.map(({ c, idx }) => (
+            <div key={idx} className="plantilla-campo-item">
+              <div className="plantilla-campo-item-row">
+                <input
+                  className="plantilla-campo-item-label"
+                  type="text"
+                  value={c.label}
+                  placeholder="Etiqueta (ej. Nombre)"
+                  onChange={(e) => patchCampoIdx(idx, { label: e.target.value })}
+                />
+                <button
+                  type="button"
+                  className="plantilla-campo-insertar"
+                  title="Colocar este dato en la hoja activa"
+                  onClick={() => { const pos = nuevaPos(); agregar({ id: nuevoId(), ...pos, tipo: 'campo', campoKey: c.key, etiqueta: `${c.label}:`, alineacion: 'izquierda' }); }}
+                >↘</button>
+                <button type="button" className="campo-modulo-del" title="Eliminar dato" onClick={() => eliminarCampoIdx(idx)}>🗑</button>
+              </div>
+              <div className="plantilla-campo-item-row">
+                <select value={c.type} onChange={(e) => patchCampoIdx(idx, { type: e.target.value as CampoPlantilla['type'] })}>
+                  {TIPOS_CAMPO.filter((t) => t.v !== 'file').map((t) => <option key={t.v} value={t.v}>{t.l}</option>)}
+                </select>
+                <button
+                  type="button"
+                  className={`campo-req-toggle${c.required ? ' on' : ''}`}
+                  onClick={() => patchCampoIdx(idx, { required: !c.required })}
+                >{c.required ? '● Obligatorio' : '○ Opcional'}</button>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* CENTRO: todas las hojas de la plantilla */}
+        <div className="plantilla-col-hojas">
+        {Array.from({ length: totalPaginas }, (_, i) => i + 1).map((pg) => (
+        <div
+          key={pg}
+          className={`plantilla-page${pg === paginaActiva ? ' activa' : ''}`}
+          ref={pg === paginaActiva ? pageRef : undefined}
+          style={{ width: 210 * SCALE, height: 297 * SCALE }}
+          onClick={() => { setPaginaActiva(pg); setSeleccionadoId(null); }}
+        >
+          <div className="plantilla-page-num">Página {pg} de {totalPaginas}</div>
+          {bloques.filter((b) => (b.pagina ?? 1) === pg).map((b) => {
             const left = b.x * SCALE;
             const top = b.y * SCALE;
             const width = (b.w || 100) * SCALE;
@@ -1511,8 +1557,67 @@ function PlantillaPdfEditor({ plantilla, onChange, campos, onInsertarConjunto }:
             );
           })}
         </div>
+        ))}
+        </div>{/* fin col-hojas */}
 
-        <aside className="plantilla-edit-panel">
+        {/* DERECHA: documentos a adjuntar + validación IA */}
+        <div className="plantilla-col-docs">
+          <div className="plantilla-col-head">
+            <strong>📎 Documentos a adjuntar</strong>
+            <button type="button" className="admin-ghost-button" onClick={agregarDocumentoCustom}>+ Adjunto</button>
+          </div>
+          <p className="admin-help-text">Lo que sube el solicitante; la IA valida que el adjunto corresponda.</p>
+          <div className="plantilla-docs-rapidos">
+            {DOCUMENTOS_PREDEFINIDOS.map((d) => {
+              const ya = campos.some((c) => c.key === d.key);
+              return (
+                <button
+                  key={d.key}
+                  type="button"
+                  className="plantilla-doc-chip"
+                  disabled={ya}
+                  title={ya ? 'Ya agregado' : `Agregar ${d.label}`}
+                  onClick={() => agregarDocumentoPredef(d)}
+                >
+                  {d.emoji} {d.label}{ya ? ' ✓' : ''}
+                </button>
+              );
+            })}
+          </div>
+          {docsIdx.length === 0 ? <p className="admin-help-text">Sin documentos aún. Usa los botones de arriba o “+ Adjunto”.</p> : null}
+          {docsIdx.map(({ c, idx }) => (
+            <div key={idx} className="plantilla-campo-item">
+              <div className="plantilla-campo-item-row">
+                <input
+                  className="plantilla-campo-item-label"
+                  type="text"
+                  value={c.label}
+                  placeholder="Nombre del documento"
+                  onChange={(e) => patchCampoIdx(idx, { label: e.target.value })}
+                />
+                <button type="button" className="campo-modulo-del" title="Eliminar adjunto" onClick={() => eliminarCampoIdx(idx)}>🗑</button>
+              </div>
+              <label className="plantilla-campo-mini-label">Qué documento es (para la IA)</label>
+              <select value={c.ocr_target ?? ''} onChange={(e) => patchCampoIdx(idx, { ocr_target: e.target.value || undefined })}>
+                {OCR_TARGETS.map((t) => <option key={t.v} value={t.v}>{t.l}</option>)}
+              </select>
+              <label className="plantilla-campo-mini-label">Dato que la IA debe verificar dentro del adjunto</label>
+              <select value={c.validar_contra ?? ''} onChange={(e) => patchCampoIdx(idx, { validar_contra: e.target.value || undefined })}>
+                <option value="">— ninguno —</option>
+                {datosIdx.map(({ c: dc }) => <option key={dc.key} value={dc.key}>{dc.label}</option>)}
+              </select>
+              <button
+                type="button"
+                className={`campo-req-toggle${c.required ? ' on' : ''}`}
+                onClick={() => patchCampoIdx(idx, { required: !c.required })}
+              >{c.required ? '● Obligatorio' : '○ Opcional'}</button>
+            </div>
+          ))}
+        </div>
+      </div>{/* fin plantilla-3col */}
+
+      {sel ? (
+        <aside className="plantilla-edit-panel plantilla-bloque-props">
           {!sel ? (
             <p className="admin-help-text">Selecciona un bloque del documento para editar sus propiedades.</p>
           ) : (
@@ -1675,7 +1780,7 @@ function PlantillaPdfEditor({ plantilla, onChange, campos, onInsertarConjunto }:
             </>
           )}
         </aside>
-      </div>
+      ) : null}
 
       <PreviewFormularioModal
         open={previewFormOpen}

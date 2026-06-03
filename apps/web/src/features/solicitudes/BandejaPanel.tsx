@@ -59,6 +59,75 @@ interface Detalle {
 
 interface AreaMini { id: number; nombre: string; activo: boolean }
 
+// --- Formateo legible de valores diligenciados (evita mostrar JSON crudo) ---
+function parseMaybeJson(v: unknown): unknown {
+  if (v && typeof v === 'object') return v;
+  if (typeof v === 'string') {
+    const s = v.trim();
+    if ((s.startsWith('{') && s.endsWith('}')) || (s.startsWith('[') && s.endsWith(']'))) {
+      try { return JSON.parse(s); } catch { /* no era JSON */ }
+    }
+  }
+  return v;
+}
+
+interface DireccionLike {
+  direccion?: string; ciudad?: string; pais?: string; localidad?: string;
+  codigoPostal?: string; lat?: number; lon?: number;
+  tipoViaje?: string; origen?: DireccionLike;
+}
+
+function textoDireccion(o: DireccionLike): string {
+  return [o.direccion, o.localidad, o.ciudad, o.pais].filter(Boolean).join(', ')
+    + (o.codigoPostal ? ` · CP ${o.codigoPostal}` : '');
+}
+
+interface ValorFormateado { texto: string; lat?: number; lon?: number; origen?: { texto: string; lat?: number; lon?: number } }
+
+function formatearValor(c: CampoPlantilla, value: unknown): ValorFormateado {
+  if (value == null || value === '') return { texto: '—' };
+  if (c.type === 'direccion') {
+    const o = parseMaybeJson(value) as DireccionLike;
+    if (o && typeof o === 'object') {
+      const res: ValorFormateado = { texto: textoDireccion(o) || '—', lat: o.lat, lon: o.lon };
+      if (o.origen && (o.tipoViaje === 'solo_ida' || o.tipoViaje === 'ida_y_vuelta')) {
+        res.origen = { texto: textoDireccion(o.origen), lat: o.origen.lat, lon: o.origen.lon };
+      }
+      return res;
+    }
+  }
+  if (c.type === 'valor-pesos') {
+    const n = typeof value === 'number' ? value : Number(String(value).replace(/[^\d.-]/g, ''));
+    if (!Number.isNaN(n) && n > 0) {
+      return { texto: n.toLocaleString('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }) };
+    }
+  }
+  const parsed = parseMaybeJson(value);
+  if (parsed && typeof parsed === 'object') {
+    // Objeto genérico: mostrar "clave: valor" legible en vez de JSON crudo
+    const pares = Object.entries(parsed as Record<string, unknown>)
+      .filter(([, v]) => v != null && v !== '' && typeof v !== 'object')
+      .map(([k, v]) => `${k}: ${String(v)}`);
+    return { texto: pares.length ? pares.join(' · ') : '—' };
+  }
+  return { texto: String(value) };
+}
+
+interface DocFormateado { texto: string; url?: string; confianza?: number }
+function formatearDocumento(v: unknown): DocFormateado | null {
+  const o = parseMaybeJson(v);
+  if (o == null || o === '') return null;
+  if (typeof o === 'string') return { texto: o, url: o.startsWith('http') || o.startsWith('data:') ? o : undefined };
+  if (typeof o === 'object') {
+    const r = o as Record<string, unknown>;
+    const nombre = (r.nombre || r.filename || r.name || 'archivo adjunto') as string;
+    const url = (r.url || r.src || r.dataUrl) as string | undefined;
+    const confianza = typeof r.ocrConfianza === 'number' ? r.ocrConfianza : undefined;
+    return { texto: nombre, url, confianza };
+  }
+  return { texto: String(v) };
+}
+
 export function BandejaPanel() {
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(false);
@@ -212,25 +281,67 @@ export function BandejaPanel() {
                     <div className="bandeja-datos">
                       {detalle.camposPlantilla
                         .filter((c) => c.type !== 'file')
-                        .map((c) => (
-                          <div key={c.key} className="bandeja-dato">
-                            <span className="admin-help-text">{c.label}</span>
-                            <strong>{String(detalle.datosFormulario[c.key] ?? '—')}</strong>
-                          </div>
-                        ))}
+                        .map((c) => {
+                          const f = formatearValor(c, detalle.datosFormulario[c.key]);
+                          return (
+                            <div key={c.key} className="bandeja-dato">
+                              <span className="admin-help-text">{c.label}</span>
+                              {f.origen ? (
+                                <>
+                                  <strong>
+                                    De: {f.origen.texto}
+                                    {f.origen.lat != null && f.origen.lon != null ? (
+                                      <a className="bandeja-mapa-link" href={`https://www.openstreetmap.org/?mlat=${f.origen.lat}&mlon=${f.origen.lon}&zoom=16`} target="_blank" rel="noopener noreferrer"> 🗺️</a>
+                                    ) : null}
+                                  </strong>
+                                  <strong>
+                                    A: {f.texto}
+                                    {f.lat != null && f.lon != null ? (
+                                      <a className="bandeja-mapa-link" href={`https://www.openstreetmap.org/?mlat=${f.lat}&mlon=${f.lon}&zoom=16`} target="_blank" rel="noopener noreferrer"> 🗺️</a>
+                                    ) : null}
+                                  </strong>
+                                </>
+                              ) : (
+                                <strong>
+                                  {f.texto}
+                                  {f.lat != null && f.lon != null ? (
+                                    <a className="bandeja-mapa-link" href={`https://www.openstreetmap.org/?mlat=${f.lat}&mlon=${f.lon}&zoom=16`} target="_blank" rel="noopener noreferrer"> 🗺️ ver en mapa</a>
+                                  ) : null}
+                                </strong>
+                              )}
+                            </div>
+                          );
+                        })}
                     </div>
 
                     <h4>Documentos adjuntos</h4>
                     <ul className="bandeja-docs">
+                      {detalle.camposPlantilla.filter((c) => c.type === 'file').length === 0 ? (
+                        <li><em className="admin-help-text">Este tipo de solicitud no pide documentos adjuntos.</em></li>
+                      ) : null}
                       {detalle.camposPlantilla
                         .filter((c) => c.type === 'file')
-                        .map((c) => (
-                          <li key={c.key}>
-                            <strong>{c.label}:</strong>{' '}
-                            {detalle.documentos[c.key] ? String(detalle.documentos[c.key]) : <em>no adjuntado</em>}
-                            {c.ocr_target ? <span className="admin-help-text"> · esperado: {etiquetaDocumento(c.ocr_target)}</span> : null}
-                          </li>
-                        ))}
+                        .map((c) => {
+                          const doc = formatearDocumento(detalle.documentos[c.key]);
+                          return (
+                            <li key={c.key}>
+                              <strong>{c.label}:</strong>{' '}
+                              {doc ? (
+                                doc.url ? (
+                                  <a href={doc.url} target="_blank" rel="noopener noreferrer">📎 {doc.texto}</a>
+                                ) : (
+                                  <span>📎 {doc.texto}</span>
+                                )
+                              ) : (
+                                <em className="admin-help-text">no adjuntado</em>
+                              )}
+                              {doc?.confianza != null ? (
+                                <span className="admin-help-text"> · IA: {Math.round(doc.confianza)}% de coincidencia</span>
+                              ) : null}
+                              {c.ocr_target ? <span className="admin-help-text"> · esperado: {etiquetaDocumento(c.ocr_target)}</span> : null}
+                            </li>
+                          );
+                        })}
                     </ul>
 
                     <h4>Trazabilidad</h4>
