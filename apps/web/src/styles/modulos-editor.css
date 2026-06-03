@@ -1,0 +1,163 @@
+/* Editor de campos como tarjetas-módulo (sección 3 del editor de tipos). */
+
+.campos-modulos-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.campo-modulo-card {
+  display: grid;
+  grid-template-columns: 28px 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid rgba(212, 175, 55, 0.35);
+  border-radius: 12px;
+  background: rgba(212, 175, 55, 0.05);
+  transition: box-shadow 0.15s ease, transform 0.1s ease, opacity 0.15s ease;
+}
+
+.campo-modulo-card:hover {
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+  border-color: rgba(212, 175, 55, 0.6);
+}
+
+.campo-modulo-card.dragging {
+  opacity: 0.5;
+  transform: scale(0.99);
+  border-style: dashed;
+}
+
+.campo-modulo-drag {
+  cursor: grab;
+  font-size: 18px;
+  line-height: 1;
+  text-align: center;
+  color: #b8901f;
+  user-select: none;
+  padding: 6px 2px;
+}
+.campo-modulo-drag:active {
+  cursor: grabbing;
+}
+
+.campo-modulo-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.campo-modulo-linea {
+  display: grid;
+  grid-template-columns: 1fr 220px;
+  gap: 8px;
+}
+.campo-modulo-linea-sec {
+  grid-template-columns: 1fr 1fr 1fr;
+}
+
+.campo-modulo-linea input,
+.campo-modulo-linea select {
+  width: 100%;
+  min-width: 0;
+}
+
+.campo-modulo-label {
+  font-weight: 600;
+}
+
+.campo-modulo-acciones {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  min-width: 130px;
+}
+
+/* Toggle obligatorio / opcional bien visible */
+.campo-req-toggle {
+  cursor: pointer;
+  border: 1px solid rgba(120, 120, 120, 0.4);
+  background: rgba(120, 120, 120, 0.12);
+  color: inherit;
+  border-radius: 999px;
+  padding: 7px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.campo-req-toggle.on {
+  border-color: #166534;
+  background: rgba(22, 101, 52, 0.16);
+  color: #15803d;
+}
+.campo-req-toggle:not(.on) {
+  border-color: rgba(120, 120, 120, 0.5);
+  color: #6b7280;
+}
+
+.campo-modulo-del {
+  cursor: pointer;
+  border: 1px solid rgba(190, 60, 60, 0.4);
+  background: rgba(190, 60, 60, 0.1);
+  color: #b91c1c;
+  border-radius: 8px;
+  padding: 7px 10px;
+  font-size: 14px;
+  transition: background 0.15s ease;
+}
+.campo-modulo-del:hover {
+  background: rgba(190, 60, 60, 0.2);
+}
+
+@media (max-width: 720px) {
+  .campo-modulo-card {
+    grid-template-columns: 24px 1fr;
+  }
+  .campo-modulo-acciones {
+    grid-column: 1 / -1;
+    flex-direction: row;
+    justify-content: flex-end;
+  }
+  .campo-modulo-linea,
+  .campo-modulo-linea-sec {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Marcadores de lugares (POIs) en el mapa */
+.mapa-pois-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0;
+  align-items: center;
+}
+.mapa-poi-chip {
+  cursor: pointer;
+  border: 1px solid rgba(212, 175, 55, 0.45);
+  background: rgba(212, 175, 55, 0.08);
+  color: inherit;
+  border-radius: 999px;
+  padding: 5px 11px;
+  font-size: 12px;
+  font-weight: 600;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.mapa-poi-chip:hover {
+  background: rgba(212, 175, 55, 0.18);
+}
+.mapa-poi-chip.active {
+  background: #d4af37;
+  border-color: #b8901f;
+  color: #0f172a;
+}
+.mapa-poi-estado {
+  font-size: 12px;
+  color: #6b7280;
+}

@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { api } from '../../services/http/api';
 import { descargarPreviewPlantilla } from '../solicitudes/generarPdfFormato';
 import { PreviewFormularioModal } from '../../components/PreviewFormularioModal';
+import '../../styles/modulos-editor.css';
 
 interface Area {
   id: number;
@@ -414,6 +415,7 @@ export function TiposSolicitudPanel() {
   const [activo, setActivo] = useState(true);
   const [orden, setOrden] = useState<number | ''>(0);
   const [campos, setCampos] = useState<CampoPlantilla[]>([]);
+  const [dragCampoIdx, setDragCampoIdx] = useState<number | null>(null);
   const [flujo, setFlujo] = useState<PasoFlujo[]>(FLUJO_DEFAULT);
 
   const [areasParticipantes, setAreasParticipantes] = useState<number[]>([]);
@@ -556,6 +558,15 @@ export function TiposSolicitudPanel() {
   }
   function eliminarCampo(idx: number) {
     setCampos((prev) => prev.filter((_, i) => i !== idx));
+  }
+  function moverCampo(from: number, to: number) {
+    if (from === to) return;
+    setCampos((prev) => {
+      const next = [...prev];
+      const [m] = next.splice(from, 1);
+      next.splice(to, 0, m);
+      return next;
+    });
   }
   function agregarPaso() {
     setFlujo((prev) => [...prev, { rol: '', label: '', orden: prev.length + 1 }]);
@@ -861,25 +872,59 @@ export function TiposSolicitudPanel() {
                   Datos que se piden al solicitante. En archivos, elige el documento esperado para que la IA valide automáticamente. Los conjuntos predefinidos (Datos personales, RUT, EPS, anexos…) ahora se insertan desde el editor de plantilla, sección 5.
                 </p>
                 {campos.length === 0 ? <p className="admin-help-text">Sin campos. Agrega al menos uno o usa los conjuntos predefinidos del editor de plantilla (sección 5).</p> : null}
-                {campos.map((c, idx) => (
-                  <div key={idx} className="admin-campo-row">
-                    <input type="text" placeholder="key" value={c.key} onChange={(e) => actualizarCampo(idx, { key: e.target.value })} />
-                    <input type="text" placeholder="Etiqueta" value={c.label} onChange={(e) => actualizarCampo(idx, { label: e.target.value })} />
-                    <select value={c.type} onChange={(e) => actualizarCampo(idx, { type: e.target.value as CampoPlantilla['type'] })}>
-                      {TIPOS_CAMPO.map((t) => <option key={t.v} value={t.v}>{t.l}</option>)}
-                    </select>
-                    <input type="text" placeholder="Grupo" value={c.group ?? ''} onChange={(e) => actualizarCampo(idx, { group: e.target.value })} />
-                    {c.type === 'file' ? (
-                      <select value={c.ocr_target ?? ''} onChange={(e) => actualizarCampo(idx, { ocr_target: e.target.value || undefined })}>
-                        {OCR_TARGETS.map((t) => <option key={t.v} value={t.v}>{t.l}</option>)}
-                      </select>
-                    ) : <span />}
-                    <label className="ops-checkbox">
-                      <input type="checkbox" checked={c.required} onChange={(e) => actualizarCampo(idx, { required: e.target.checked })} /> Obligatorio
-                    </label>
-                    <button type="button" className="admin-ghost-button" onClick={() => eliminarCampo(idx)}>Eliminar</button>
-                  </div>
-                ))}
+                <div className="campos-modulos-lista">
+                  {campos.map((c, idx) => (
+                    <div
+                      key={idx}
+                      className={`campo-modulo-card${dragCampoIdx === idx ? ' dragging' : ''}`}
+                      draggable
+                      onDragStart={() => setDragCampoIdx(idx)}
+                      onDragOver={(e) => e.preventDefault()}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        if (dragCampoIdx !== null) moverCampo(dragCampoIdx, idx);
+                        setDragCampoIdx(null);
+                      }}
+                      onDragEnd={() => setDragCampoIdx(null)}
+                    >
+                      <div className="campo-modulo-drag" title="Arrastra para reordenar" aria-hidden="true">⠿</div>
+                      <div className="campo-modulo-body">
+                        <div className="campo-modulo-linea">
+                          <input
+                            className="campo-modulo-label"
+                            type="text"
+                            placeholder="Etiqueta visible (ej. Número de cuenta)"
+                            value={c.label}
+                            onChange={(e) => actualizarCampo(idx, { label: e.target.value })}
+                          />
+                          <select value={c.type} onChange={(e) => actualizarCampo(idx, { type: e.target.value as CampoPlantilla['type'] })}>
+                            {TIPOS_CAMPO.map((t) => <option key={t.v} value={t.v}>{t.l}</option>)}
+                          </select>
+                        </div>
+                        <div className="campo-modulo-linea campo-modulo-linea-sec">
+                          <input type="text" placeholder="key (ej. numeroCuenta)" value={c.key} onChange={(e) => actualizarCampo(idx, { key: e.target.value })} />
+                          <input type="text" placeholder="Grupo (ej. Cuenta bancaria)" value={c.group ?? ''} onChange={(e) => actualizarCampo(idx, { group: e.target.value })} />
+                          {c.type === 'file' ? (
+                            <select value={c.ocr_target ?? ''} onChange={(e) => actualizarCampo(idx, { ocr_target: e.target.value || undefined })}>
+                              {OCR_TARGETS.map((t) => <option key={t.v} value={t.v}>{t.l}</option>)}
+                            </select>
+                          ) : null}
+                        </div>
+                      </div>
+                      <div className="campo-modulo-acciones">
+                        <button
+                          type="button"
+                          className={`campo-req-toggle${c.required ? ' on' : ''}`}
+                          onClick={() => actualizarCampo(idx, { required: !c.required })}
+                          title="Cambiar entre obligatorio y opcional"
+                        >
+                          {c.required ? '● Obligatorio' : '○ Opcional'}
+                        </button>
+                        <button type="button" className="campo-modulo-del" onClick={() => eliminarCampo(idx)} title="Eliminar campo">🗑</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </section>
 
               {/* SECCIÓN 4: Flujo de aprobación por niveles */}
@@ -1231,19 +1276,19 @@ function PlantillaPdfEditor({ plantilla, onChange, campos, onInsertarConjunto }:
         >
           📝 Cómo se ve el formulario
         </button>
-        <span className="admin-help-text" style={{ marginLeft: 8 }}><strong>Agregar bloque:</strong></span>
-        <button type="button" className="bloque-rapido-btn" onClick={() => { const p = nuevaPos(); agregar({ id: nuevoId(), ...p, w: 40, tipo: 'logo', alineacion: 'izquierda', ancho: 36, src: '/logo-payops-dark.png' }); }}>+ Logo</button>
-        <button type="button" className="bloque-rapido-btn" onClick={() => { const p = nuevaPos(); agregar({ id: nuevoId(), ...p, tipo: 'titulo', texto: 'Nuevo título', alineacion: 'centro', tamano: 14, negrita: true }); }}>+ Título</button>
-        <button type="button" className="bloque-rapido-btn" onClick={() => { const p = nuevaPos(); agregar({ id: nuevoId(), ...p, tipo: 'texto', texto: 'Texto del documento', alineacion: 'izquierda', tamano: 11 }); }}>+ Texto</button>
-        <button type="button" className="bloque-rapido-btn" onClick={() => { const p = nuevaPos(); agregar({ id: nuevoId(), ...p, tipo: 'campo', campoKey: camposDisponibles[0]?.key || '__nombre', etiqueta: 'Campo:', alineacion: 'izquierda' }); }}>+ Campo</button>
-        <button type="button" className="bloque-rapido-btn" onClick={() => { const p = nuevaPos(); agregar({ id: nuevoId(), ...p, w: 170, tipo: 'tabla', columnas: ['FECHA', 'ITEM', 'VALOR'] }); }}>+ Tabla</button>
-        <button type="button" className="bloque-rapido-btn" onClick={() => { const p = nuevaPos(); agregar({ id: nuevoId(), ...p, w: 170, tipo: 'divider' }); }}>+ Línea</button>
-        <button type="button" className="bloque-rapido-btn" onClick={() => { const p = nuevaPos(); agregar({ id: nuevoId(), ...p, w: 70, tipo: 'firma', etiqueta: 'Firma', campoFirma: 'profesional' }); }}>+ Firma</button>
-        <button type="button" className="bloque-rapido-btn" onClick={() => { const p = nuevaPos(); agregar({ id: nuevoId(), ...p, w: 80, tipo: 'caja', alto: 30, relleno: false, etiqueta: '' }); }}>+ Caja</button>
-        <button type="button" className="bloque-rapido-btn" onClick={() => { const p = nuevaPos(); agregar({ id: nuevoId(), ...p, w: 60, tipo: 'imagen', src: '' }); }}>+ Imagen</button>
-        <button type="button" className="bloque-rapido-btn" onClick={() => { const p = nuevaPos(); agregar({ id: nuevoId(), ...p, w: 120, tipo: 'lista', items: ['Item 1', 'Item 2', 'Item 3'], conVinetas: true }); }}>+ Lista</button>
-        <button type="button" className="bloque-rapido-btn" onClick={() => { const p = nuevaPos(); agregar({ id: nuevoId(), ...p, w: 170, tipo: 'separador-doble' }); }}>+ Doble línea</button>
-        <button type="button" className="bloque-rapido-btn" onClick={() => { const p = nuevaPos(); agregar({ id: nuevoId(), ...p, w: 30, tipo: 'qr-radicado', tamano: 30 }); }}>+ QR Radicado</button>
+        <span className="admin-help-text" style={{ marginLeft: 8 }}><strong>Agregar bloque:</strong> <span style={{ fontWeight: 400 }}>(pasa el mouse para ver qué hace cada uno)</span></span>
+        <button type="button" className="bloque-rapido-btn" title="Inserta el logo de Goleman IPS. Puedes cambiar la imagen y la alineación en el panel derecho." onClick={() => { const p = nuevaPos(); agregar({ id: nuevoId(), ...p, w: 40, tipo: 'logo', alineacion: 'izquierda', ancho: 36, src: '/logo-payops-dark.png' }); }}>🏷️ Logo</button>
+        <button type="button" className="bloque-rapido-btn" title="Texto grande de encabezado (ej. el nombre del documento). Configura tamaño y negrita." onClick={() => { const p = nuevaPos(); agregar({ id: nuevoId(), ...p, tipo: 'titulo', texto: 'Nuevo título', alineacion: 'centro', tamano: 14, negrita: true }); }}>🅷 Título</button>
+        <button type="button" className="bloque-rapido-btn" title="Párrafo de texto normal. Admite variables como {{nombre}}, {{fecha}}, {{valor}}." onClick={() => { const p = nuevaPos(); agregar({ id: nuevoId(), ...p, tipo: 'texto', texto: 'Texto del documento', alineacion: 'izquierda', tamano: 11 }); }}>📝 Texto</button>
+        <button type="button" className="bloque-rapido-btn" title="Muestra el valor de un campo del formulario (ej. Número de cuenta) con su etiqueta." onClick={() => { const p = nuevaPos(); agregar({ id: nuevoId(), ...p, tipo: 'campo', campoKey: camposDisponibles[0]?.key || '__nombre', etiqueta: 'Campo:', alineacion: 'izquierda' }); }}>🔗 Campo</button>
+        <button type="button" className="bloque-rapido-btn" title="Tabla con columnas (ej. Fecha / Ítem / Valor) para detallar conceptos." onClick={() => { const p = nuevaPos(); agregar({ id: nuevoId(), ...p, w: 170, tipo: 'tabla', columnas: ['FECHA', 'ITEM', 'VALOR'] }); }}>▦ Tabla</button>
+        <button type="button" className="bloque-rapido-btn" title="Línea horizontal para separar secciones del documento." onClick={() => { const p = nuevaPos(); agregar({ id: nuevoId(), ...p, w: 170, tipo: 'divider' }); }}>─ Línea</button>
+        <button type="button" className="bloque-rapido-btn" title="Espacio de firma con línea y etiqueta (solicitante, coordinador o área final)." onClick={() => { const p = nuevaPos(); agregar({ id: nuevoId(), ...p, w: 70, tipo: 'firma', etiqueta: 'Firma', campoFirma: 'profesional' }); }}>✍ Firma</button>
+        <button type="button" className="bloque-rapido-btn" title="Recuadro vacío o relleno para resaltar o dejar un espacio en blanco." onClick={() => { const p = nuevaPos(); agregar({ id: nuevoId(), ...p, w: 80, tipo: 'caja', alto: 30, relleno: false, etiqueta: '' }); }}>▭ Caja</button>
+        <button type="button" className="bloque-rapido-btn" title="Inserta una imagen desde una URL (sello, foto, gráfico…)." onClick={() => { const p = nuevaPos(); agregar({ id: nuevoId(), ...p, w: 60, tipo: 'imagen', src: '' }); }}>🖼️ Imagen</button>
+        <button type="button" className="bloque-rapido-btn" title="Lista de puntos (con o sin viñetas), ej. requisitos o documentos." onClick={() => { const p = nuevaPos(); agregar({ id: nuevoId(), ...p, w: 120, tipo: 'lista', items: ['Item 1', 'Item 2', 'Item 3'], conVinetas: true }); }}>☰ Lista</button>
+        <button type="button" className="bloque-rapido-btn" title="Doble línea dorada decorativa para separar secciones." onClick={() => { const p = nuevaPos(); agregar({ id: nuevoId(), ...p, w: 170, tipo: 'separador-doble' }); }}>═ Doble línea</button>
+        <button type="button" className="bloque-rapido-btn" title="Código QR que codifica automáticamente el número de radicado de la solicitud." onClick={() => { const p = nuevaPos(); agregar({ id: nuevoId(), ...p, w: 30, tipo: 'qr-radicado', tamano: 30 }); }}>▣ QR Radicado</button>
       </div>
 
       <div className="plantilla-conjuntos-paleta">

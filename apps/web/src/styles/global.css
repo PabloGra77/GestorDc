@@ -6960,6 +6960,68 @@ textarea {
 }
 .direccion-clima-info strong { font-size: 14px; }
 
+/* Explorador de lugares cercanos + enlaces de viaje */
+.direccion-lugares,
+.direccion-viaje {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid var(--gold-line, rgba(212, 175, 55, 0.45));
+  background: rgba(7, 11, 29, 0.35);
+}
+[data-theme="light"] .direccion-lugares,
+[data-theme="light"] .direccion-viaje {
+  background: #FFFFFF;
+}
+.direccion-lugares-chips,
+.direccion-viaje-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.direccion-lugar-chip,
+.direccion-viaje-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  font-size: 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(212, 175, 55, 0.45);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.direccion-lugar-chip:hover,
+.direccion-viaje-link:hover {
+  background: rgba(212, 175, 55, 0.15);
+  border-color: var(--gold-bright, #D4AF37);
+}
+.direccion-lugar-chip.active {
+  background: var(--gold-bright, #D4AF37);
+  color: #070B1D;
+  border-color: var(--gold-bright, #D4AF37);
+  font-weight: 600;
+}
+.direccion-lugares-lista {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 2px;
+  font-size: 12px;
+  max-height: 160px;
+  overflow-y: auto;
+}
+.direccion-lugares-lista a {
+  color: var(--gold-bright, #D4AF37);
+  text-decoration: none;
+}
+.direccion-lugares-lista a:hover { text-decoration: underline; }
+
 /* Bandeja: fila de "remitir a otra area" */
 .bandeja-remitir-row {
   display: flex;

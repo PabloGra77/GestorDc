@@ -5,14 +5,21 @@ type LeafletGlobal = {
   map: (el: HTMLElement) => LeafletMapInstance;
   tileLayer: (url: string, opts: Record<string, unknown>) => { addTo: (m: LeafletMapInstance) => unknown };
   marker: (latlng: [number, number], opts?: { draggable?: boolean }) => LeafletMarkerInstance;
+  circleMarker: (latlng: [number, number], opts?: Record<string, unknown>) => LeafletLayerInstance;
 };
 type LeafletMapInstance = {
   setView: (latlng: [number, number], zoom: number) => LeafletMapInstance;
   remove: () => void;
+  removeLayer: (layer: LeafletLayerInstance) => void;
   on: (evt: string, cb: (e: { latlng: { lat: number; lng: number } }) => void) => void;
+};
+type LeafletLayerInstance = {
+  addTo: (m: LeafletMapInstance) => LeafletLayerInstance;
+  bindPopup: (html: string) => LeafletLayerInstance;
 };
 type LeafletMarkerInstance = {
   addTo: (m: LeafletMapInstance) => LeafletMarkerInstance;
+  bindPopup: (html: string) => LeafletMarkerInstance;
   setLatLng: (latlng: [number, number] | { lat: number; lng: number }) => LeafletMarkerInstance;
   getLatLng: () => { lat: number; lng: number };
   on: (evt: string, cb: () => void) => void;
@@ -55,18 +62,26 @@ function cargarLeaflet(): Promise<void> {
   return leafletLoading;
 }
 
+export interface LugarMapa {
+  lat: number;
+  lon: number;
+  nombre: string;
+}
+
 interface Props {
   lat: number;
   lon: number;
   zoom?: number;
   onMover?: (coords: { lat: number; lon: number }) => void;
   alto?: number;
+  pois?: LugarMapa[];
 }
 
-export function MapaInteractivo({ lat, lon, zoom = 16, onMover, alto = 280 }: Props) {
+export function MapaInteractivo({ lat, lon, zoom = 16, onMover, alto = 280, pois }: Props) {
   const contenedorRef = useRef<HTMLDivElement | null>(null);
   const mapaRef = useRef<LeafletMapInstance | null>(null);
   const markerRef = useRef<LeafletMarkerInstance | null>(null);
+  const poiLayersRef = useRef<LeafletLayerInstance[]>([]);
   const [listo, setListo] = useState(false);
 
   useEffect(() => {
@@ -113,6 +128,31 @@ export function MapaInteractivo({ lat, lon, zoom = 16, onMover, alto = 280 }: Pr
     markerRef.current.setLatLng([lat, lon]);
     mapaRef.current.setView([lat, lon], zoom);
   }, [lat, lon, zoom]);
+
+  // Pinta los lugares (POIs) como puntos dorados con popup del nombre
+  useEffect(() => {
+    const mapa = mapaRef.current;
+    const L = window.L;
+    if (!listo || !mapa || !L) return;
+    // Limpia los marcadores de lugares anteriores
+    for (const capa of poiLayersRef.current) {
+      mapa.removeLayer(capa);
+    }
+    poiLayersRef.current = [];
+    for (const p of pois || []) {
+      if (typeof p.lat !== 'number' || typeof p.lon !== 'number') continue;
+      const c = L.circleMarker([p.lat, p.lon], {
+        radius: 7,
+        color: '#b8901f',
+        weight: 2,
+        fillColor: '#D4AF37',
+        fillOpacity: 0.85,
+      })
+        .bindPopup(`<strong>${p.nombre}</strong>`)
+        .addTo(mapa);
+      poiLayersRef.current.push(c);
+    }
+  }, [pois, listo]);
 
   return (
     <div className="mapa-interactivo-wrap">

@@ -1,6 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { PAISES, CIUDADES_POR_PAIS, LOCALIDADES_POR_CIUDAD } from '../utils/ubicaciones';
-import { MapaInteractivo } from './MapaInteractivo';
+import { MapaInteractivo, type LugarMapa } from './MapaInteractivo';
+import { buscarLugares, CATEGORIAS_LUGAR, enlacesViaje, type CategoriaLugar } from '../utils/lugares';
 
 const TIPOS_VIA = [
   'Carrera', 'Calle', 'Avenida', 'Avenida Calle', 'Avenida Carrera',
@@ -495,6 +496,37 @@ export function DireccionField({ value, onChange, required }: Props) {
   const debounceRef = useRef<number | null>(null);
   const radioName = useId();
 
+  // Explorador de lugares cercanos al destino (tiendas, hoteles, etc.)
+  const [lugares, setLugares] = useState<LugarMapa[]>([]);
+  const [categoriaActiva, setCategoriaActiva] = useState<CategoriaLugar | null>(null);
+  const [buscandoLugares, setBuscandoLugares] = useState(false);
+
+  async function explorarLugares(cat: CategoriaLugar) {
+    if (valor.lat == null || valor.lon == null) return;
+    // Toggle: volver a tocar la categoría activa limpia el mapa
+    if (categoriaActiva === cat) {
+      setCategoriaActiva(null);
+      setLugares([]);
+      return;
+    }
+    setCategoriaActiva(cat);
+    setBuscandoLugares(true);
+    try {
+      const res = await buscarLugares(valor.lat, valor.lon, cat);
+      setLugares(res);
+    } catch {
+      setLugares([]);
+    } finally {
+      setBuscandoLugares(false);
+    }
+  }
+
+  // Si cambia el destino, limpia los lugares (ya no corresponden a la zona)
+  useEffect(() => {
+    setLugares([]);
+    setCategoriaActiva(null);
+  }, [valor.lat, valor.lon]);
+
   const consulta = useMemo(() => {
     const partes = [valor.direccion, valor.localidad, valor.ciudad, valor.pais].map((p) => (p || '').trim()).filter(Boolean);
     return partes.join(', ');
@@ -660,6 +692,16 @@ export function DireccionField({ value, onChange, required }: Props) {
   const tipoViaje = valor.tipoViaje || 'unico';
   const muestraOrigen = tipoViaje === 'solo_ida' || tipoViaje === 'ida_y_vuelta';
 
+  const enlaces = useMemo(
+    () => enlacesViaje({
+      destinoCiudad: valor.ciudad,
+      destinoPais: valor.pais,
+      origenCiudad: valor.origen?.ciudad,
+      origenPais: valor.origen?.pais,
+    }),
+    [valor.ciudad, valor.pais, valor.origen?.ciudad, valor.origen?.pais],
+  );
+
   return (
     <div className="direccion-field">
       <div className="direccion-tipo-bar">
@@ -758,11 +800,70 @@ export function DireccionField({ value, onChange, required }: Props) {
               zoom={zoomDestino}
               onMover={mapaDestinoMovido}
               alto={300}
+              pois={lugares}
             />
             <a className="direccion-mapa-link" href={`https://www.openstreetmap.org/?mlat=${valor.lat}&mlon=${valor.lon}&zoom=17`} target="_blank" rel="noopener noreferrer">
               {muestraOrigen ? 'Destino ↗' : 'Ver en OpenStreetMap ↗'}
             </a>
           </div>
+
+          {/* Explorador de lugares cercanos (Overpass / OpenStreetMap) */}
+          <div className="direccion-lugares">
+            <span className="admin-help-text"><strong>🔎 Explorar cerca del destino:</strong></span>
+            <div className="direccion-lugares-chips">
+              {CATEGORIAS_LUGAR.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  className={`direccion-lugar-chip${categoriaActiva === c.id ? ' active' : ''}`}
+                  onClick={() => explorarLugares(c.id)}
+                  title={`Ver ${c.label.toLowerCase()} cercanos en el mapa`}
+                >
+                  {c.emoji} {c.label}
+                </button>
+              ))}
+            </div>
+            {buscandoLugares ? (
+              <small className="admin-help-text">Buscando lugares cercanos…</small>
+            ) : categoriaActiva && lugares.length > 0 ? (
+              <ul className="direccion-lugares-lista">
+                {lugares.slice(0, 12).map((l, i) => (
+                  <li key={`${l.nombre}-${i}`}>
+                    <a
+                      href={`https://www.google.com/maps/search/${encodeURIComponent(l.nombre)}/@${l.lat},${l.lon},17z`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      📍 {l.nombre}
+                    </a>
+                  </li>
+                ))}
+                {lugares.length > 12 ? <li className="admin-help-text">y {lugares.length - 12} más en el mapa…</li> : null}
+              </ul>
+            ) : categoriaActiva ? (
+              <small className="admin-help-text">No se encontraron lugares de esa categoría en la zona.</small>
+            ) : null}
+          </div>
+
+          {/* Enlaces de viaje: vuelos, hoteles, transporte (mejores precios) */}
+          {enlaces.length > 0 ? (
+            <div className="direccion-viaje">
+              <span className="admin-help-text"><strong>💸 Buscar precios para {valor.ciudad}:</strong></span>
+              <div className="direccion-viaje-links">
+                {enlaces.map((e) => (
+                  <a
+                    key={e.id}
+                    className="direccion-viaje-link"
+                    href={e.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    {e.emoji} {e.label}
+                  </a>
+                ))}
+              </div>
+            </div>
+          ) : null}
 
           {climaInfo && clima ? (
             <div className="direccion-clima card-surface">
