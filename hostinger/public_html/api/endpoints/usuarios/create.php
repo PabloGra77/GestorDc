@@ -57,7 +57,7 @@ if ($nivelAprob && !in_array($nivelAprob, $nivelesValidos, true)) {
     Response::error('Nivel de aprobacion invalido', 400);
 }
 
-$pdo->beginTransaction();
+// 1) Crear el usuario. El envio de correo NO debe bloquear la creacion.
 try {
     $ins = $pdo->prepare(
         "INSERT INTO usuarios
@@ -86,35 +86,35 @@ try {
         ':na' => $nivelAprob,
     ]);
     $newId = (int)$pdo->lastInsertId();
+} catch (Throwable $e) {
+    error_log('[usuarios/create] ' . $e->getMessage());
+    Response::error('No se pudo crear el usuario', 500);
+}
 
-    // Enviar correo de bienvenida. Si falla, hacer rollback.
-    $base = rtrim(Config::get('WEB_BASE_URL', ''), '/');
-    $loginLink = $base . '/login';
-    $text = "Hola {$nombreCompleto},\n\nSe realizo la creacion de tu usuario en la plataforma GestorDoc.\n"
-          . "Usuario: {$correo}\nContrasena temporal: {$tempPassword}\n\n"
-          . "Al ingresar por primera vez debes cambiar tu contrasena.\nAcceso: {$loginLink}";
-    $html = '<div style="font-family:Arial,sans-serif;color:#0f172a;line-height:1.5;">'
-          . '<p>Hola ' . htmlspecialchars($nombreCompleto) . ',</p>'
-          . '<p>Se realizo la creacion de tu usuario en la plataforma <strong>GestorDoc</strong>.</p>'
-          . '<p><strong>Usuario:</strong> ' . htmlspecialchars($correo) . '<br/>'
-          . '<strong>Contrasena temporal:</strong> ' . htmlspecialchars($tempPassword) . '</p>'
-          . '<p>Al ingresar por primera vez debes cambiar tu contrasena.</p>'
-          . '<p><a href="' . htmlspecialchars($loginLink) . '">Ir a iniciar sesion</a></p></div>';
+// 2) Correo de bienvenida (best-effort: si falla, el usuario YA quedo creado).
+$base = rtrim(Config::get('WEB_BASE_URL', ''), '/');
+$loginLink = $base . '/login';
+$text = "Hola {$nombreCompleto},\n\nSe realizo la creacion de tu usuario en la plataforma GestorDoc.\n"
+      . "Usuario: {$correo}\nContrasena temporal: {$tempPassword}\n\n"
+      . "Al ingresar por primera vez debes cambiar tu contrasena.\nAcceso: {$loginLink}";
+$html = '<div style="font-family:Arial,sans-serif;color:#0f172a;line-height:1.5;">'
+      . '<p>Hola ' . htmlspecialchars($nombreCompleto) . ',</p>'
+      . '<p>Se realizo la creacion de tu usuario en la plataforma <strong>GestorDoc</strong>.</p>'
+      . '<p><strong>Usuario:</strong> ' . htmlspecialchars($correo) . '<br/>'
+      . '<strong>Contrasena temporal:</strong> ' . htmlspecialchars($tempPassword) . '</p>'
+      . '<p>Al ingresar por primera vez debes cambiar tu contrasena.</p>'
+      . '<p><a href="' . htmlspecialchars($loginLink) . '">Ir a iniciar sesion</a></p></div>';
 
-    $sent = Mailer::send([
+$correoEnviado = false;
+try {
+    $correoEnviado = Mailer::send([
         'to'      => [$correo],
         'subject' => 'Creacion de usuario - GestorDoc',
         'text'    => $text,
         'html'    => $html,
     ]);
-    if (!$sent) {
-        throw new RuntimeException('No se pudo enviar el correo de bienvenida');
-    }
-    $pdo->commit();
 } catch (Throwable $e) {
-    $pdo->rollBack();
-    error_log('[usuarios/create] ' . $e->getMessage());
-    Response::error('No se pudo crear el usuario', 500);
+    error_log('[usuarios/create email] ' . $e->getMessage());
 }
 
 $sel = $pdo->prepare(
@@ -124,4 +124,8 @@ $sel = $pdo->prepare(
      WHERE u.id = :id"
 );
 $sel->execute([':id' => $newId]);
-Response::json(Shapes::usuario($sel->fetch()), 201);
+$out = Shapes::usuario($sel->fetch());
+$out['correoEnviado'] = $correoEnviado;
+// Si el correo no salio, devolver la contrasena temporal para que el admin la entregue.
+$out['passwordTemporal'] = $correoEnviado ? null : $tempPassword;
+Response::json($out, 201);

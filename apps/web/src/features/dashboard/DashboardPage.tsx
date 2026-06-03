@@ -590,8 +590,19 @@ export function DashboardPage() {
 				await api.patch(`/usuarios/${editingUserId}`, payload);
 				setAdminMessage('Usuario actualizado correctamente.');
 			} else {
-				await api.post('/usuarios', payload);
-				setAdminMessage('Usuario creado correctamente.');
+				const resp = await api.post<{ correoEnviado?: boolean; passwordTemporal?: string | null }>(
+					'/usuarios',
+					payload,
+				);
+				if (resp.data?.correoEnviado === false) {
+					setAdminMessage(
+						`Usuario creado, pero el correo no se pudo enviar. Contraseña temporal: ${
+							resp.data.passwordTemporal ?? '(usa "Restablecer")'
+						}. Entrégasela al usuario o usa "Restablecer".`,
+					);
+				} else {
+					setAdminMessage('Usuario creado. Se envió la contraseña temporal por correo.');
+				}
 			}
 
 			limpiarFormularioUsuario();
@@ -647,8 +658,27 @@ export function DashboardPage() {
 			});
 
 			setAdminMessage(
-				`Usuario ${usuario.nombreCompleto} ${usuario.activo ? 'desactivado' : 'activado'} correctamente.`,
+				`Usuario ${usuario.nombreCompleto} ${usuario.activo ? 'desactivado' : 'aprobado'} correctamente.`,
 			);
+			await loadAdminData();
+		} catch (error) {
+			setAdminError(getErrorMessage(error));
+		}
+	}
+
+	async function eliminarUsuario(usuario: Usuario) {
+		setAdminMessage('');
+		setAdminError('');
+		if (
+			!window.confirm(
+				`¿Rechazar y eliminar definitivamente a ${usuario.nombreCompleto} (${usuario.correo})? Esta acción no se puede deshacer.`,
+			)
+		) {
+			return;
+		}
+		try {
+			await api.delete(`/usuarios/${usuario.id}`);
+			setAdminMessage(`Usuario ${usuario.correo} rechazado y eliminado.`);
 			await loadAdminData();
 		} catch (error) {
 			setAdminError(getErrorMessage(error));
@@ -1303,16 +1333,37 @@ export function DashboardPage() {
 														>
 															Modificar
 														</button>
-														<button
-															type="button"
-															className="admin-ghost-button"
-															disabled={!canCrearUsuarios}
-															onClick={() => cambiarEstadoUsuario(usuario)}
-														>
-															{usuario.activo ? 'Desactivar' : 'Activar'}
-														</button>
+														{usuario.activo ? (
+															<button
+																type="button"
+																className="admin-ghost-button"
+																disabled={!canCrearUsuarios}
+																onClick={() => cambiarEstadoUsuario(usuario)}
+															>
+																Desactivar
+															</button>
+														) : (
+															<>
+																<button
+																	type="button"
+																	className="admin-ghost-button"
+																	disabled={!canCrearUsuarios}
+																	onClick={() => cambiarEstadoUsuario(usuario)}
+																>
+																	Aprobar
+																</button>
+																<button
+																	type="button"
+																	className="admin-ghost-button admin-role-delete"
+																	disabled={!canCrearUsuarios}
+																	onClick={() => eliminarUsuario(usuario)}
+																>
+																	Rechazar
+																</button>
+															</>
+														)}
 														<span className={`status-pill ${usuario.activo ? 'on' : 'off'}`}>
-															{usuario.activo ? 'Habilitado' : 'Bloqueado'}
+															{usuario.activo ? 'Habilitado' : 'Pendiente'}
 														</span>
 													</div>
 												</li>

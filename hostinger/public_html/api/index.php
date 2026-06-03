@@ -41,6 +41,7 @@ $routes = [
     ['GET',    '#^/usuarios$#',                                  'usuarios/find_all'],
     ['GET',    '#^/usuarios/(?P<id>\d+)$#',                      'usuarios/find_one'],
     ['PATCH',  '#^/usuarios/(?P<id>\d+)$#',                      'usuarios/update'],
+    ['DELETE', '#^/usuarios/(?P<id>\d+)$#',                      'usuarios/delete'],
 
     // Roles
     ['POST',   '#^/roles$#',                                     'roles/create'],
