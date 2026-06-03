@@ -1,0 +1,1651 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { api } from '../../services/http/api';
+import { descargarPreviewPlantilla } from '../solicitudes/generarPdfFormato';
+import { PreviewFormularioModal } from '../../components/PreviewFormularioModal';
+
+interface Area {
+  id: number;
+  nombre: string;
+  slug: string;
+  activo: boolean;
+}
+
+interface CampoPlantilla {
+  key: string;
+  label: string;
+  type:
+    | 'text'
+    | 'email'
+    | 'number'
+    | 'valor-pesos'
+    | 'date'
+    | 'mes-anio'
+    | 'file'
+    | 'select'
+    | 'textarea'
+    | 'texto-fijo'
+    | 'tipo-doc'
+    | 'cc'
+    | 'nit'
+    | 'cuenta-bancaria'
+    | 'banco-select'
+    | 'direccion';
+  required: boolean;
+  group?: string;
+  ocr_target?: string;
+  texto?: string;
+}
+
+interface PasoFlujo {
+  rol: string;
+  label: string;
+  orden: number;
+}
+
+interface FlujoAreas {
+  areasParticipantes: number[];
+  areaInicialId: number | null;
+  areaFinalId: number | null;
+  remision: Record<string, number[]>;
+}
+
+type PdfAlineacion = 'izquierda' | 'centro' | 'derecha';
+
+interface BloqueBase {
+  id: string;
+  x: number;
+  y: number;
+  w: number;
+  pagina?: number; // default 1
+}
+
+type PdfBloque = BloqueBase & (
+  | { tipo: 'logo'; alineacion: PdfAlineacion; ancho: number; src?: string }
+  | { tipo: 'titulo'; texto: string; alineacion: PdfAlineacion; tamano: number; negrita: boolean }
+  | { tipo: 'texto'; texto: string; alineacion: PdfAlineacion; tamano: number }
+  | { tipo: 'campo'; campoKey: string; etiqueta: string; alineacion: PdfAlineacion }
+  | { tipo: 'tabla'; columnas: string[] }
+  | { tipo: 'divider' }
+  | { tipo: 'firma'; etiqueta: string; campoFirma: 'profesional' | 'coordinador' | 'contabilidad' }
+  | { tipo: 'caja'; alto: number; relleno: boolean; etiqueta?: string }
+  | { tipo: 'imagen'; src: string; etiqueta?: string }
+  | { tipo: 'lista'; items: string[]; conVinetas: boolean }
+  | { tipo: 'separador-doble' }
+  | { tipo: 'qr-radicado'; tamano: number }
+);
+
+const LOGOS_DISPONIBLES: Array<{ id: string; nombre: string; src: string }> = [
+  { id: 'goleman-claro', nombre: 'Goleman IPS · Color', src: '/logo-payops-dark.png' },
+  { id: 'goleman-oscuro', nombre: 'Goleman IPS · Versión clara', src: '/logo-payops.png' },
+  { id: 'pestana', nombre: 'Logo pestaña (transparente)', src: '/logo-pestana.png' },
+  { id: 'icon-app', nombre: 'Icono Payops', src: '/icon-app.png' },
+];
+
+const FIRMA_LABELS: Record<'profesional' | 'coordinador' | 'contabilidad', string> = {
+  profesional: 'Solicitante / Profesional del área',
+  coordinador: 'Coordinador / Director',
+  contabilidad: 'Persona que certifica (área final)',
+};
+
+interface PlantillaPdf {
+  bloques: PdfBloque[];
+}
+
+function nuevoId() {
+  return Math.random().toString(36).slice(2, 9);
+}
+
+function plantillaCuentaCobro(): PdfBloque[] {
+  return [
+    // Página 1: Cuenta de cobro principal
+    { id: nuevoId(), pagina: 1, x: 18, y: 14, w: 36, tipo: 'logo', alineacion: 'izquierda', ancho: 36, src: '/logo-payops-dark.png' },
+    { id: nuevoId(), pagina: 1, x: 18, y: 38, w: 110, tipo: 'texto', texto: 'Ciudad y fecha: {{ciudad}}, {{fecha}}', alineacion: 'izquierda', tamano: 11 },
+    { id: nuevoId(), pagina: 1, x: 18, y: 52, w: 174, tipo: 'titulo', texto: 'CUENTA DE COBRO N° {{radicado}}', alineacion: 'centro', tamano: 14, negrita: true },
+    { id: nuevoId(), pagina: 1, x: 18, y: 66, w: 174, tipo: 'titulo', texto: 'IPS GOLEMAN SERVICIO INTEGRAL SAS', alineacion: 'centro', tamano: 11, negrita: true },
+    { id: nuevoId(), pagina: 1, x: 18, y: 74, w: 174, tipo: 'titulo', texto: 'NIT 900.231.82', alineacion: 'centro', tamano: 11, negrita: true },
+    { id: nuevoId(), pagina: 1, x: 18, y: 86, w: 174, tipo: 'titulo', texto: 'DEBE A:', alineacion: 'centro', tamano: 11, negrita: true },
+    { id: nuevoId(), pagina: 1, x: 18, y: 96, w: 174, tipo: 'campo', campoKey: '__nombre', etiqueta: 'NOMBRE:', alineacion: 'izquierda' },
+    { id: nuevoId(), pagina: 1, x: 18, y: 108, w: 174, tipo: 'campo', campoKey: '__cedula', etiqueta: 'C.C:', alineacion: 'izquierda' },
+    { id: nuevoId(), pagina: 1, x: 18, y: 124, w: 174, tipo: 'texto', texto: 'La suma de: {{valor}} ({{valorLetras}})', alineacion: 'izquierda', tamano: 11 },
+    { id: nuevoId(), pagina: 1, x: 18, y: 134, w: 174, tipo: 'texto', texto: 'Por concepto de: {{concepto}}', alineacion: 'izquierda', tamano: 11 },
+    { id: nuevoId(), pagina: 1, x: 18, y: 146, w: 174, tipo: 'tabla', columnas: ['FECHA', 'ITEM', 'VALOR'] },
+    { id: nuevoId(), pagina: 1, x: 18, y: 240, w: 70, tipo: 'firma', etiqueta: 'Firma del solicitante', campoFirma: 'profesional' },
+    { id: nuevoId(), pagina: 1, x: 100, y: 240, w: 70, tipo: 'firma', etiqueta: 'Coordinador / Director', campoFirma: 'coordinador' },
+    // Página 2: Soportes documentales adjuntos
+    { id: nuevoId(), pagina: 2, x: 18, y: 18, w: 174, tipo: 'titulo', texto: 'ANEXOS · SOPORTES DOCUMENTALES', alineacion: 'centro', tamano: 13, negrita: true },
+    { id: nuevoId(), pagina: 2, x: 18, y: 28, w: 174, tipo: 'divider' },
+    { id: nuevoId(), pagina: 2, x: 18, y: 38, w: 174, tipo: 'campo', campoKey: 'banco', etiqueta: 'Banco:', alineacion: 'izquierda' },
+    { id: nuevoId(), pagina: 2, x: 18, y: 50, w: 174, tipo: 'campo', campoKey: 'numeroCuenta', etiqueta: 'N° Cuenta:', alineacion: 'izquierda' },
+    { id: nuevoId(), pagina: 2, x: 18, y: 62, w: 174, tipo: 'campo', campoKey: 'tipoCuenta', etiqueta: 'Tipo de cuenta:', alineacion: 'izquierda' },
+    { id: nuevoId(), pagina: 2, x: 18, y: 78, w: 174, tipo: 'campo', campoKey: 'eps', etiqueta: 'EPS:', alineacion: 'izquierda' },
+    { id: nuevoId(), pagina: 2, x: 18, y: 94, w: 174, tipo: 'texto', texto: 'Documentos cargados:', alineacion: 'izquierda', tamano: 11 },
+    { id: nuevoId(), pagina: 2, x: 18, y: 104, w: 174, tipo: 'campo', campoKey: 'docRut', etiqueta: '• RUT:', alineacion: 'izquierda' },
+    { id: nuevoId(), pagina: 2, x: 18, y: 114, w: 174, tipo: 'campo', campoKey: 'docEps', etiqueta: '• Certificado EPS:', alineacion: 'izquierda' },
+    { id: nuevoId(), pagina: 2, x: 18, y: 124, w: 174, tipo: 'campo', campoKey: 'docCuentaBancaria', etiqueta: '• Certificación bancaria:', alineacion: 'izquierda' },
+    { id: nuevoId(), pagina: 2, x: 18, y: 134, w: 174, tipo: 'campo', campoKey: 'docPlanilla', etiqueta: '• Planilla seguridad social:', alineacion: 'izquierda' },
+    { id: nuevoId(), pagina: 2, x: 18, y: 144, w: 174, tipo: 'campo', campoKey: 'docAdres', etiqueta: '• Certificado ADRES:', alineacion: 'izquierda' },
+    { id: nuevoId(), pagina: 2, x: 18, y: 154, w: 174, tipo: 'campo', campoKey: 'docCuentaCobro', etiqueta: '• Cuenta de cobro firmada:', alineacion: 'izquierda' },
+    { id: nuevoId(), pagina: 2, x: 18, y: 240, w: 70, tipo: 'firma', etiqueta: 'Certifica área final', campoFirma: 'contabilidad' },
+  ];
+}
+
+function plantillaViaticos(): PdfBloque[] {
+  return [
+    { id: nuevoId(), pagina: 1, x: 18, y: 14, w: 36, tipo: 'logo', alineacion: 'izquierda', ancho: 36, src: '/logo-payops-dark.png' },
+    { id: nuevoId(), pagina: 1, x: 18, y: 38, w: 174, tipo: 'titulo', texto: 'SOLICITUD DE VIÁTICOS · {{radicado}}', alineacion: 'centro', tamano: 14, negrita: true },
+    { id: nuevoId(), pagina: 1, x: 18, y: 54, w: 174, tipo: 'texto', texto: 'Fecha de elaboración: {{fecha}}', alineacion: 'izquierda', tamano: 10 },
+    { id: nuevoId(), pagina: 1, x: 18, y: 70, w: 174, tipo: 'divider' },
+    { id: nuevoId(), pagina: 1, x: 18, y: 80, w: 174, tipo: 'titulo', texto: 'DATOS DEL SOLICITANTE', alineacion: 'izquierda', tamano: 11, negrita: true },
+    { id: nuevoId(), pagina: 1, x: 18, y: 92, w: 174, tipo: 'campo', campoKey: '__nombre', etiqueta: 'Nombre:', alineacion: 'izquierda' },
+    { id: nuevoId(), pagina: 1, x: 18, y: 104, w: 174, tipo: 'campo', campoKey: '__cedula', etiqueta: 'Documento:', alineacion: 'izquierda' },
+    { id: nuevoId(), pagina: 1, x: 18, y: 120, w: 174, tipo: 'titulo', texto: 'DETALLES DEL VIAJE', alineacion: 'izquierda', tamano: 11, negrita: true },
+    { id: nuevoId(), pagina: 1, x: 18, y: 132, w: 174, tipo: 'campo', campoKey: 'destinoViaje', etiqueta: 'Destino:', alineacion: 'izquierda' },
+    { id: nuevoId(), pagina: 1, x: 18, y: 144, w: 174, tipo: 'campo', campoKey: 'tipoTransporte', etiqueta: 'Medio de transporte:', alineacion: 'izquierda' },
+    { id: nuevoId(), pagina: 1, x: 18, y: 156, w: 174, tipo: 'campo', campoKey: 'numeroReferenciaViaje', etiqueta: 'Referencia (vuelo/reserva/placa):', alineacion: 'izquierda' },
+    { id: nuevoId(), pagina: 1, x: 18, y: 168, w: 174, tipo: 'campo', campoKey: 'fechaViaje', etiqueta: 'Fecha del viaje:', alineacion: 'izquierda' },
+    { id: nuevoId(), pagina: 1, x: 18, y: 184, w: 174, tipo: 'texto', texto: 'Valor total del viaje: {{valor}} ({{valorLetras}})', alineacion: 'izquierda', tamano: 11 },
+    { id: nuevoId(), pagina: 1, x: 18, y: 198, w: 174, tipo: 'campo', campoKey: 'docFacturaViaje', etiqueta: 'Soporte / factura adjunta:', alineacion: 'izquierda' },
+    { id: nuevoId(), pagina: 1, x: 18, y: 235, w: 70, tipo: 'firma', etiqueta: 'Solicitante', campoFirma: 'profesional' },
+    { id: nuevoId(), pagina: 1, x: 100, y: 235, w: 70, tipo: 'firma', etiqueta: 'Coordinador / Director', campoFirma: 'coordinador' },
+  ];
+}
+
+function plantillaAdres(): PdfBloque[] {
+  return [
+    { id: nuevoId(), x: 18, y: 14, w: 36, tipo: 'logo', alineacion: 'izquierda', ancho: 36 },
+    { id: nuevoId(), x: 18, y: 38, w: 174, tipo: 'titulo', texto: 'CERTIFICADO ADRES', alineacion: 'centro', tamano: 16, negrita: true },
+    { id: nuevoId(), x: 18, y: 52, w: 174, tipo: 'texto', texto: 'Radicado N° {{radicado}} · Fecha: {{fecha}}', alineacion: 'centro', tamano: 10 },
+    { id: nuevoId(), x: 18, y: 70, w: 174, tipo: 'titulo', texto: 'ADMINISTRADORA DE LOS RECURSOS DEL SISTEMA DE SEGURIDAD SOCIAL EN SALUD', alineacion: 'centro', tamano: 10, negrita: true },
+    { id: nuevoId(), x: 18, y: 92, w: 174, tipo: 'divider' },
+    { id: nuevoId(), x: 18, y: 100, w: 174, tipo: 'texto', texto: 'Por medio del presente documento se certifica la información de afiliación del usuario:', alineacion: 'izquierda', tamano: 11 },
+    { id: nuevoId(), x: 18, y: 118, w: 174, tipo: 'campo', campoKey: '__nombre', etiqueta: 'Nombre:', alineacion: 'izquierda' },
+    { id: nuevoId(), x: 18, y: 130, w: 174, tipo: 'campo', campoKey: '__cedula', etiqueta: 'Documento:', alineacion: 'izquierda' },
+    { id: nuevoId(), x: 18, y: 142, w: 174, tipo: 'campo', campoKey: 'eps', etiqueta: 'EPS:', alineacion: 'izquierda' },
+    { id: nuevoId(), x: 18, y: 160, w: 174, tipo: 'texto', texto: 'La presente certificación se expide a solicitud del interesado para los fines que estime convenientes.', alineacion: 'izquierda', tamano: 11 },
+    { id: nuevoId(), x: 18, y: 230, w: 80, tipo: 'firma', etiqueta: 'Firma autorizada', campoFirma: 'coordinador' },
+  ];
+}
+
+function plantillaEps(): PdfBloque[] {
+  return [
+    { id: nuevoId(), x: 18, y: 14, w: 36, tipo: 'logo', alineacion: 'izquierda', ancho: 36 },
+    { id: nuevoId(), x: 18, y: 38, w: 174, tipo: 'titulo', texto: 'CERTIFICADO DE AFILIACIÓN EPS', alineacion: 'centro', tamano: 15, negrita: true },
+    { id: nuevoId(), x: 18, y: 54, w: 174, tipo: 'texto', texto: 'Radicado: {{radicado}} · Bogotá D.C., {{fecha}}', alineacion: 'centro', tamano: 10 },
+    { id: nuevoId(), x: 18, y: 72, w: 174, tipo: 'divider' },
+    { id: nuevoId(), x: 18, y: 84, w: 174, tipo: 'texto', texto: 'La Entidad Promotora de Salud certifica que el usuario relacionado a continuación se encuentra afiliado:', alineacion: 'izquierda', tamano: 11 },
+    { id: nuevoId(), x: 18, y: 104, w: 174, tipo: 'campo', campoKey: '__nombre', etiqueta: 'Nombre completo:', alineacion: 'izquierda' },
+    { id: nuevoId(), x: 18, y: 116, w: 174, tipo: 'campo', campoKey: '__cedula', etiqueta: 'Documento de identidad:', alineacion: 'izquierda' },
+    { id: nuevoId(), x: 18, y: 128, w: 174, tipo: 'campo', campoKey: 'eps', etiqueta: 'EPS:', alineacion: 'izquierda' },
+    { id: nuevoId(), x: 18, y: 148, w: 174, tipo: 'texto', texto: 'Estado: ACTIVO · Régimen: Contributivo', alineacion: 'izquierda', tamano: 11 },
+    { id: nuevoId(), x: 18, y: 166, w: 174, tipo: 'texto', texto: 'Se expide a solicitud del interesado a los {{fecha}}.', alineacion: 'izquierda', tamano: 11 },
+    { id: nuevoId(), x: 18, y: 230, w: 80, tipo: 'firma', etiqueta: 'Firma representante EPS', campoFirma: 'coordinador' },
+  ];
+}
+
+function plantillaRut(): PdfBloque[] {
+  return [
+    { id: nuevoId(), x: 18, y: 14, w: 36, tipo: 'logo', alineacion: 'izquierda', ancho: 36 },
+    { id: nuevoId(), x: 18, y: 38, w: 174, tipo: 'titulo', texto: 'REGISTRO ÚNICO TRIBUTARIO - RUT', alineacion: 'centro', tamano: 15, negrita: true },
+    { id: nuevoId(), x: 18, y: 54, w: 174, tipo: 'texto', texto: 'Radicado: {{radicado}}', alineacion: 'centro', tamano: 10 },
+    { id: nuevoId(), x: 18, y: 72, w: 174, tipo: 'titulo', texto: 'DIAN · Dirección de Impuestos y Aduanas Nacionales', alineacion: 'centro', tamano: 10, negrita: true },
+    { id: nuevoId(), x: 18, y: 90, w: 174, tipo: 'divider' },
+    { id: nuevoId(), x: 18, y: 102, w: 174, tipo: 'campo', campoKey: '__nombre', etiqueta: 'Razón social / Nombre:', alineacion: 'izquierda' },
+    { id: nuevoId(), x: 18, y: 114, w: 174, tipo: 'campo', campoKey: '__cedula', etiqueta: 'NIT / Documento:', alineacion: 'izquierda' },
+    { id: nuevoId(), x: 18, y: 130, w: 174, tipo: 'texto', texto: 'Información tributaria certificada por la DIAN.', alineacion: 'izquierda', tamano: 11 },
+    { id: nuevoId(), x: 18, y: 230, w: 80, tipo: 'firma', etiqueta: 'Firma del solicitante', campoFirma: 'profesional' },
+  ];
+}
+
+function plantillaGenerica(): PdfBloque[] {
+  return [
+    { id: nuevoId(), x: 18, y: 14, w: 36, tipo: 'logo', alineacion: 'izquierda', ancho: 36 },
+    { id: nuevoId(), x: 18, y: 38, w: 174, tipo: 'titulo', texto: 'SOLICITUD - {{radicado}}', alineacion: 'centro', tamano: 14, negrita: true },
+    { id: nuevoId(), x: 18, y: 54, w: 174, tipo: 'texto', texto: 'Fecha: {{fecha}}', alineacion: 'izquierda', tamano: 10 },
+    { id: nuevoId(), x: 18, y: 72, w: 174, tipo: 'divider' },
+    { id: nuevoId(), x: 18, y: 84, w: 174, tipo: 'campo', campoKey: '__nombre', etiqueta: 'Solicitante:', alineacion: 'izquierda' },
+    { id: nuevoId(), x: 18, y: 96, w: 174, tipo: 'campo', campoKey: '__cedula', etiqueta: 'Documento:', alineacion: 'izquierda' },
+    { id: nuevoId(), x: 18, y: 230, w: 80, tipo: 'firma', etiqueta: 'Firma', campoFirma: 'profesional' },
+  ];
+}
+
+const PLANTILLAS_EJEMPLO: Array<{ id: string; nombre: string; build: () => PdfBloque[] }> = [
+  { id: 'cuenta-cobro', nombre: 'Cuenta de cobro (con anexos)', build: plantillaCuentaCobro },
+  { id: 'viaticos', nombre: 'Solicitud de viáticos', build: plantillaViaticos },
+  { id: 'adres', nombre: 'Certificado ADRES', build: plantillaAdres },
+  { id: 'eps', nombre: 'Certificado EPS', build: plantillaEps },
+  { id: 'rut', nombre: 'Registro RUT', build: plantillaRut },
+  { id: 'generica', nombre: 'Solicitud genérica', build: plantillaGenerica },
+];
+
+function inferirPlantillaPorNombre(nombre: string): PdfBloque[] {
+  const lower = nombre.toLowerCase();
+  if (lower.includes('viatic') || lower.includes('viaje')) return plantillaViaticos();
+  if (lower.includes('adres')) return plantillaAdres();
+  if (lower.includes('eps')) return plantillaEps();
+  if (lower.includes('rut')) return plantillaRut();
+  if (lower.includes('cuenta') && lower.includes('cobro')) return plantillaCuentaCobro();
+  return plantillaGenerica();
+}
+
+const PLANTILLA_PDF_DEFAULT: PlantillaPdf = {
+  bloques: plantillaCuentaCobro(),
+};
+
+const TIPOS_BLOQUE_LABELS: Record<string, string> = {
+  logo: '🏷️ Logo',
+  titulo: '🅷 Título',
+  texto: '📝 Texto',
+  campo: '🔗 Campo',
+  tabla: '▦ Tabla',
+  divider: '─ Línea',
+  firma: '✍ Firma',
+  caja: '▭ Caja',
+  imagen: '🖼️ Imagen',
+  lista: '☰ Lista',
+  'separador-doble': '═ Separador doble',
+  'qr-radicado': '▣ QR del radicado',
+};
+
+interface TipoSolicitud {
+  id: number;
+  areaId: number;
+  areaNombre: string;
+  areaSlug: string;
+  nombre: string;
+  descripcion: string | null;
+  slug: string;
+  activo: boolean;
+  orden: number;
+  camposPlantilla: CampoPlantilla[];
+  flujoAprobacion: PasoFlujo[];
+  flujoAreas: FlujoAreas | null;
+  plantillaPdf?: PlantillaPdf | null;
+}
+
+const TIPOS_CAMPO = [
+  { v: 'text', l: 'Texto' },
+  { v: 'email', l: 'Correo' },
+  { v: 'number', l: 'Numero' },
+  { v: 'valor-pesos', l: 'Valor en pesos (auto letras)' },
+  { v: 'date', l: 'Fecha' },
+  { v: 'mes-anio', l: 'Mes y ano' },
+  { v: 'textarea', l: 'Texto largo' },
+  { v: 'texto-fijo', l: 'Texto fijo / nota' },
+  { v: 'select', l: 'Lista de opciones' },
+  { v: 'tipo-doc', l: 'Tipo de documento (CC/CE/TI)' },
+  { v: 'cc', l: 'Cedula / numero' },
+  { v: 'nit', l: 'NIT' },
+  { v: 'cuenta-bancaria', l: 'Numero cuenta bancaria' },
+  { v: 'banco-select', l: 'Banco (lista colombiana)' },
+  { v: 'direccion', l: 'Dirección + ciudad + país (con mapa y clima)' },
+  { v: 'file', l: 'Archivo / documento' },
+];
+
+const BLOQUES_PREDEFINIDOS: Array<{ id: string; nombre: string; descripcion: string; campos: CampoPlantilla[] }> = [
+  {
+    id: 'datos-personales',
+    nombre: 'Datos personales',
+    descripcion: 'Documento, nombres, apellidos, fechas',
+    campos: [
+      { key: 'tipoDocumento', label: 'Tipo de documento', type: 'tipo-doc', required: true, group: 'Datos personales' },
+      { key: 'numeroDocumento', label: 'Numero de documento', type: 'cc', required: true, group: 'Datos personales' },
+      { key: 'primerNombre', label: 'Primer nombre', type: 'text', required: true, group: 'Datos personales' },
+      { key: 'segundoNombre', label: 'Segundo nombre (opcional)', type: 'text', required: false, group: 'Datos personales' },
+      { key: 'primerApellido', label: 'Primer apellido', type: 'text', required: true, group: 'Datos personales' },
+      { key: 'segundoApellido', label: 'Segundo apellido (opcional)', type: 'text', required: false, group: 'Datos personales' },
+      { key: 'fechaNacimiento', label: 'Fecha de nacimiento', type: 'date', required: true, group: 'Datos personales' },
+      { key: 'fechaExpedicion', label: 'Fecha de expedicion', type: 'date', required: true, group: 'Datos personales' },
+      { key: 'lugarExpedicion', label: 'Lugar de expedicion', type: 'text', required: true, group: 'Datos personales' },
+      { key: 'telefono', label: 'Telefono', type: 'text', required: true, group: 'Datos personales' },
+      { key: 'correo', label: 'Correo electronico', type: 'email', required: true, group: 'Datos personales' },
+      { key: 'docCedula', label: 'Adjuntar cedula', type: 'file', required: true, group: 'Datos personales', ocr_target: 'cedula' },
+    ],
+  },
+  {
+    id: 'rut',
+    nombre: 'RUT',
+    descripcion: 'Solicitar y validar RUT',
+    campos: [
+      { key: 'docRut', label: 'Adjuntar RUT', type: 'file', required: true, group: 'RUT', ocr_target: 'rut' },
+    ],
+  },
+  {
+    id: 'certificado-eps',
+    nombre: 'Certificado EPS',
+    descripcion: 'Solicitar y validar EPS',
+    campos: [
+      { key: 'eps', label: 'EPS / afiliacion', type: 'text', required: true, group: 'Salud' },
+      { key: 'docEps', label: 'Adjuntar certificado EPS', type: 'file', required: true, group: 'Salud', ocr_target: 'eps' },
+    ],
+  },
+  {
+    id: 'cuenta-bancaria',
+    nombre: 'Certificado cuenta bancaria',
+    descripcion: 'Banco, numero de cuenta, tipo y certificado',
+    campos: [
+      { key: 'banco', label: 'Banco', type: 'banco-select', required: true, group: 'Cuenta bancaria' },
+      { key: 'tipoCuenta', label: 'Tipo de cuenta (ahorros/corriente)', type: 'select', required: true, group: 'Cuenta bancaria' },
+      { key: 'numeroCuenta', label: 'Numero de cuenta', type: 'cuenta-bancaria', required: true, group: 'Cuenta bancaria' },
+      { key: 'docCuentaBancaria', label: 'Adjuntar certificacion bancaria', type: 'file', required: true, group: 'Cuenta bancaria', ocr_target: 'cuenta_bancaria' },
+    ],
+  },
+  {
+    id: 'planilla-seguridad',
+    nombre: 'Planilla seguridad social',
+    descripcion: 'Soporte de aportes',
+    campos: [
+      { key: 'docPlanilla', label: 'Adjuntar planilla seguridad social', type: 'file', required: true, group: 'Planilla seguridad social', ocr_target: 'planilla' },
+    ],
+  },
+  {
+    id: 'cuenta-cobro',
+    nombre: 'Cuenta de cobro (valor + texto)',
+    descripcion: 'Mes a radicar, valor en numero y letras (auto), texto formal',
+    campos: [
+      { key: 'mesRadicar', label: 'Mes y ano a radicar', type: 'mes-anio', required: true, group: 'Cuenta de cobro' },
+      { key: 'valorPesos', label: 'Valor a radicar', type: 'valor-pesos', required: true, group: 'Cuenta de cobro' },
+      { key: 'observaciones', label: 'Observaciones (opcional)', type: 'textarea', required: false, group: 'Cuenta de cobro' },
+      { key: 'docCuentaCobro', label: 'Adjuntar cuenta de cobro firmada', type: 'file', required: true, group: 'Cuenta de cobro', ocr_target: 'cuenta_cobro' },
+    ],
+  },
+  {
+    id: 'adres',
+    nombre: 'Certificado ADRES',
+    descripcion: 'Validacion ADRES',
+    campos: [
+      { key: 'docAdres', label: 'Adjuntar certificado ADRES', type: 'file', required: false, group: 'ADRES', ocr_target: 'adres' },
+    ],
+  },
+  {
+    id: 'direccion-viaje',
+    nombre: 'Dirección / destino',
+    descripcion: 'Dirección con ciudad, país, mapa y clima del destino',
+    campos: [
+      { key: 'direccionDestino', label: 'Dirección del destino', type: 'direccion', required: true, group: 'Destino' },
+    ],
+  },
+  {
+    id: 'destino-viaje-soporte',
+    nombre: 'Destino de viaje + soporte',
+    descripcion: 'Destino con mapa/clima + medio de transporte, valor y factura/recibo',
+    campos: [
+      { key: 'destinoViaje', label: 'Destino del viaje', type: 'direccion', required: true, group: 'Viaje' },
+      { key: 'tipoTransporte', label: 'Medio de transporte', type: 'select', required: true, group: 'Viaje' },
+      { key: 'numeroReferenciaViaje', label: 'Número de vuelo / reserva / placa', type: 'text', required: false, group: 'Viaje' },
+      { key: 'fechaViaje', label: 'Fecha del viaje', type: 'date', required: true, group: 'Viaje' },
+      { key: 'valorViaje', label: 'Valor del viaje', type: 'valor-pesos', required: true, group: 'Viaje' },
+      { key: 'docFacturaViaje', label: 'Adjuntar factura / recibo (avión, taxi, pickup, carro)', type: 'file', required: true, group: 'Viaje' },
+    ],
+  },
+];
+
+const OCR_TARGETS = [
+  { v: '', l: '— ninguno —' },
+  { v: 'cedula', l: 'Cedula de ciudadania' },
+  { v: 'rut', l: 'RUT' },
+  { v: 'eps', l: 'Certificado EPS' },
+  { v: 'adres', l: 'Certificado ADRES' },
+  { v: 'planilla', l: 'Planilla seguridad social' },
+  { v: 'cuenta_cobro', l: 'Cuenta de cobro' },
+  { v: 'contrato', l: 'Contrato' },
+];
+
+const FLUJO_DEFAULT: PasoFlujo[] = [
+  { rol: 'analista', label: 'Analista del area', orden: 1 },
+  { rol: 'coordinador', label: 'Coordinador / Director', orden: 2 },
+  { rol: 'contabilidad', label: 'Contabilidad', orden: 3 },
+];
+
+export function TiposSolicitudPanel() {
+  const [areas, setAreas] = useState<Area[]>([]);
+  const [tipos, setTipos] = useState<TipoSolicitud[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [msg, setMsg] = useState('');
+  const [err, setErr] = useState('');
+  const [filtroArea, setFiltroArea] = useState<number | ''>('');
+
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [areaId, setAreaId] = useState<number | ''>('');
+  const [nombre, setNombre] = useState('');
+  const [descripcion, setDescripcion] = useState('');
+  const [slug, setSlug] = useState('');
+  const [activo, setActivo] = useState(true);
+  const [orden, setOrden] = useState<number | ''>(0);
+  const [campos, setCampos] = useState<CampoPlantilla[]>([]);
+  const [flujo, setFlujo] = useState<PasoFlujo[]>(FLUJO_DEFAULT);
+
+  const [areasParticipantes, setAreasParticipantes] = useState<number[]>([]);
+  const [areaInicialId, setAreaInicialId] = useState<number | null>(null);
+  const [areaFinalId, setAreaFinalId] = useState<number | null>(null);
+  const [remision, setRemision] = useState<Record<string, number[]>>({});
+  const [plantillaPdf, setPlantillaPdf] = useState<PlantillaPdf>(PLANTILLA_PDF_DEFAULT);
+  const [usaPlantillaPdf, setUsaPlantillaPdf] = useState(false);
+
+  const cargar = useCallback(async () => {
+    setLoading(true);
+    setErr('');
+    try {
+      const [a, t] = await Promise.all([
+        api.get<Area[]>('/areas'),
+        api.get<TipoSolicitud[]>('/tipos'),
+      ]);
+      setAreas(a.data);
+      setTipos(t.data);
+    } catch {
+      setErr('No se pudo cargar los datos.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { cargar(); }, [cargar]);
+
+  const areasActivas = useMemo(() => areas.filter((a) => a.activo), [areas]);
+  const areasParticipantesArr = useMemo(
+    () => areasActivas.filter((a) => areasParticipantes.includes(a.id)),
+    [areasActivas, areasParticipantes],
+  );
+
+  function abrirEditor(t: TipoSolicitud | null) {
+    setMsg('');
+    setErr('');
+    if (t) {
+      setEditingId(t.id);
+      setAreaId(t.areaId);
+      setNombre(t.nombre);
+      setDescripcion(t.descripcion ?? '');
+      setSlug(t.slug);
+      setActivo(t.activo);
+      setOrden(t.orden);
+      setCampos(t.camposPlantilla || []);
+      setFlujo((t.flujoAprobacion || []).length > 0 ? t.flujoAprobacion : FLUJO_DEFAULT);
+      const fa = t.flujoAreas;
+      setAreasParticipantes(fa?.areasParticipantes || (t.areaId ? [t.areaId] : []));
+      setAreaInicialId(fa?.areaInicialId ?? t.areaId ?? null);
+      setAreaFinalId(fa?.areaFinalId ?? null);
+      setRemision(fa?.remision || {});
+      if (t.plantillaPdf) {
+        setUsaPlantillaPdf(true);
+        // Migrar plantillas viejas: asegurar pagina y src en logos
+        const bloquesMig = (t.plantillaPdf.bloques || []).map((b) => {
+          const next: PdfBloque = { ...b, pagina: b.pagina ?? 1 } as PdfBloque;
+          if (next.tipo === 'logo' && !next.src) {
+            return { ...next, src: '/logo-payops-dark.png' } as PdfBloque;
+          }
+          return next;
+        });
+        setPlantillaPdf({ bloques: bloquesMig });
+      } else {
+        setUsaPlantillaPdf(false);
+        // Inferir plantilla por nombre del tipo (ADRES, EPS, RUT, etc.)
+        setPlantillaPdf({ bloques: inferirPlantillaPorNombre(t.nombre) });
+      }
+    } else {
+      setEditingId(null);
+      setAreaId('');
+      setNombre('');
+      setDescripcion('');
+      setSlug('');
+      setActivo(true);
+      setOrden(0);
+      setCampos([]);
+      setFlujo(FLUJO_DEFAULT);
+      setAreasParticipantes([]);
+      setAreaInicialId(null);
+      setAreaFinalId(null);
+      setRemision({});
+      setUsaPlantillaPdf(false);
+      setPlantillaPdf(PLANTILLA_PDF_DEFAULT);
+    }
+    setEditorOpen(true);
+  }
+
+  function cerrarEditor() {
+    setEditorOpen(false);
+  }
+
+  function toggleAreaParticipante(id: number) {
+    setAreasParticipantes((prev) => {
+      const yaEsta = prev.includes(id);
+      const next = yaEsta ? prev.filter((x) => x !== id) : [...prev, id];
+      if (yaEsta) {
+        if (areaInicialId === id) setAreaInicialId(null);
+        if (areaFinalId === id) setAreaFinalId(null);
+        setRemision((r) => {
+          const copy = { ...r };
+          delete copy[String(id)];
+          for (const k of Object.keys(copy)) {
+            copy[k] = copy[k].filter((x) => x !== id);
+          }
+          return copy;
+        });
+      }
+      return next;
+    });
+  }
+
+  function toggleRemision(origen: number, destino: number) {
+    setRemision((prev) => {
+      const lista = prev[String(origen)] || [];
+      const tiene = lista.includes(destino);
+      const next = tiene ? lista.filter((x) => x !== destino) : [...lista, destino];
+      return { ...prev, [String(origen)]: next };
+    });
+  }
+
+  function marcarTodaLaMatriz() {
+    const ids = areasParticipantes;
+    const next: Record<string, number[]> = {};
+    for (const origen of ids) {
+      next[String(origen)] = ids.filter((d) => d !== origen);
+    }
+    setRemision(next);
+  }
+
+  function limpiarMatriz() {
+    setRemision({});
+  }
+
+  function agregarCampo() {
+    setCampos((prev) => [...prev, { key: '', label: '', type: 'text', required: true, group: 'Datos personales' }]);
+  }
+  function actualizarCampo(idx: number, patch: Partial<CampoPlantilla>) {
+    setCampos((prev) => prev.map((c, i) => (i === idx ? { ...c, ...patch } : c)));
+  }
+  function eliminarCampo(idx: number) {
+    setCampos((prev) => prev.filter((_, i) => i !== idx));
+  }
+  function agregarPaso() {
+    setFlujo((prev) => [...prev, { rol: '', label: '', orden: prev.length + 1 }]);
+  }
+  function actualizarPaso(idx: number, patch: Partial<PasoFlujo>) {
+    setFlujo((prev) => prev.map((p, i) => (i === idx ? { ...p, ...patch } : p)));
+  }
+  function eliminarPaso(idx: number) {
+    setFlujo((prev) => prev.filter((_, i) => i !== idx).map((p, i) => ({ ...p, orden: i + 1 })));
+  }
+
+  async function guardar(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setMsg(''); setErr('');
+    if (!nombre.trim()) { setErr('Nombre es obligatorio.'); return; }
+    if (areasParticipantes.length === 0) {
+      setErr('Debes seleccionar al menos un área participante en el flujo.');
+      return;
+    }
+    // Derivar areaId del area inicial o de la primera participante
+    const areaIdResuelto = Number(areaId) > 0
+      ? Number(areaId)
+      : (areaInicialId ?? areasParticipantes[0]);
+
+    const camposLimpios = campos
+      .map((c) => ({ ...c, key: c.key.trim(), label: c.label.trim() }))
+      .filter((c) => c.key && c.label);
+    const flujoLimpio = flujo
+      .map((p, i) => ({ rol: p.rol.trim(), label: p.label.trim(), orden: i + 1 }))
+      .filter((p) => p.rol && p.label);
+
+    const flujoAreas: FlujoAreas | null = areasParticipantes.length > 0 ? {
+      areasParticipantes,
+      areaInicialId,
+      areaFinalId,
+      remision,
+    } : null;
+
+    const payload = {
+      areaId: areaIdResuelto,
+      nombre: nombre.trim(),
+      descripcion: descripcion.trim() || null,
+      slug: slug.trim() || undefined,
+      activo,
+      orden: typeof orden === 'number' ? orden : 0,
+      camposPlantilla: camposLimpios,
+      flujoAprobacion: flujoLimpio,
+      flujoAreas,
+      plantillaPdf: usaPlantillaPdf ? plantillaPdf : null,
+    };
+    try {
+      if (editingId) {
+        await api.patch(`/tipos/${editingId}`, payload);
+        setMsg('Tipo actualizado.');
+      } else {
+        await api.post('/tipos', payload);
+        setMsg('Tipo creado.');
+      }
+      cerrarEditor();
+      cargar();
+    } catch (e) {
+      const r = (e as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      setErr(r || 'No se pudo guardar el tipo.');
+    }
+  }
+
+  async function eliminar(t: TipoSolicitud) {
+    if (!window.confirm(`¿Eliminar el tipo "${t.nombre}"? Esta acción no se puede deshacer.`)) return;
+    setMsg(''); setErr('');
+    try {
+      await api.delete(`/tipos/${t.id}`);
+      setMsg(`Tipo "${t.nombre}" eliminado.`);
+      cargar();
+    } catch (e) {
+      const r = (e as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      setErr(r || 'No se pudo eliminar el tipo.');
+    }
+  }
+
+  async function toggleActivo(t: TipoSolicitud) {
+    setMsg(''); setErr('');
+    try {
+      await api.patch(`/tipos/${t.id}`, { activo: !t.activo });
+      setMsg(`Tipo "${t.nombre}" ${t.activo ? 'desactivado' : 'activado'}.`);
+      cargar();
+    } catch (e) {
+      const r = (e as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      setErr(r || 'No se pudo actualizar.');
+    }
+  }
+
+  const tiposFiltrados = useMemo(
+    () => filtroArea ? tipos.filter((t) => t.areaId === filtroArea) : tipos,
+    [tipos, filtroArea],
+  );
+
+  return (
+    <section className="admin-tipos-panel">
+      <div className="tipos-toolbar card-surface">
+        <div>
+          <h3>Tipos de solicitud</h3>
+          <p className="admin-help-text">
+            {loading ? 'Cargando…' : `${tipos.length} tipo(s) en el sistema.`}
+          </p>
+        </div>
+        <div className="tipos-toolbar-actions">
+          <select
+            value={filtroArea}
+            onChange={(e) => setFiltroArea(e.target.value === '' ? '' : Number(e.target.value))}
+            aria-label="Filtrar por area"
+          >
+            <option value="">Todas las áreas</option>
+            {areas.map((a) => <option key={a.id} value={a.id}>{a.nombre}</option>)}
+          </select>
+          <button type="button" className="admin-refresh-button" onClick={cargar}>Refrescar</button>
+          <button type="button" className="admin-primary-button" onClick={() => abrirEditor(null)}>
+            + Nuevo tipo
+          </button>
+        </div>
+      </div>
+
+      {msg ? <div className="admin-success">{msg}</div> : null}
+      {err ? <div className="admin-error">{err}</div> : null}
+
+      <div className="tipos-grid">
+        {tiposFiltrados.length === 0 ? (
+          <p className="admin-help-text">No hay tipos registrados.</p>
+        ) : null}
+        {tiposFiltrados.map((t) => (
+          <article key={t.id} className="tipo-card card-surface">
+            <div className="tipo-card-head">
+              <div>
+                <strong>{t.nombre}</strong>
+                <p className="admin-help-text">{t.areaNombre}</p>
+              </div>
+              <span className={`status-pill ${t.activo ? 'on' : 'off'}`}>{t.activo ? 'Activo' : 'Inactivo'}</span>
+            </div>
+            {t.descripcion ? <p className="admin-help-text">{t.descripcion}</p> : null}
+            <ul className="tipo-card-meta">
+              <li>{t.camposPlantilla.length} campo(s)</li>
+              <li>{(t.flujoAprobacion || []).length} nivel(es)</li>
+              {t.flujoAreas?.areasParticipantes?.length ? (
+                <li>{t.flujoAreas.areasParticipantes.length} área(s) en flujo</li>
+              ) : null}
+            </ul>
+            <div className="tipo-card-actions">
+              <button type="button" className="admin-ghost-button" onClick={() => abrirEditor(t)}>Editar</button>
+              <button type="button" className="admin-ghost-button" onClick={() => toggleActivo(t)}>
+                {t.activo ? 'Desactivar' : 'Activar'}
+              </button>
+              <button type="button" className="admin-ghost-button admin-role-delete" onClick={() => eliminar(t)}>
+                Eliminar
+              </button>
+            </div>
+          </article>
+        ))}
+      </div>
+
+      {editorOpen ? (
+        <div className="tipos-editor-overlay" role="dialog" aria-modal="true" aria-label="Editor de tipo de solicitud">
+          <div className="tipos-editor card-surface">
+            <header className="tipos-editor-head">
+              <h3>{editingId ? 'Editar tipo de solicitud' : 'Crear tipo de solicitud'}</h3>
+              <button type="button" className="admin-ghost-button" onClick={cerrarEditor}>✕ Cerrar</button>
+            </header>
+
+            <form className="tipos-editor-form" onSubmit={guardar}>
+              {/* SECCIÓN 1: Datos generales */}
+              <section className="tipos-editor-section">
+                <h4>1. Datos generales</h4>
+                <div className="admin-user-form-grid">
+                  <div className="form-group">
+                    <label htmlFor="t-nombre">Nombre del tipo *</label>
+                    <input id="t-nombre" type="text" value={nombre} onChange={(e) => setNombre(e.target.value)} required placeholder="Ej. Cuenta de cobro OPS" />
+                  </div>
+                  <div className="form-group">
+                    <label htmlFor="t-slug">Identificador (slug)</label>
+                    <input id="t-slug" type="text" value={slug} onChange={(e) => setSlug(e.target.value)} placeholder="auto-generado" />
+                  </div>
+                  <div className="form-group">
+                    <label htmlFor="t-orden">Orden</label>
+                    <input id="t-orden" type="number" value={orden} onChange={(e) => setOrden(e.target.value === '' ? '' : Number(e.target.value))} />
+                  </div>
+                  <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                    <label htmlFor="t-desc">Descripción</label>
+                    <input id="t-desc" type="text" value={descripcion} onChange={(e) => setDescripcion(e.target.value)} placeholder="Descripción visible al solicitante" />
+                  </div>
+                  <label className="ops-checkbox" style={{ alignSelf: 'end' }}>
+                    <input type="checkbox" checked={activo} onChange={(e) => setActivo(e.target.checked)} /> Activo
+                  </label>
+                </div>
+                <p className="admin-help-text">
+                  El tipo será visible para todas las áreas que selecciones como participantes en la siguiente sección.
+                </p>
+              </section>
+
+              {/* SECCIÓN 2: Flujo de áreas (la novedad) */}
+              <section className="tipos-editor-section tipos-editor-flujo-areas">
+                <h4>2. Flujo de áreas</h4>
+                <p className="admin-help-text">
+                  Define qué áreas participan en este tipo, dónde inicia y termina, y qué remisiones están permitidas entre ellas.
+                </p>
+
+                <div className="form-group">
+                  <label>Áreas participantes</label>
+                  <div className="flujo-areas-chips">
+                    {areasActivas.map((a) => {
+                      const checked = areasParticipantes.includes(a.id);
+                      return (
+                        <button
+                          key={a.id}
+                          type="button"
+                          className={`flujo-area-chip${checked ? ' active' : ''}`}
+                          onClick={() => toggleAreaParticipante(a.id)}
+                        >
+                          {checked ? '✓ ' : '+ '}{a.nombre}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {areasParticipantesArr.length > 0 ? (
+                  <>
+                    <div className="admin-user-form-grid">
+                      <div className="form-group">
+                        <label htmlFor="t-area-ini">Área inicial (recibe primero)</label>
+                        <select id="t-area-ini" value={areaInicialId ?? ''} onChange={(e) => setAreaInicialId(e.target.value === '' ? null : Number(e.target.value))}>
+                          <option value="">— selecciona —</option>
+                          {areasParticipantesArr.map((a) => <option key={a.id} value={a.id}>{a.nombre}</option>)}
+                        </select>
+                      </div>
+                      <div className="form-group">
+                        <label htmlFor="t-area-fin">Área final (aprueba)</label>
+                        <select id="t-area-fin" value={areaFinalId ?? ''} onChange={(e) => setAreaFinalId(e.target.value === '' ? null : Number(e.target.value))}>
+                          <option value="">— selecciona —</option>
+                          {areasParticipantesArr.map((a) => <option key={a.id} value={a.id}>{a.nombre}</option>)}
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="flujo-matriz-wrap">
+                      <div className="flujo-matriz-toolbar">
+                        <p className="admin-help-text" style={{ margin: 0 }}>
+                          Matriz de remisión: marca a qué áreas puede remitir cada una.
+                        </p>
+                        <div className="admin-inline-actions">
+                          <button type="button" className="admin-ghost-button" onClick={marcarTodaLaMatriz}>
+                            ✓ Marcar todas
+                          </button>
+                          <button type="button" className="admin-ghost-button" onClick={limpiarMatriz}>
+                            ✕ Limpiar matriz
+                          </button>
+                        </div>
+                      </div>
+                      <table className="flujo-matriz">
+                        <thead>
+                          <tr>
+                            <th></th>
+                            {areasParticipantesArr.map((destino) => (
+                              <th key={destino.id} title={destino.nombre}>{destino.nombre}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {areasParticipantesArr.map((origen) => (
+                            <tr key={origen.id}>
+                              <th scope="row">{origen.nombre}</th>
+                              {areasParticipantesArr.map((destino) => {
+                                if (origen.id === destino.id) {
+                                  return <td key={destino.id} className="flujo-matriz-self">—</td>;
+                                }
+                                const permitido = (remision[String(origen.id)] || []).includes(destino.id);
+                                return (
+                                  <td key={destino.id}>
+                                    <input
+                                      type="checkbox"
+                                      checked={permitido}
+                                      onChange={() => toggleRemision(origen.id, destino.id)}
+                                      aria-label={`Permitir remision de ${origen.nombre} a ${destino.nombre}`}
+                                    />
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </>
+                ) : (
+                  <p className="admin-help-text">Selecciona al menos un área para configurar el flujo.</p>
+                )}
+              </section>
+
+              {/* SECCIÓN 3: Campos */}
+              <section className="tipos-editor-section">
+                <header className="admin-panel-head">
+                  <h4>3. Campos de la plantilla</h4>
+                  <button type="button" className="admin-ghost-button" onClick={agregarCampo}>+ Agregar campo</button>
+                </header>
+                <p className="admin-help-text">
+                  Datos que se piden al solicitante. En archivos, elige el documento esperado para que la IA valide automáticamente. Los conjuntos predefinidos (Datos personales, RUT, EPS, anexos…) ahora se insertan desde el editor de plantilla, sección 5.
+                </p>
+                {campos.length === 0 ? <p className="admin-help-text">Sin campos. Agrega al menos uno o usa los conjuntos predefinidos del editor de plantilla (sección 5).</p> : null}
+                {campos.map((c, idx) => (
+                  <div key={idx} className="admin-campo-row">
+                    <input type="text" placeholder="key" value={c.key} onChange={(e) => actualizarCampo(idx, { key: e.target.value })} />
+                    <input type="text" placeholder="Etiqueta" value={c.label} onChange={(e) => actualizarCampo(idx, { label: e.target.value })} />
+                    <select value={c.type} onChange={(e) => actualizarCampo(idx, { type: e.target.value as CampoPlantilla['type'] })}>
+                      {TIPOS_CAMPO.map((t) => <option key={t.v} value={t.v}>{t.l}</option>)}
+                    </select>
+                    <input type="text" placeholder="Grupo" value={c.group ?? ''} onChange={(e) => actualizarCampo(idx, { group: e.target.value })} />
+                    {c.type === 'file' ? (
+                      <select value={c.ocr_target ?? ''} onChange={(e) => actualizarCampo(idx, { ocr_target: e.target.value || undefined })}>
+                        {OCR_TARGETS.map((t) => <option key={t.v} value={t.v}>{t.l}</option>)}
+                      </select>
+                    ) : <span />}
+                    <label className="ops-checkbox">
+                      <input type="checkbox" checked={c.required} onChange={(e) => actualizarCampo(idx, { required: e.target.checked })} /> Obligatorio
+                    </label>
+                    <button type="button" className="admin-ghost-button" onClick={() => eliminarCampo(idx)}>Eliminar</button>
+                  </div>
+                ))}
+              </section>
+
+              {/* SECCIÓN 4: Flujo de aprobación por niveles */}
+              <section className="tipos-editor-section">
+                <header className="admin-panel-head">
+                  <h4>4. Flujo de aprobación por niveles</h4>
+                  <button type="button" className="admin-ghost-button" onClick={agregarPaso}>+ Agregar paso</button>
+                </header>
+                <p className="admin-help-text">Niveles secuenciales que deben validar dentro de cada área.</p>
+                {flujo.map((p, idx) => (
+                  <div key={idx} className="admin-paso-row">
+                    <span className="admin-paso-orden">{idx + 1}.</span>
+                    <input type="text" placeholder="rol (analista, coordinador, contabilidad)" value={p.rol} onChange={(e) => actualizarPaso(idx, { rol: e.target.value })} />
+                    <input type="text" placeholder="Etiqueta visible" value={p.label} onChange={(e) => actualizarPaso(idx, { label: e.target.value })} />
+                    <button type="button" className="admin-ghost-button" onClick={() => eliminarPaso(idx)}>Eliminar</button>
+                  </div>
+                ))}
+              </section>
+
+              {/* SECCIÓN 5: Editor de plantilla PDF tipo Word (bloques) */}
+              <section className="tipos-editor-section">
+                <header className="admin-panel-head">
+                  <div>
+                    <h4>5. Diseñador del PDF de salida</h4>
+                    <p className="admin-help-text">
+                      Arma el PDF como en Word: agrega bloques (logo, títulos, párrafos, campos del formulario, tablas, firmas) y ordénalos como quieras. Cada bloque se renderiza arriba a abajo en el documento.
+                    </p>
+                  </div>
+                  <label className="ops-checkbox">
+                    <input type="checkbox" checked={usaPlantillaPdf} onChange={(e) => setUsaPlantillaPdf(e.target.checked)} /> Usar plantilla personalizada
+                  </label>
+                </header>
+                {usaPlantillaPdf ? (
+                  <PlantillaPdfEditor
+                    plantilla={plantillaPdf}
+                    onChange={setPlantillaPdf}
+                    campos={campos}
+                    onInsertarConjunto={(conjuntoId, pagina) => {
+                      const conjunto = BLOQUES_PREDEFINIDOS.find((b) => b.id === conjuntoId);
+                      if (!conjunto) return;
+                      // 1) Agregar campos al state (evitando duplicados por key)
+                      const keysExistentes = new Set(campos.map((c) => c.key));
+                      const nuevos = conjunto.campos.filter((c) => !keysExistentes.has(c.key));
+                      const camposFinales = [...campos, ...nuevos];
+                      setCampos(camposFinales);
+                      // 2) Agregar bloques visuales al PDF (incluso si los campos ya existían: solo se crean para los nuevos)
+                      if (nuevos.length === 0) return;
+                      const bloquesPag = (plantillaPdf.bloques || []).filter((b) => (b.pagina ?? 1) === pagina);
+                      const maxBottom = bloquesPag.reduce((acc, b) => {
+                        const h = b.tipo === 'tabla' ? 36 : b.tipo === 'firma' ? 36 : b.tipo === 'logo' ? 18 : 10;
+                        return Math.max(acc, b.y + h);
+                      }, 18);
+                      let yActual = Math.min(260, maxBottom + 6);
+                      const tituloBloque: PdfBloque = {
+                        id: nuevoId(),
+                        pagina,
+                        x: 18,
+                        y: yActual,
+                        w: 174,
+                        tipo: 'titulo',
+                        texto: conjunto.nombre.toUpperCase(),
+                        alineacion: 'izquierda',
+                        tamano: 12,
+                        negrita: true,
+                      };
+                      yActual += 8;
+                      const dividerBloque: PdfBloque = {
+                        id: nuevoId(),
+                        pagina,
+                        x: 18,
+                        y: yActual,
+                        w: 174,
+                        tipo: 'divider',
+                      };
+                      yActual += 4;
+                      const camposBloques: PdfBloque[] = nuevos.map((c) => {
+                        const yy = yActual;
+                        yActual += 10;
+                        if (c.type === 'file') {
+                          return {
+                            id: nuevoId(),
+                            pagina,
+                            x: 18,
+                            y: yy,
+                            w: 174,
+                            tipo: 'campo',
+                            campoKey: c.key,
+                            etiqueta: `☐ ${c.label}:`,
+                            alineacion: 'izquierda',
+                          } as PdfBloque;
+                        }
+                        return {
+                          id: nuevoId(),
+                          pagina,
+                          x: 18,
+                          y: yy,
+                          w: 174,
+                          tipo: 'campo',
+                          campoKey: c.key,
+                          etiqueta: `${c.label}:`,
+                          alineacion: 'izquierda',
+                        } as PdfBloque;
+                      });
+                      setPlantillaPdf({
+                        ...plantillaPdf,
+                        bloques: [...(plantillaPdf.bloques || []), tituloBloque, dividerBloque, ...camposBloques],
+                      });
+                    }}
+                  />
+                ) : null}
+              </section>
+
+              <footer className="tipos-editor-footer">
+                <button type="button" className="admin-ghost-button" onClick={cerrarEditor}>Cancelar</button>
+                <button type="submit" className="admin-primary-button">
+                  {editingId ? 'Guardar cambios' : 'Crear tipo'}
+                </button>
+              </footer>
+            </form>
+          </div>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+/* ============================================================
+   Editor de plantilla PDF por bloques (tipo Word)
+   ============================================================ */
+interface EditorProps {
+  plantilla: PlantillaPdf;
+  onChange: (next: PlantillaPdf) => void;
+  campos: CampoPlantilla[];
+  onInsertarConjunto: (conjuntoId: string, pagina: number) => void;
+}
+
+function PlantillaPdfEditor({ plantilla, onChange, campos, onInsertarConjunto }: EditorProps) {
+  const bloques = plantilla.bloques || [];
+
+  const [seleccionadoId, setSeleccionadoId] = useState<string | null>(null);
+  const [paginaActiva, setPaginaActiva] = useState(1);
+  const [pantallaCompleta, setPantallaCompleta] = useState(false);
+  const [ocultarOverlap, setOcultarOverlap] = useState(false);
+  const [previewFormOpen, setPreviewFormOpen] = useState(false);
+  const pageRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!pantallaCompleta) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = prev; };
+  }, [pantallaCompleta]);
+
+  const totalPaginas = useMemo(
+    () => Math.max(1, ...bloques.map((b) => b.pagina ?? 1)),
+    [bloques],
+  );
+
+  function insertarPlaceholder(token: string) {
+    if (!seleccionadoId) return;
+    const b = bloques.find((x) => x.id === seleccionadoId);
+    if (!b) return;
+    if (b.tipo === 'texto' || b.tipo === 'titulo') {
+      actualizar(b.id, { texto: (b.texto || '') + ' ' + token } as Partial<PdfBloque>);
+    } else if (b.tipo === 'campo') {
+      actualizar(b.id, { etiqueta: (b.etiqueta || '') + ' ' + token } as Partial<PdfBloque>);
+    }
+  }
+
+  // Escala mm → pixeles (A4 = 210x297 mm)
+  const SCALE = 2.6; // ~ A4 = 546 × 772 px
+
+  function setBloques(next: PdfBloque[]) {
+    onChange({ ...plantilla, bloques: next });
+  }
+  function agregar(b: PdfBloque) {
+    const conPagina = { ...b, pagina: (b.pagina ?? paginaActiva) } as PdfBloque;
+    setBloques([...bloques, conPagina]);
+    setSeleccionadoId(b.id);
+  }
+  function actualizar(id: string, patch: Partial<PdfBloque>) {
+    setBloques(bloques.map((b) => (b.id === id ? ({ ...b, ...patch } as PdfBloque) : b)));
+  }
+  function eliminar(id: string) {
+    setBloques(bloques.filter((b) => b.id !== id));
+    if (seleccionadoId === id) setSeleccionadoId(null);
+  }
+
+  function eliminarPagina(pagina: number) {
+    if (pagina <= 1) return;
+    const cantBloques = bloques.filter((b) => (b.pagina ?? 1) === pagina).length;
+    const msg = cantBloques > 0
+      ? `¿Eliminar la página ${pagina}? Se borrarán ${cantBloques} bloque(s) y las páginas posteriores se reorganizarán.`
+      : `¿Eliminar la página ${pagina}?`;
+    if (!window.confirm(msg)) return;
+    // Quita bloques de esa página y compacta el número de página de las posteriores
+    const next = bloques
+      .filter((b) => (b.pagina ?? 1) !== pagina)
+      .map((b) => {
+        const p = b.pagina ?? 1;
+        return p > pagina ? ({ ...b, pagina: p - 1 } as PdfBloque) : b;
+      });
+    setBloques(next);
+    if (paginaActiva === pagina) setPaginaActiva(Math.max(1, pagina - 1));
+    else if (paginaActiva > pagina) setPaginaActiva(paginaActiva - 1);
+  }
+
+  const camposDisponibles = [
+    { key: '__radicado', label: 'Número de radicado' },
+    { key: '__nombre', label: 'Nombre del solicitante' },
+    { key: '__cedula', label: 'Cédula del solicitante' },
+    { key: '__correo', label: 'Correo del solicitante' },
+    { key: '__fecha', label: 'Fecha actual' },
+    { key: '__ciudad', label: 'Ciudad' },
+    ...campos.filter((c) => c.key && c.type !== 'texto-fijo').map((c) => ({ key: c.key, label: c.label })),
+  ];
+
+  // Posición inicial para nuevo bloque: busca un Y libre debajo del último bloque de la página activa
+  function nuevaPos(): { x: number; y: number; w: number } {
+    const bloquesPag = bloques.filter((b) => (b.pagina ?? 1) === paginaActiva);
+    if (bloquesPag.length === 0) return { x: 18, y: 30, w: 174 };
+    const maxBottom = bloquesPag.reduce((acc, b) => {
+      const h = b.tipo === 'tabla' ? 36 : b.tipo === 'firma' ? 36 : b.tipo === 'logo' ? 18 : 10;
+      return Math.max(acc, b.y + h);
+    }, 0);
+    const nextY = Math.min(280, maxBottom + 4);
+    return { x: 18, y: nextY, w: 174 };
+  }
+
+  // Bloques que se superponen: aproximación con bounding box rectangular
+  function alturaEstimada(b: PdfBloque): number {
+    if (b.tipo === 'tabla') return 36;
+    if (b.tipo === 'firma') return 36;
+    if (b.tipo === 'logo') return 18;
+    if (b.tipo === 'titulo') return Math.max(6, b.tamano * 0.5);
+    if (b.tipo === 'texto') return Math.max(5, b.tamano * 0.5);
+    if (b.tipo === 'divider') return 2;
+    return 8;
+  }
+  const idsSuperpuestos = useMemo(() => {
+    const set = new Set<string>();
+    for (let i = 0; i < bloques.length; i++) {
+      const a = bloques[i];
+      const ah = alturaEstimada(a);
+      for (let j = i + 1; j < bloques.length; j++) {
+        const b = bloques[j];
+        const bh = alturaEstimada(b);
+        const overlapX = a.x < b.x + b.w && a.x + a.w > b.x;
+        const overlapY = a.y < b.y + bh && a.y + ah > b.y;
+        if (overlapX && overlapY) {
+          set.add(a.id);
+          set.add(b.id);
+        }
+      }
+    }
+    return set;
+  }, [bloques]);
+
+  function cargarEjemplo(id: string) {
+    const ej = PLANTILLAS_EJEMPLO.find((p) => p.id === id);
+    if (!ej) return;
+    if (bloques.length > 0 && !window.confirm('Esto reemplaza la plantilla actual con un ejemplo. ¿Continuar?')) return;
+    setBloques(ej.build());
+    setSeleccionadoId(null);
+  }
+
+  // Drag handling
+  function onPointerDown(e: React.PointerEvent<HTMLDivElement>, id: string) {
+    const target = e.currentTarget;
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const b = bloques.find((x) => x.id === id);
+    if (!b) return;
+    const startBx = b.x;
+    const startBy = b.y;
+    setSeleccionadoId(id);
+    target.setPointerCapture(e.pointerId);
+
+    const move = (ev: PointerEvent) => {
+      const dxPx = ev.clientX - startX;
+      const dyPx = ev.clientY - startY;
+      const dxMm = dxPx / SCALE;
+      const dyMm = dyPx / SCALE;
+      const nx = Math.max(0, Math.min(210, startBx + dxMm));
+      const ny = Math.max(0, Math.min(297, startBy + dyMm));
+      actualizar(id, { x: Math.round(nx), y: Math.round(ny) } as Partial<PdfBloque>);
+    };
+    const up = (ev: PointerEvent) => {
+      try { target.releasePointerCapture(ev.pointerId); } catch { /* ignorar */ }
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  }
+
+  const sel = bloques.find((b) => b.id === seleccionadoId) || null;
+
+  const editorContent = (
+    <div className={`plantilla-editor${pantallaCompleta ? ' plantilla-editor-fullscreen' : ''}`}>
+      {pantallaCompleta ? (
+        <div className="plantilla-fullscreen-bar">
+          <strong>Editor de plantilla · Pantalla completa</strong>
+          <button type="button" className="admin-ghost-button" onClick={() => setPantallaCompleta(false)}>
+            ✕ Salir de pantalla completa
+          </button>
+        </div>
+      ) : (
+        <div className="plantilla-fullscreen-toggle">
+          <button type="button" className="admin-primary-button" onClick={() => setPantallaCompleta(true)}>
+            ⛶ Editar en pantalla completa (estilo Word)
+          </button>
+        </div>
+      )}
+      <div className="plantilla-paleta">
+        <span className="admin-help-text"><strong>Cargar ejemplo:</strong></span>
+        <select
+          className="plantilla-ejemplo-select"
+          value=""
+          onChange={(e) => { if (e.target.value) { cargarEjemplo(e.target.value); e.target.value = ''; } }}
+        >
+          <option value="">— escoge un ejemplo —</option>
+          {PLANTILLAS_EJEMPLO.map((p) => (
+            <option key={p.id} value={p.id}>{p.nombre}</option>
+          ))}
+        </select>
+        <span className="plantilla-preview-sep" />
+        <button
+          type="button"
+          className="bloque-rapido-btn plantilla-preview-btn"
+          title="Descarga el PDF con los datos rellenados con valores de ejemplo"
+          onClick={() => descargarPreviewPlantilla(plantilla, campos, 'ejemplo')}
+        >
+          👁️ Ver ejemplo con datos
+        </button>
+        <button
+          type="button"
+          className="bloque-rapido-btn plantilla-preview-btn"
+          title="Descarga el PDF en blanco, listo para diligenciar"
+          onClick={() => descargarPreviewPlantilla(plantilla, campos, 'vacia')}
+        >
+          📥 Descargar en blanco
+        </button>
+        <button
+          type="button"
+          className="bloque-rapido-btn plantilla-preview-btn"
+          title="Vista previa del formulario tal como lo verá el solicitante"
+          onClick={() => setPreviewFormOpen(true)}
+        >
+          📝 Cómo se ve el formulario
+        </button>
+        <span className="admin-help-text" style={{ marginLeft: 8 }}><strong>Agregar bloque:</strong></span>
+        <button type="button" className="bloque-rapido-btn" onClick={() => { const p = nuevaPos(); agregar({ id: nuevoId(), ...p, w: 40, tipo: 'logo', alineacion: 'izquierda', ancho: 36, src: '/logo-payops-dark.png' }); }}>+ Logo</button>
+        <button type="button" className="bloque-rapido-btn" onClick={() => { const p = nuevaPos(); agregar({ id: nuevoId(), ...p, tipo: 'titulo', texto: 'Nuevo título', alineacion: 'centro', tamano: 14, negrita: true }); }}>+ Título</button>
+        <button type="button" className="bloque-rapido-btn" onClick={() => { const p = nuevaPos(); agregar({ id: nuevoId(), ...p, tipo: 'texto', texto: 'Texto del documento', alineacion: 'izquierda', tamano: 11 }); }}>+ Texto</button>
+        <button type="button" className="bloque-rapido-btn" onClick={() => { const p = nuevaPos(); agregar({ id: nuevoId(), ...p, tipo: 'campo', campoKey: camposDisponibles[0]?.key || '__nombre', etiqueta: 'Campo:', alineacion: 'izquierda' }); }}>+ Campo</button>
+        <button type="button" className="bloque-rapido-btn" onClick={() => { const p = nuevaPos(); agregar({ id: nuevoId(), ...p, w: 170, tipo: 'tabla', columnas: ['FECHA', 'ITEM', 'VALOR'] }); }}>+ Tabla</button>
+        <button type="button" className="bloque-rapido-btn" onClick={() => { const p = nuevaPos(); agregar({ id: nuevoId(), ...p, w: 170, tipo: 'divider' }); }}>+ Línea</button>
+        <button type="button" className="bloque-rapido-btn" onClick={() => { const p = nuevaPos(); agregar({ id: nuevoId(), ...p, w: 70, tipo: 'firma', etiqueta: 'Firma', campoFirma: 'profesional' }); }}>+ Firma</button>
+        <button type="button" className="bloque-rapido-btn" onClick={() => { const p = nuevaPos(); agregar({ id: nuevoId(), ...p, w: 80, tipo: 'caja', alto: 30, relleno: false, etiqueta: '' }); }}>+ Caja</button>
+        <button type="button" className="bloque-rapido-btn" onClick={() => { const p = nuevaPos(); agregar({ id: nuevoId(), ...p, w: 60, tipo: 'imagen', src: '' }); }}>+ Imagen</button>
+        <button type="button" className="bloque-rapido-btn" onClick={() => { const p = nuevaPos(); agregar({ id: nuevoId(), ...p, w: 120, tipo: 'lista', items: ['Item 1', 'Item 2', 'Item 3'], conVinetas: true }); }}>+ Lista</button>
+        <button type="button" className="bloque-rapido-btn" onClick={() => { const p = nuevaPos(); agregar({ id: nuevoId(), ...p, w: 170, tipo: 'separador-doble' }); }}>+ Doble línea</button>
+        <button type="button" className="bloque-rapido-btn" onClick={() => { const p = nuevaPos(); agregar({ id: nuevoId(), ...p, w: 30, tipo: 'qr-radicado', tamano: 30 }); }}>+ QR Radicado</button>
+      </div>
+
+      <div className="plantilla-conjuntos-paleta">
+        <span className="admin-help-text"><strong>📑 Conjuntos predefinidos (agregan campos al form + bloques al PDF):</strong></span>
+        {BLOQUES_PREDEFINIDOS.map((b) => (
+          <button
+            key={b.id}
+            type="button"
+            className="plantilla-conjunto-chip"
+            title={b.descripcion}
+            onClick={() => onInsertarConjunto(b.id, paginaActiva)}
+          >
+            ➕ {b.nombre}
+          </button>
+        ))}
+      </div>
+
+      {campos.length > 0 ? (
+        <div className="plantilla-campos-paleta">
+          <span className="admin-help-text"><strong>Campos del formulario (click para insertar):</strong></span>
+          {campos.filter((c) => c.key && c.type !== 'texto-fijo').map((c) => (
+            <button
+              key={c.key}
+              type="button"
+              className="plantilla-campo-chip"
+              title={`Insertar campo "${c.label}" en la página activa`}
+              onClick={() => {
+                const p = nuevaPos();
+                agregar({
+                  id: nuevoId(),
+                  ...p,
+                  tipo: 'campo',
+                  campoKey: c.key,
+                  etiqueta: `${c.label}:`,
+                  alineacion: 'izquierda',
+                });
+              }}
+            >
+              ➕ {c.label}
+            </button>
+          ))}
+        </div>
+      ) : (
+        <div className="plantilla-campos-paleta plantilla-campos-vacio">
+          <span className="admin-help-text">
+            ⓘ Aún no has definido campos del formulario en la sección 3. Defínelos arriba y aparecerán aquí para insertarlos.
+          </span>
+        </div>
+      )}
+      {idsSuperpuestos.size > 0 && !ocultarOverlap ? (
+        <div className="plantilla-overlap-aviso">
+          <span>⚠ {idsSuperpuestos.size} bloque(s) cercanos. Puedes seguir editando.</span>
+          <button type="button" className="admin-ghost-button" onClick={() => setOcultarOverlap(true)}>✕ Ocultar</button>
+        </div>
+      ) : null}
+
+      <div className="plantilla-tip">
+        <span>👆 Toma un bloque del documento y arrástralo a donde quieras. Click para editarlo.</span>
+      </div>
+
+      {/* Selector de página (multi-página) */}
+      <div className="plantilla-paginas-nav">
+        {[1, 2, 3, 4, 5].filter((p) => p === 1 || bloques.some((b) => (b.pagina ?? 1) === p) || p === paginaActiva).map((p) => {
+          const cantBloques = bloques.filter((b) => (b.pagina ?? 1) === p).length;
+          return (
+            <div key={p} className={`plantilla-pagina-tab-wrap${p === paginaActiva ? ' active' : ''}`}>
+              <button
+                type="button"
+                className={`plantilla-pagina-tab${p === paginaActiva ? ' active' : ''}`}
+                onClick={() => setPaginaActiva(p)}
+              >
+                Página {p}{cantBloques === 0 && p > 1 ? ' (vacía)' : cantBloques > 0 ? ` · ${cantBloques}` : ''}
+              </button>
+              {p > 1 ? (
+                <button
+                  type="button"
+                  className="plantilla-pagina-delete"
+                  title={`Eliminar página ${p}`}
+                  onPointerDown={(e) => { e.stopPropagation(); e.preventDefault(); }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    eliminarPagina(p);
+                  }}
+                >
+                  ✕
+                </button>
+              ) : null}
+            </div>
+          );
+        })}
+        <button
+          type="button"
+          className="plantilla-pagina-add"
+          onClick={() => setPaginaActiva(Math.min(5, totalPaginas + 1))}
+        >
+          + Agregar página
+        </button>
+      </div>
+
+      {/* Chips clickeables de placeholders */}
+      {sel && (sel.tipo === 'texto' || sel.tipo === 'titulo' || sel.tipo === 'campo') ? (
+        <div className="plantilla-placeholders-bar">
+          <span className="admin-help-text">Insertar en el bloque seleccionado:</span>
+          {[
+            { key: 'radicado', label: 'N° Radicado' },
+            { key: 'nombre', label: 'Nombre' },
+            { key: 'cedula', label: 'Cédula' },
+            { key: 'correo', label: 'Correo' },
+            { key: 'ciudad', label: 'Ciudad' },
+            { key: 'fecha', label: 'Fecha' },
+            { key: 'valor', label: 'Valor $' },
+            { key: 'valorLetras', label: 'Valor en letras' },
+            { key: 'concepto', label: 'Concepto' },
+          ].map((p) => (
+            <button
+              key={p.key}
+              type="button"
+              className="plantilla-placeholder-chip"
+              onClick={() => insertarPlaceholder(`{{${p.key}}}`)}
+            >
+              + {p.label}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
+      <div className="plantilla-workspace">
+        <div className="plantilla-page" ref={pageRef} style={{ width: 210 * SCALE, height: 297 * SCALE }} onClick={() => setSeleccionadoId(null)}>
+          <div className="plantilla-page-num">Página {paginaActiva} de {totalPaginas}</div>
+          {bloques.filter((b) => (b.pagina ?? 1) === paginaActiva).map((b) => {
+            const left = b.x * SCALE;
+            const top = b.y * SCALE;
+            const width = (b.w || 100) * SCALE;
+            const isSel = b.id === seleccionadoId;
+            return (
+              <div
+                key={b.id}
+                className={`plantilla-canvas-bloque tipo-${b.tipo}${isSel ? ' seleccionado' : ''}${idsSuperpuestos.has(b.id) && !ocultarOverlap ? ' con-overlap' : ''}`}
+                style={{ left, top, width }}
+                onPointerDown={(e) => onPointerDown(e, b.id)}
+                onClick={(e) => { e.stopPropagation(); setSeleccionadoId(b.id); }}
+              >
+                {b.tipo === 'logo' ? (
+                  <div className="canvas-logo" style={{ width: '100%', textAlign: b.alineacion === 'centro' ? 'center' : b.alineacion === 'derecha' ? 'right' : 'left' }}>
+                    <img
+                      src={b.src || '/logo-payops-dark.png'}
+                      alt="Logo"
+                      style={{ maxWidth: '100%', maxHeight: 60, display: 'inline-block', objectFit: 'contain' }}
+                    />
+                  </div>
+                ) : null}
+                {b.tipo === 'titulo' ? (
+                  <div style={{ textAlign: b.alineacion === 'centro' ? 'center' : b.alineacion === 'derecha' ? 'right' : 'left', fontSize: b.tamano, fontWeight: b.negrita ? 700 : 400 }}>
+                    {b.texto}
+                  </div>
+                ) : null}
+                {b.tipo === 'texto' ? (
+                  <div style={{ textAlign: b.alineacion === 'centro' ? 'center' : b.alineacion === 'derecha' ? 'right' : 'left', fontSize: b.tamano }}>
+                    {b.texto}
+                  </div>
+                ) : null}
+                {b.tipo === 'campo' ? (
+                  <div style={{ fontSize: 11, textAlign: b.alineacion === 'centro' ? 'center' : b.alineacion === 'derecha' ? 'right' : 'left' }}>
+                    <strong>{b.etiqueta}</strong> <span style={{ color: '#999', borderBottom: '1px solid #999', display: 'inline-block', minWidth: 60 }}>[{b.campoKey}]</span>
+                  </div>
+                ) : null}
+                {b.tipo === 'tabla' ? (
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 10 }}>
+                    <thead>
+                      <tr>{b.columnas.map((c, i) => <th key={i} style={{ background: '#070B1D', color: '#D4AF37', padding: '4px 6px' }}>{c}</th>)}</tr>
+                    </thead>
+                    <tbody>
+                      <tr>{b.columnas.map((_, i) => <td key={i} style={{ border: '1px solid #ccc', padding: '4px 6px', minHeight: 18 }}>&nbsp;</td>)}</tr>
+                      <tr>{b.columnas.map((_, i) => <td key={i} style={{ border: '1px solid #ccc', padding: '4px 6px' }}>&nbsp;</td>)}</tr>
+                    </tbody>
+                  </table>
+                ) : null}
+                {b.tipo === 'divider' ? (
+                  <div style={{ borderTop: '1px solid #D4AF37', width: '100%', height: 1 }} />
+                ) : null}
+                {b.tipo === 'firma' ? (
+                  <div style={{ textAlign: 'center', fontSize: 11 }}>
+                    <div style={{ height: 28, border: '1px dashed #aaa', background: 'repeating-linear-gradient(45deg, #fafafa, #fafafa 4px, #eee 4px, #eee 8px)' }} />
+                    <div style={{ borderTop: '1px solid #444', marginTop: 2, paddingTop: 2 }}>{b.etiqueta}</div>
+                  </div>
+                ) : null}
+                {b.tipo === 'caja' ? (
+                  <div style={{ width: '100%', height: (b.alto || 30) * SCALE / 2, border: '2px solid #0F172A', background: b.relleno ? 'rgba(212, 175, 55, 0.18)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, color: '#444' }}>
+                    {b.etiqueta || '—'}
+                  </div>
+                ) : null}
+                {b.tipo === 'imagen' ? (
+                  b.src ? (
+                    <img src={b.src} alt="" style={{ maxWidth: '100%', maxHeight: 80, display: 'block', objectFit: 'contain' }} />
+                  ) : (
+                    <div style={{ width: '100%', height: 40, border: '1px dashed #999', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, color: '#999', background: '#fafafa' }}>
+                      📷 Sin imagen — pega URL en el panel
+                    </div>
+                  )
+                ) : null}
+                {b.tipo === 'lista' ? (
+                  <ul style={{ margin: 0, paddingLeft: b.conVinetas ? 18 : 0, fontSize: 11, listStyle: b.conVinetas ? 'disc' : 'none' }}>
+                    {b.items.slice(0, 6).map((it, i) => <li key={i}>{it}</li>)}
+                  </ul>
+                ) : null}
+                {b.tipo === 'separador-doble' ? (
+                  <div style={{ width: '100%' }}>
+                    <div style={{ borderTop: '2px solid #D4AF37' }} />
+                    <div style={{ borderTop: '1px solid #D4AF37', marginTop: 2 }} />
+                  </div>
+                ) : null}
+                {b.tipo === 'qr-radicado' ? (
+                  <div style={{ width: (b.tamano || 30) * SCALE / 2, height: (b.tamano || 30) * SCALE / 2, background: '#0F172A', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#D4AF37', fontSize: 9, textAlign: 'center', padding: 4 }}>
+                    QR<br/>{'{radicado}'}
+                  </div>
+                ) : null}
+                <span className="canvas-bloque-tag">{TIPOS_BLOQUE_LABELS[b.tipo]} · {b.x},{b.y}</span>
+              </div>
+            );
+          })}
+        </div>
+
+        <aside className="plantilla-edit-panel">
+          {!sel ? (
+            <p className="admin-help-text">Selecciona un bloque del documento para editar sus propiedades.</p>
+          ) : (
+            <>
+              <header className="plantilla-edit-head">
+                <strong>{TIPOS_BLOQUE_LABELS[sel.tipo]}</strong>
+                <button type="button" className="admin-ghost-button admin-role-delete" onClick={() => eliminar(sel.id)}>✕ Eliminar</button>
+              </header>
+              <div className="plantilla-edit-body">
+                <div className="plantilla-edit-row">
+                  <label>X (mm)</label>
+                  <input type="number" value={sel.x} onChange={(e) => actualizar(sel.id, { x: Number(e.target.value) } as Partial<PdfBloque>)} />
+                  <label>Y (mm)</label>
+                  <input type="number" value={sel.y} onChange={(e) => actualizar(sel.id, { y: Number(e.target.value) } as Partial<PdfBloque>)} />
+                  <label>Ancho (mm)</label>
+                  <input type="number" value={sel.w} onChange={(e) => actualizar(sel.id, { w: Number(e.target.value) } as Partial<PdfBloque>)} />
+                </div>
+                <label>Página</label>
+                <select value={sel.pagina ?? 1} onChange={(e) => actualizar(sel.id, { pagina: Number(e.target.value) } as Partial<PdfBloque>)}>
+                  {[1, 2, 3, 4, 5].map((p) => <option key={p} value={p}>Página {p}</option>)}
+                </select>
+
+                {sel.tipo === 'logo' ? (
+                  <>
+                    <label>Imagen del logo</label>
+                    <select value={sel.src || ''} onChange={(e) => actualizar(sel.id, { src: e.target.value || undefined })}>
+                      <option value="">— Recuadro genérico (GOLEMAN IPS) —</option>
+                      {LOGOS_DISPONIBLES.map((l) => (
+                        <option key={l.id} value={l.src}>{l.nombre}</option>
+                      ))}
+                    </select>
+                    <label>Alineación</label>
+                    <select value={sel.alineacion} onChange={(e) => actualizar(sel.id, { alineacion: e.target.value as PdfAlineacion })}>
+                      <option value="izquierda">Izquierda</option>
+                      <option value="centro">Centro</option>
+                      <option value="derecha">Derecha</option>
+                    </select>
+                  </>
+                ) : null}
+
+                {sel.tipo === 'titulo' ? (
+                  <>
+                    <label>Texto</label>
+                    <input type="text" value={sel.texto} onChange={(e) => actualizar(sel.id, { texto: e.target.value })} />
+                    <label>Alineación</label>
+                    <select value={sel.alineacion} onChange={(e) => actualizar(sel.id, { alineacion: e.target.value as PdfAlineacion })}>
+                      <option value="izquierda">Izquierda</option>
+                      <option value="centro">Centro</option>
+                      <option value="derecha">Derecha</option>
+                    </select>
+                    <label>Tamaño</label>
+                    <input type="number" min={8} max={32} value={sel.tamano} onChange={(e) => actualizar(sel.id, { tamano: Number(e.target.value) })} />
+                    <label className="ops-checkbox">
+                      <input type="checkbox" checked={sel.negrita} onChange={(e) => actualizar(sel.id, { negrita: e.target.checked })} /> Negrita
+                    </label>
+                  </>
+                ) : null}
+
+                {sel.tipo === 'texto' ? (
+                  <>
+                    <label>Texto</label>
+                    <textarea rows={3} value={sel.texto} onChange={(e) => actualizar(sel.id, { texto: e.target.value })} />
+                    <label>Alineación</label>
+                    <select value={sel.alineacion} onChange={(e) => actualizar(sel.id, { alineacion: e.target.value as PdfAlineacion })}>
+                      <option value="izquierda">Izquierda</option>
+                      <option value="centro">Centro</option>
+                      <option value="derecha">Derecha</option>
+                    </select>
+                    <label>Tamaño</label>
+                    <input type="number" min={8} max={20} value={sel.tamano} onChange={(e) => actualizar(sel.id, { tamano: Number(e.target.value) })} />
+                  </>
+                ) : null}
+
+                {sel.tipo === 'campo' ? (
+                  <>
+                    <label>Campo</label>
+                    <select value={sel.campoKey} onChange={(e) => actualizar(sel.id, { campoKey: e.target.value })}>
+                      {camposDisponibles.map((c) => (
+                        <option key={c.key} value={c.key}>{c.label}</option>
+                      ))}
+                    </select>
+                    <label>Etiqueta</label>
+                    <input type="text" value={sel.etiqueta} onChange={(e) => actualizar(sel.id, { etiqueta: e.target.value })} />
+                    <label>Alineación</label>
+                    <select value={sel.alineacion} onChange={(e) => actualizar(sel.id, { alineacion: e.target.value as PdfAlineacion })}>
+                      <option value="izquierda">Izquierda</option>
+                      <option value="centro">Centro</option>
+                      <option value="derecha">Derecha</option>
+                    </select>
+                  </>
+                ) : null}
+
+                {sel.tipo === 'tabla' ? (
+                  <>
+                    <label>Columnas (separadas por coma)</label>
+                    <input type="text" value={sel.columnas.join(', ')} onChange={(e) => actualizar(sel.id, { columnas: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) })} />
+                  </>
+                ) : null}
+
+                {sel.tipo === 'firma' ? (
+                  <>
+                    <label>Etiqueta</label>
+                    <input type="text" value={sel.etiqueta} onChange={(e) => actualizar(sel.id, { etiqueta: e.target.value })} />
+                    <label>Tipo</label>
+                    <select value={sel.campoFirma} onChange={(e) => actualizar(sel.id, { campoFirma: e.target.value as 'profesional' | 'coordinador' | 'contabilidad' })}>
+                      <option value="profesional">{FIRMA_LABELS.profesional}</option>
+                      <option value="coordinador">{FIRMA_LABELS.coordinador}</option>
+                      <option value="contabilidad">{FIRMA_LABELS.contabilidad}</option>
+                    </select>
+                  </>
+                ) : null}
+
+                {sel.tipo === 'divider' ? (
+                  <span className="admin-help-text">Línea horizontal. Solo necesita posición y ancho.</span>
+                ) : null}
+
+                {sel.tipo === 'caja' ? (
+                  <>
+                    <label>Alto (mm)</label>
+                    <input type="number" min={5} max={200} value={sel.alto} onChange={(e) => actualizar(sel.id, { alto: Number(e.target.value) })} />
+                    <label>Etiqueta interior</label>
+                    <input type="text" value={sel.etiqueta || ''} onChange={(e) => actualizar(sel.id, { etiqueta: e.target.value })} placeholder="Texto opcional dentro de la caja" />
+                    <label className="ops-checkbox">
+                      <input type="checkbox" checked={sel.relleno} onChange={(e) => actualizar(sel.id, { relleno: e.target.checked })} /> Caja rellena (dorado)
+                    </label>
+                  </>
+                ) : null}
+
+                {sel.tipo === 'imagen' ? (
+                  <>
+                    <label>URL de la imagen</label>
+                    <input type="text" value={sel.src} onChange={(e) => actualizar(sel.id, { src: e.target.value })} placeholder="https://... o /ruta-local.png" />
+                    <label>Etiqueta (caption opcional)</label>
+                    <input type="text" value={sel.etiqueta || ''} onChange={(e) => actualizar(sel.id, { etiqueta: e.target.value })} />
+                  </>
+                ) : null}
+
+                {sel.tipo === 'lista' ? (
+                  <>
+                    <label>Items (uno por línea)</label>
+                    <textarea rows={4} value={sel.items.join('\n')} onChange={(e) => actualizar(sel.id, { items: e.target.value.split('\n').filter(Boolean) })} />
+                    <label className="ops-checkbox">
+                      <input type="checkbox" checked={sel.conVinetas} onChange={(e) => actualizar(sel.id, { conVinetas: e.target.checked })} /> Con viñetas
+                    </label>
+                  </>
+                ) : null}
+
+                {sel.tipo === 'separador-doble' ? (
+                  <span className="admin-help-text">Doble línea horizontal dorada. Solo posición y ancho.</span>
+                ) : null}
+
+                {sel.tipo === 'qr-radicado' ? (
+                  <>
+                    <label>Tamaño (mm)</label>
+                    <input type="number" min={20} max={60} value={sel.tamano} onChange={(e) => actualizar(sel.id, { tamano: Number(e.target.value) })} />
+                    <span className="admin-help-text">El QR codifica automáticamente el número de radicado de la solicitud.</span>
+                  </>
+                ) : null}
+              </div>
+            </>
+          )}
+        </aside>
+      </div>
+
+      <PreviewFormularioModal
+        open={previewFormOpen}
+        onClose={() => setPreviewFormOpen(false)}
+        campos={campos}
+        plantillaPdf={plantilla}
+        tipoNombre=""
+      />
+    </div>
+  );
+
+  // Cuando está en pantalla completa, portal a document.body para escapar
+  // de modales padres y stacking contexts
+  if (pantallaCompleta && typeof document !== 'undefined') {
+    return createPortal(editorContent, document.body);
+  }
+  return editorContent;
+}

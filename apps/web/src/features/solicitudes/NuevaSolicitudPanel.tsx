@@ -1,0 +1,666 @@
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { api } from '../../services/http/api';
+import { useOcrDocument, validarOcrContraDato, validarTipoDocumento } from '../../hooks/useOcrDocument';
+import { numeroAPesosEnLetras, formatearMiles } from '../../utils/numeroALetras';
+import { SignaturePad } from '../../components/SignaturePad';
+import { BANCOS_COLOMBIA } from '../../utils/bancos';
+import { etiquetaDocumento } from '../../utils/documentoLabels';
+import { DireccionField } from '../../components/DireccionField';
+import { ordenarCamposPorPlantilla } from '../../utils/ordenCamposPlantilla';
+
+interface Area {
+  id: number;
+  nombre: string;
+  descripcion: string | null;
+  slug: string;
+  activo: boolean;
+}
+
+interface CampoPlantilla {
+  key: string;
+  label: string;
+  type:
+    | 'text'
+    | 'email'
+    | 'number'
+    | 'valor-pesos'
+    | 'date'
+    | 'mes-anio'
+    | 'file'
+    | 'select'
+    | 'textarea'
+    | 'texto-fijo'
+    | 'tipo-doc'
+    | 'cc'
+    | 'nit'
+    | 'cuenta-bancaria'
+    | 'banco-select'
+    | 'direccion';
+  required: boolean;
+  group?: string;
+  ocr_target?: string;
+  texto?: string;
+}
+
+interface BloqueCampoMin {
+  tipo: string;
+  campoKey?: string;
+  pagina?: number;
+  y?: number;
+  x?: number;
+}
+
+interface PlantillaPdfMin {
+  bloques?: BloqueCampoMin[];
+}
+
+interface TipoSolicitud {
+  id: number;
+  areaId: number;
+  areaNombre: string;
+  nombre: string;
+  descripcion: string | null;
+  slug: string;
+  activo: boolean;
+  camposPlantilla: CampoPlantilla[];
+  plantillaPdf?: PlantillaPdfMin | null;
+}
+
+interface NuevaSolicitudPanelProps {
+  onCreada?: (info: { id: number; numeroRadicado: string }) => void;
+}
+
+export function NuevaSolicitudPanel({ onCreada }: NuevaSolicitudPanelProps) {
+  const [paso, setPaso] = useState<1 | 2 | 3>(1);
+  const [areas, setAreas] = useState<Area[]>([]);
+  const [tipos, setTipos] = useState<TipoSolicitud[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState('');
+  const [msg, setMsg] = useState('');
+
+  const [areaSel, setAreaSel] = useState<Area | null>(null);
+  const [tipoSel, setTipoSel] = useState<TipoSolicitud | null>(null);
+  const [datos, setDatos] = useState<Record<string, string>>({});
+  const [docs, setDocs] = useState<Record<string, string>>({});
+  const [ocrPorCampo, setOcrPorCampo] = useState<Record<string, { texto: string; confianza: number; alertas: string[] }>>({});
+  const [ocrCampoActivo, setOcrCampoActivo] = useState<string | null>(null);
+  const [enviando, setEnviando] = useState(false);
+  const [firmaSolicitante, setFirmaSolicitante] = useState('');
+  const [subPaso, setSubPaso] = useState(0);
+  const { procesarArchivo, running: ocrRunning, progress: ocrProgress } = useOcrDocument();
+
+  useEffect(() => {
+    let cancel = false;
+    setLoading(true);
+    Promise.all([
+      api.get<Area[]>('/areas'),
+      api.get<TipoSolicitud[]>('/tipos'),
+    ])
+      .then(([a, t]) => {
+        if (cancel) return;
+        setAreas(a.data.filter((x) => x.activo));
+        setTipos(t.data.filter((x) => x.activo));
+      })
+      .catch(() => setErr('No se pudo cargar areas y tipos.'))
+      .finally(() => setLoading(false));
+    return () => { cancel = true; };
+  }, []);
+
+  const tiposDelArea = useMemo(() => {
+    if (!areaSel) return [];
+    return tipos.filter((t) => {
+      if (t.areaId === areaSel.id) return true;
+      const participantes = (t as unknown as { flujoAreas?: { areasParticipantes?: number[] } })?.flujoAreas?.areasParticipantes;
+      return Array.isArray(participantes) && participantes.includes(areaSel.id);
+    });
+  }, [tipos, areaSel]);
+
+  const camposPorGrupo = useMemo(() => {
+    if (!tipoSel) return new Map<string, CampoPlantilla[]>();
+    const camposOrdenados = ordenarCamposPorPlantilla(tipoSel.camposPlantilla, tipoSel.plantillaPdf);
+    const m = new Map<string, CampoPlantilla[]>();
+    for (const c of camposOrdenados) {
+      const g = c.group || 'Datos';
+      if (!m.has(g)) m.set(g, []);
+      m.get(g)!.push(c);
+    }
+    return m;
+  }, [tipoSel]);
+
+  function reiniciar() {
+    setPaso(1);
+    setAreaSel(null);
+    setTipoSel(null);
+    setDatos({});
+    setDocs({});
+    setMsg('');
+    setErr('');
+  }
+
+  function elegirArea(a: Area) {
+    setAreaSel(a);
+    setTipoSel(null);
+    setPaso(2);
+  }
+
+  function elegirTipo(t: TipoSolicitud) {
+    setTipoSel(t);
+    setPaso(3);
+    setSubPaso(0);
+    setDatos({});
+    setDocs({});
+  }
+
+  const gruposArr = useMemo(() => Array.from(camposPorGrupo.entries()), [camposPorGrupo]);
+  const totalSubPasos = gruposArr.length + 1; // grupos + firma
+
+  function validarGrupoActual(): string {
+    if (subPaso < gruposArr.length) {
+      const [, campos] = gruposArr[subPaso];
+      const faltan = campos.filter((c) => {
+        if (!c.required) return false;
+        if (c.type === 'texto-fijo') return false;
+        if (c.type === 'file') return !docs[c.key];
+        return !datos[c.key] || (datos[c.key] || '').trim() === '';
+      });
+      if (faltan.length > 0) return `Faltan: ${faltan.map((f) => f.label).join(', ')}`;
+    }
+    return '';
+  }
+
+  function siguienteSubPaso() {
+    const e = validarGrupoActual();
+    if (e) { setErr(e); return; }
+    setErr('');
+    setSubPaso((p) => Math.min(totalSubPasos - 1, p + 1));
+  }
+
+  function anteriorSubPaso() {
+    setErr('');
+    setSubPaso((p) => Math.max(0, p - 1));
+  }
+
+  async function handleFile(key: string, file: File | null) {
+    if (!file) {
+      setDocs((p) => { const copy = { ...p }; delete copy[key]; return copy; });
+      setOcrPorCampo((p) => { const copy = { ...p }; delete copy[key]; return copy; });
+      return;
+    }
+    setDocs((p) => ({ ...p, [key]: file.name }));
+
+    // OCR si el campo tiene ocr_target
+    const campo = tipoSel?.camposPlantilla.find((c) => c.key === key);
+    if (!campo || !campo.ocr_target) return;
+
+    setOcrCampoActivo(key);
+    const ocr = await procesarArchivo(file);
+    setOcrCampoActivo(null);
+    if (!ocr) return;
+
+    const alertas: string[] = [];
+    const target = campo.ocr_target;
+    const targetLabel = etiquetaDocumento(target);
+
+    // 1) Verificar que el documento sea del tipo correcto
+    const tipoCheck = validarTipoDocumento(ocr.text, target);
+    if (!tipoCheck.esValido) {
+      const detectadoLabel = tipoCheck.tipoDetectado ? etiquetaDocumento(tipoCheck.tipoDetectado) : '';
+      alertas.push(
+        detectadoLabel
+          ? `El archivo adjuntado no parece ser un ${targetLabel}. La inteligencia artificial detectó que se parece más a un ${detectadoLabel}.`
+          : `El archivo adjuntado no parece ser un ${targetLabel}. Verifica que estés subiendo el documento correcto.`
+      );
+    }
+
+    // Comparar contra cedula del solicitante (campo 'cedula' o 'numeroDocumento')
+    if (target === 'cedula') {
+      const cc = datos.cedula || datos.numeroDocumento || datos.cc || '';
+      if (cc) {
+        const v = validarOcrContraDato(ocr.text, cc, 'cc');
+        if (!v.coincide) alertas.push(`El número ${cc} no se identificó en el ${targetLabel}.`);
+      }
+    }
+    if (target === 'rut' || target === 'eps' || target === 'adres') {
+      const cc = datos.cedula || datos.numeroDocumento || '';
+      const nombre = datos.nombreCompleto || '';
+      if (cc) {
+        const v = validarOcrContraDato(ocr.text, cc, 'cc');
+        if (!v.coincide) alertas.push(`El número ${cc} no se identificó en el ${targetLabel}.`);
+      }
+      if (nombre) {
+        const v2 = validarOcrContraDato(ocr.text, nombre, 'texto');
+        if (!v2.coincide) alertas.push(`El nombre "${nombre}" coincide solo parcialmente con el ${targetLabel}.`);
+      }
+      if (target === 'eps') {
+        const eps = datos.eps || '';
+        if (eps) {
+          const v3 = validarOcrContraDato(ocr.text, eps, 'texto');
+          if (!v3.coincide) alertas.push(`La EPS "${eps}" no se identificó en el certificado.`);
+        }
+      }
+    }
+    if (target === 'cuenta_bancaria') {
+      const banco = datos.banco || '';
+      const numCuenta = datos.numeroCuenta || '';
+      if (banco) {
+        const v = validarOcrContraDato(ocr.text, banco, 'texto');
+        if (!v.coincide) alertas.push(`El banco "${banco}" no se identificó en la certificación bancaria.`);
+      }
+      if (numCuenta && numCuenta.length >= 5) {
+        const v = validarOcrContraDato(ocr.text, numCuenta, 'cc');
+        if (!v.coincide) alertas.push(`El número de cuenta ${numCuenta} no se identificó en la certificación bancaria.`);
+      }
+    }
+    if (target === 'cuenta_cobro' || target === 'planilla') {
+      const cc = datos.cedula || '';
+      if (cc) {
+        const v = validarOcrContraDato(ocr.text, cc, 'cc');
+        if (!v.coincide) alertas.push(`El número de identidad no coincide con el ${targetLabel}.`);
+      }
+    }
+    if (ocr.confidence < 50) {
+      alertas.push(`La inteligencia artificial leyó el documento con baja confiabilidad (${Math.round(ocr.confidence)}%). El archivo puede estar borroso o ser ilegible.`);
+    }
+
+    setOcrPorCampo((p) => ({
+      ...p,
+      [key]: { texto: ocr.text, confianza: ocr.confidence, alertas },
+    }));
+  }
+
+  const camposEnviar = useCallback(() => {
+    return tipoSel?.camposPlantilla ?? [];
+  }, [tipoSel]);
+
+  async function enviar(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setErr('');
+    setMsg('');
+    if (!tipoSel) return;
+
+    // Validacion cliente: campos requeridos
+    const faltantes = camposEnviar().filter((c) => {
+      if (!c.required) return false;
+      if (c.type === 'file') return !docs[c.key];
+      return !datos[c.key] || datos[c.key].trim() === '';
+    });
+    if (faltantes.length > 0) {
+      setErr(`Faltan campos obligatorios: ${faltantes.map((f) => f.label).join(', ')}`);
+      return;
+    }
+    if (!firmaSolicitante) {
+      setErr('Debes firmar antes de enviar la solicitud.');
+      return;
+    }
+
+    setEnviando(true);
+    try {
+      // Documentos enriquecidos con OCR si lo hubo
+      const documentosFinales: Record<string, unknown> = {};
+      Object.entries(docs).forEach(([k, nombre]) => {
+        const ocrInfo = ocrPorCampo[k];
+        documentosFinales[k] = ocrInfo
+          ? {
+              nombre,
+              ocrTexto: ocrInfo.texto,
+              ocrConfianza: ocrInfo.confianza,
+              ocrAlertas: ocrInfo.alertas,
+            }
+          : { nombre };
+      });
+
+      const r = await api.post<{ id: number; numeroRadicado: string; pasoLabel: string | null }>(
+        '/solicitudes',
+        {
+          tipoSolicitudId: tipoSel.id,
+          datos,
+          documentos: documentosFinales,
+          firmas: { profesional: firmaSolicitante },
+        }
+      );
+      setMsg(
+        `Solicitud creada. Radicado: ${r.data.numeroRadicado}. ` +
+        (r.data.pasoLabel ? `Pendiente de: ${r.data.pasoLabel}` : '')
+      );
+      onCreada?.(r.data);
+      // Despues de 1.5s reinicia el formulario
+      setTimeout(reiniciar, 2000);
+    } catch (e) {
+      const r = (e as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      setErr(r || 'No se pudo crear la solicitud.');
+    } finally {
+      setEnviando(false);
+    }
+  }
+
+  return (
+    <section className="nueva-solicitud-panel">
+      {/* Stepper */}
+      <div className="nueva-sol-steps">
+        <button
+          type="button"
+          className={`nueva-sol-step${paso >= 1 ? ' active' : ''}`}
+          onClick={() => paso > 1 && setPaso(1)}
+        >
+          <span className="nueva-sol-step-n">1</span>
+          <span>Area</span>
+          {areaSel ? <small>{areaSel.nombre}</small> : null}
+        </button>
+        <div className="nueva-sol-divider" />
+        <button
+          type="button"
+          className={`nueva-sol-step${paso >= 2 ? ' active' : ''}`}
+          disabled={!areaSel}
+          onClick={() => paso > 2 && areaSel && setPaso(2)}
+        >
+          <span className="nueva-sol-step-n">2</span>
+          <span>Tipo de solicitud</span>
+          {tipoSel ? <small>{tipoSel.nombre}</small> : null}
+        </button>
+        <div className="nueva-sol-divider" />
+        <button
+          type="button"
+          className={`nueva-sol-step${paso >= 3 ? ' active' : ''}`}
+          disabled={!tipoSel}
+        >
+          <span className="nueva-sol-step-n">3</span>
+          <span>Diligenciar</span>
+        </button>
+      </div>
+
+      {err ? <div className="admin-error">{err}</div> : null}
+      {msg ? <div className="admin-success">{msg}</div> : null}
+
+      {/* PASO 1: elegir area */}
+      {paso === 1 ? (
+        <div className="nueva-sol-cards">
+          {loading ? <p className="admin-help-text">Cargando areas…</p> : null}
+          {!loading && areas.length === 0 ? (
+            <p className="admin-help-text">
+              No hay areas activas. Pide al administrador crear al menos una en Panel administrador → Areas.
+            </p>
+          ) : null}
+          {areas.map((a) => (
+            <button
+              key={a.id}
+              type="button"
+              className="nueva-sol-card"
+              onClick={() => elegirArea(a)}
+            >
+              <strong>{a.nombre}</strong>
+              <p>{a.descripcion || 'Sin descripcion'}</p>
+            </button>
+          ))}
+        </div>
+      ) : null}
+
+      {/* PASO 2: elegir tipo del area */}
+      {paso === 2 && areaSel ? (
+        <>
+          <header className="admin-panel-head">
+            <div>
+              <h3>Tipo de solicitud · {areaSel.nombre}</h3>
+              <p className="admin-help-text">Elige el tipo de solicitud que corresponde al tramite.</p>
+            </div>
+            <button type="button" className="admin-ghost-button" onClick={() => setPaso(1)}>
+              ← Cambiar area
+            </button>
+          </header>
+          <div className="nueva-sol-cards">
+            {tiposDelArea.length === 0 ? (
+              <p className="admin-help-text">
+                No hay tipos de solicitud activos en esta area. Pide al administrador crear uno
+                en Panel administrador → Tipos de solicitud.
+              </p>
+            ) : null}
+            {tiposDelArea.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                className="nueva-sol-card"
+                onClick={() => elegirTipo(t)}
+              >
+                <strong>{t.nombre}</strong>
+                <p>{t.descripcion || 'Sin descripcion'}</p>
+                <small>{t.camposPlantilla.length} campo(s)</small>
+              </button>
+            ))}
+          </div>
+        </>
+      ) : null}
+
+      {/* PASO 3: diligenciar formulario */}
+      {paso === 3 && tipoSel ? (
+        <>
+          <header className="admin-panel-head">
+            <div>
+              <h3>{tipoSel.nombre}</h3>
+              <p className="admin-help-text">{areaSel?.nombre} · {tipoSel.descripcion || 'Diligencia los campos requeridos.'}</p>
+            </div>
+            <button type="button" className="admin-ghost-button" onClick={() => setPaso(2)}>
+              ← Cambiar tipo
+            </button>
+          </header>
+
+          <form className="nueva-sol-form" onSubmit={enviar}>
+            {/* Indicador de sub-pasos */}
+            <div className="nueva-sol-substeps">
+              {gruposArr.map(([g], i) => (
+                <span key={g} className={`nueva-sol-substep${i === subPaso ? ' active' : ''}${i < subPaso ? ' done' : ''}`}>
+                  {i + 1}. {g}
+                </span>
+              ))}
+              <span className={`nueva-sol-substep${subPaso === gruposArr.length ? ' active' : ''}`}>
+                {gruposArr.length + 1}. Firma
+              </span>
+            </div>
+
+            {subPaso < gruposArr.length ? (() => {
+              const [grupo, campos] = gruposArr[subPaso];
+              return (
+              <div key={grupo} className="nueva-sol-grupo">
+                <h4 className="nueva-sol-grupo-titulo">{grupo}</h4>
+                <div className="nueva-sol-grupo-grid">
+                  {campos.map((c) => (
+                    <div key={c.key} className="form-group">
+                      <label htmlFor={`f-${c.key}`}>
+                        {c.label} {c.required ? <span className="req">*</span> : null}
+                      </label>
+                      {c.type === 'textarea' ? (
+                        <textarea
+                          id={`f-${c.key}`}
+                          value={datos[c.key] || ''}
+                          onChange={(e) => setDatos((p) => ({ ...p, [c.key]: e.target.value }))}
+                          required={c.required}
+                        />
+                      ) : c.type === 'file' ? (
+                        <>
+                          <input
+                            id={`f-${c.key}`}
+                            type="file"
+                            accept="image/*,application/pdf"
+                            onChange={(e) => handleFile(c.key, e.target.files?.[0] ?? null)}
+                            required={c.required && !docs[c.key]}
+                          />
+                          {c.ocr_target ? (
+                            <small className="admin-help-text">
+                              Validación automática con inteligencia artificial · documento esperado: <em>{etiquetaDocumento(c.ocr_target)}</em>
+                            </small>
+                          ) : null}
+                          {ocrCampoActivo === c.key && ocrRunning ? (
+                            <div className="ocr-progress">
+                              <div className="ocr-progress-bar" style={{ width: `${ocrProgress}%` }} />
+                              <small>Validando con inteligencia artificial… {ocrProgress}%</small>
+                            </div>
+                          ) : null}
+                          {ocrPorCampo[c.key] ? (
+                            <div className={`ocr-result ${ocrPorCampo[c.key].alertas.length > 0 ? 'ocr-warn' : 'ocr-ok'}`}>
+                              {ocrPorCampo[c.key].alertas.length === 0 ? (
+                                <small>✓ Documento validado por IA · confiabilidad {Math.round(ocrPorCampo[c.key].confianza)}%</small>
+                              ) : (
+                                <>
+                                  <small>⚠ La inteligencia artificial detectó:</small>
+                                  <ul>
+                                    {ocrPorCampo[c.key].alertas.map((a, i) => <li key={i}>{a}</li>)}
+                                  </ul>
+                                </>
+                              )}
+                            </div>
+                          ) : null}
+                        </>
+                      ) : c.type === 'texto-fijo' ? (
+                        <p className="texto-fijo-nota">
+                          {(c as { texto?: string }).texto || c.label}
+                        </p>
+                      ) : c.type === 'tipo-doc' ? (
+                        <select
+                          id={`f-${c.key}`}
+                          value={datos[c.key] || ''}
+                          onChange={(e) => setDatos((p) => ({ ...p, [c.key]: e.target.value }))}
+                          required={c.required}
+                        >
+                          <option value="">— selecciona —</option>
+                          <option value="CC">Cedula de ciudadania (CC)</option>
+                          <option value="CE">Cedula de extranjeria (CE)</option>
+                          <option value="TI">Tarjeta de identidad (TI)</option>
+                          <option value="PP">Pasaporte (PP)</option>
+                          <option value="NIT">NIT</option>
+                        </select>
+                      ) : c.type === 'mes-anio' ? (
+                        <input
+                          id={`f-${c.key}`}
+                          type="month"
+                          value={datos[c.key] || ''}
+                          onChange={(e) => setDatos((p) => ({ ...p, [c.key]: e.target.value }))}
+                          required={c.required}
+                        />
+                      ) : c.type === 'valor-pesos' ? (
+                        <div className="valor-pesos-wrap">
+                          <input
+                            id={`f-${c.key}`}
+                            type="text"
+                            inputMode="numeric"
+                            placeholder="Ej: 1500000"
+                            value={datos[c.key] || ''}
+                            onChange={(e) => {
+                              const limpio = e.target.value.replace(/\D/g, '');
+                              setDatos((p) => ({
+                                ...p,
+                                [c.key]: limpio,
+                                [`${c.key}__letras`]: numeroAPesosEnLetras(limpio),
+                              }));
+                            }}
+                            required={c.required}
+                          />
+                          {datos[c.key] ? (
+                            <div className="valor-pesos-preview">
+                              <span>$ {formatearMiles(datos[c.key])}</span>
+                              <strong>{datos[`${c.key}__letras`] || numeroAPesosEnLetras(datos[c.key])}</strong>
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : c.type === 'cuenta-bancaria' ? (
+                        <input
+                          id={`f-${c.key}`}
+                          type="text"
+                          inputMode="numeric"
+                          placeholder="Solo numeros"
+                          value={datos[c.key] || ''}
+                          onChange={(e) => setDatos((p) => ({ ...p, [c.key]: e.target.value.replace(/\D/g, '') }))}
+                          required={c.required}
+                        />
+                      ) : c.type === 'banco-select' ? (
+                        <select
+                          id={`f-${c.key}`}
+                          value={datos[c.key] || ''}
+                          onChange={(e) => setDatos((p) => ({ ...p, [c.key]: e.target.value }))}
+                          required={c.required}
+                        >
+                          <option value="">— selecciona banco —</option>
+                          {BANCOS_COLOMBIA.map((b) => (
+                            <option key={b} value={b}>{b}</option>
+                          ))}
+                        </select>
+                      ) : c.type === 'direccion' ? (
+                        <DireccionField
+                          value={datos[c.key] || ''}
+                          onChange={(json) => setDatos((p) => ({ ...p, [c.key]: json }))}
+                          required={c.required}
+                        />
+                      ) : c.type === 'select' && c.key === 'tipoCuenta' ? (
+                        <select
+                          id={`f-${c.key}`}
+                          value={datos[c.key] || ''}
+                          onChange={(e) => setDatos((p) => ({ ...p, [c.key]: e.target.value }))}
+                          required={c.required}
+                        >
+                          <option value="">— selecciona —</option>
+                          <option value="ahorros">Ahorros</option>
+                          <option value="corriente">Corriente</option>
+                        </select>
+                      ) : c.type === 'select' && c.key === 'tipoTransporte' ? (
+                        <select
+                          id={`f-${c.key}`}
+                          value={datos[c.key] || ''}
+                          onChange={(e) => setDatos((p) => ({ ...p, [c.key]: e.target.value }))}
+                          required={c.required}
+                        >
+                          <option value="">— selecciona —</option>
+                          <option value="avion">Avión</option>
+                          <option value="taxi">Taxi</option>
+                          <option value="pickup">Pick-up / Uber / Cabify / DiDi</option>
+                          <option value="carro_arrendado">Carro arrendado</option>
+                          <option value="bus">Bus / transporte público</option>
+                          <option value="otro">Otro</option>
+                        </select>
+                      ) : (
+                        <input
+                          id={`f-${c.key}`}
+                          type={c.type === 'cc' || c.type === 'nit' ? 'text' : c.type}
+                          inputMode={c.type === 'cc' || c.type === 'nit' || c.type === 'number' ? 'numeric' : undefined}
+                          value={datos[c.key] || ''}
+                          onChange={(e) => setDatos((p) => ({ ...p, [c.key]: e.target.value }))}
+                          required={c.required}
+                        />
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+              );
+            })() : (
+              <div className="nueva-sol-grupo">
+                <h4 className="nueva-sol-grupo-titulo">Firma del solicitante</h4>
+                <SignaturePad
+                  label="Firma con dedo, lapiz tactil o adjunta imagen"
+                  value={firmaSolicitante}
+                  onChange={setFirmaSolicitante}
+                />
+              </div>
+            )}
+
+            <div className="nueva-sol-actions">
+              <button type="button" className="admin-ghost-button" onClick={reiniciar}>
+                Cancelar
+              </button>
+              {subPaso > 0 ? (
+                <button type="button" className="admin-ghost-button" onClick={anteriorSubPaso}>
+                  ← Anterior
+                </button>
+              ) : null}
+              {subPaso < totalSubPasos - 1 ? (
+                <button type="button" className="admin-primary-button" onClick={siguienteSubPaso}>
+                  Siguiente →
+                </button>
+              ) : (
+              <button type="submit" className="admin-primary-button" disabled={enviando}>
+                {enviando ? 'Enviando…' : 'Enviar solicitud'}
+              </button>
+              )}
+            </div>
+          </form>
+        </>
+      ) : null}
+    </section>
+  );
+}

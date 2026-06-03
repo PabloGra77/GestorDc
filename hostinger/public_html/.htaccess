@@ -1,0 +1,78 @@
+# Hostinger - GestorDoc CO
+
+RewriteEngine On
+
+# Forzar HTTPS
+RewriteCond %{HTTPS} !=on
+RewriteCond %{HTTP:X-Forwarded-Proto} !https
+RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+# Bloquear acceso a /api/lib, /api/endpoints y /api/bootstrap.php
+RewriteRule ^api/lib(/.*)?$       - [F,L]
+RewriteRule ^api/endpoints(/.*)?$ - [F,L]
+RewriteRule ^api/bootstrap\.php$  - [F,L]
+RewriteRule ^api/\.env$           - [F,L]
+
+# Bloquear metodos HTTP raros
+RewriteCond %{REQUEST_METHOD} !^(GET|POST|PATCH|PUT|DELETE|OPTIONS|HEAD)$
+RewriteRule .* - [F,L]
+
+# Bloquear User-Agents de scanners
+RewriteCond %{HTTP_USER_AGENT} (nikto|sqlmap|nmap|masscan|gobuster|dirb|wpscan|fimap|nessus|whatweb|openvas|zmeu) [NC]
+RewriteRule .* - [F,L]
+
+# Bloquear patrones SQLi/XSS
+RewriteCond %{QUERY_STRING} (union[\s+]+select|<script|javascript:|base64_decode|eval\(|\.\./\.\.) [NC]
+RewriteRule .* - [F,L]
+
+# /api/* -> /api/index.php (excepto archivos reales como .css, .js dentro de api)
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteRule ^api/.+$ api/index.php [QSA,END]
+
+# /api/ directorio sin path -> index.php
+RewriteRule ^api/?$ api/index.php [QSA,END]
+
+# Resto: SPA fallback
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^ index.html [L]
+
+# Bloquear listado y archivos sensibles
+Options -Indexes -ExecCGI
+ServerSignature Off
+DirectoryIndex index.html index.php
+
+<FilesMatch "^\.(env|git|htpasswd|DS_Store)|.*\.(env|log|sql|md|yml|yaml|lock|json5|ini|conf)$">
+    Require all denied
+</FilesMatch>
+
+# Compresion
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/css text/javascript application/javascript application/json image/svg+xml
+</IfModule>
+
+# Cache estaticos
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType text/css "access plus 7 days"
+    ExpiresByType application/javascript "access plus 7 days"
+    ExpiresByType image/svg+xml "access plus 30 days"
+    ExpiresByType image/png "access plus 30 days"
+    ExpiresByType image/jpeg "access plus 30 days"
+    ExpiresByType image/webp "access plus 30 days"
+    ExpiresByType font/woff2 "access plus 365 days"
+</IfModule>
+
+# Headers de seguridad
+<IfModule mod_headers.c>
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-Frame-Options "SAMEORIGIN"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+    Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains" "expr=%{HTTPS} == 'on'"
+    Header always set Permissions-Policy "geolocation=(), microphone=(), camera=(), payment=()"
+    Header always set Cross-Origin-Opener-Policy "same-origin"
+    Header always set X-Permitted-Cross-Domain-Policies "none"
+    Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'wasm-unsafe-eval' https://cdn.jsdelivr.net https://unpkg.com https://tessdata.projectnaptha.com; style-src 'self' 'unsafe-inline' https://unpkg.com; img-src 'self' data: blob: https://*.tile.openstreetmap.org https://*.openstreetmap.org https://unpkg.com; font-src 'self' data:; connect-src 'self' https://cdn.jsdelivr.net https://unpkg.com https://tessdata.projectnaptha.com https://nominatim.openstreetmap.org https://api.open-meteo.com blob:; frame-ancestors 'self'; frame-src 'self' https://www.openstreetmap.org; worker-src 'self' blob:; manifest-src 'self'; base-uri 'self'; form-action 'self'; object-src 'none'"
+    Header unset X-Powered-By
+    Header unset Server
+</IfModule>

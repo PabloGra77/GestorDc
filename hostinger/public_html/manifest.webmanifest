@@ -1,0 +1,47 @@
+{
+  "name": "Payops · Goleman IPS",
+  "short_name": "Payops",
+  "description": "Gestión documental y radicación de cuentas de cobro - Goleman IPS",
+  "start_url": "/login",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "lang": "es-CO",
+  "categories": ["business", "productivity", "medical"],
+  "icons": [
+    {
+      "src": "/logo-pestana.png",
+      "sizes": "1254x1254",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/logo-pestana.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/logo-pestana.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Iniciar sesión",
+      "short_name": "Login",
+      "url": "/login",
+      "description": "Acceder al panel"
+    },
+    {
+      "name": "Verificar radicado",
+      "short_name": "Radicado",
+      "url": "/radicacion-cuenta-cobro-ops",
+      "description": "Consultar o cargar documentos"
+    }
+  ]
+}
