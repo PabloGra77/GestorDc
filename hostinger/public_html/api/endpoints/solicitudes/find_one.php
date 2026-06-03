@@ -22,7 +22,7 @@ if (!$r) Response::error('Solicitud no encontrada', 404);
 
 // Verificar permisos: solicitante, mismo area, o admin
 $uStmt = $pdo->prepare(
-    "SELECT u.area_id, r.nombre AS rol
+    "SELECT u.area_id, u.nivel_aprobacion, r.nombre AS rol
      FROM usuarios u INNER JOIN roles r ON r.id = u.rol_id WHERE u.id = :id LIMIT 1"
 );
 $uStmt->execute([':id' => $usuarioId]);
@@ -30,12 +30,15 @@ $user = $uStmt->fetch();
 $esAdmin = strtolower(trim($user['rol'] ?? '')) === 'administrador';
 
 $esSolicitante = (int)$r['solicitante_usuario_id'] === $usuarioId;
-// Validador autorizado: mismo area + nivel coincide con paso_actual O la solicitud esta cerrada (historico)
-$mismaArea = (int)($user['area_id'] ?? 0) === (int)$r['area_id'];
+// Validador autorizado: su nivel coincide con el paso_actual (o la solicitud ya esta cerrada =
+// historico) Y el area coincide. Excepcion: contabilidad ve todas las areas (igual que en _flujo.php).
 $nivelUser = (string)($user['nivel_aprobacion'] ?? '');
+$mismaArea = (int)($user['area_id'] ?? 0) === (int)$r['area_id'];
+$esContabilidad = $nivelUser === 'contabilidad';
 $pasoActual = (string)($r['paso_actual'] ?? '');
 $estadoCerrado = in_array((string)$r['estado'], ['aprobado', 'rechazado'], true);
-$esValidadorEnTurno = $mismaArea && $nivelUser !== '' && ($nivelUser === $pasoActual || $estadoCerrado);
+$nivelHabilitado = $nivelUser !== '' && ($nivelUser === $pasoActual || $estadoCerrado);
+$esValidadorEnTurno = $nivelHabilitado && ($esContabilidad || $mismaArea);
 
 if (!$esAdmin && !$esSolicitante && !$esValidadorEnTurno) {
     Response::error('No tienes permiso para ver esta solicitud', 403);
