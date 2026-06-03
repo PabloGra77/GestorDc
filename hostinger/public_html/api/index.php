@@ -78,6 +78,11 @@ $routes = [
     ['POST',   '#^/solicitudes/(?P<id>\d+)/rechazar$#',          'solicitudes/rechazar'],
     ['POST',   '#^/solicitudes/(?P<id>\d+)/remitir$#',           'solicitudes/remitir'],
 
+    // Configuracion (solo admin)
+    ['GET',    '#^/config/smtp$#',                               'config/smtp_get'],
+    ['PUT',    '#^/config/smtp$#',                               'config/smtp_update'],
+    ['POST',   '#^/config/smtp/test$#',                          'config/smtp_test'],
+
     // Radicados
     ['POST',   '#^/radicados$#',                                 'radicados/create'],
     ['POST',   '#^/radicados/cuentas-cobro-ops/solicitud$#',     'radicados/ops_solicitud'],

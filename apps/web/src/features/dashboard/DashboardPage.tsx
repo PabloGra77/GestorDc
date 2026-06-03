@@ -9,12 +9,13 @@ import { AreasPanel } from '../admin/AreasPanel';
 import { TiposSolicitudPanel } from '../admin/TiposSolicitudPanel';
 import { ReportesPanel } from '../admin/ReportesPanel';
 import { BulkCreatePanel } from '../admin/BulkCreatePanel';
+import { ConfiguracionSmtpPanel } from '../admin/ConfiguracionSmtpPanel';
 import { InicioStats, InicioRecientes } from './InicioStats';
 import type { Role } from '../../types/role';
 import type { Radicado, VerificarRadicadoResponse } from '../../types/radicado';
 import type { Usuario } from '../../types/usuario';
 
-type AdminModule = 'Usuarios' | 'Roles' | 'Areas' | 'Tipos de solicitud' | 'Usuarios en linea' | 'Reportes';
+type AdminModule = 'Usuarios' | 'Roles' | 'Areas' | 'Tipos de solicitud' | 'Usuarios en linea' | 'Reportes' | 'Configuracion';
 
 const ROLE_PERMISSIONS_CATALOG = {
 	inicio: {
@@ -1121,7 +1122,7 @@ export function DashboardPage() {
 					</div>
 
 					<div className="admin-module-nav" role="tablist" aria-label="Módulos administrativos">
-						{(['Usuarios', 'Roles', 'Areas', 'Tipos de solicitud', 'Usuarios en linea', 'Reportes'] as AdminModule[]).map((module) => (
+						{(['Usuarios', 'Roles', 'Areas', 'Tipos de solicitud', 'Usuarios en linea', 'Reportes', 'Configuracion'] as AdminModule[]).map((module) => (
 							<button
 								key={module}
 								type="button"
@@ -1448,6 +1449,10 @@ export function DashboardPage() {
 
 						{activeAdminModule === 'Reportes' ? (
 							<ReportesPanel onMsg={setAdminMessage} onErr={setAdminError} />
+						) : null}
+
+						{activeAdminModule === 'Configuracion' ? (
+							<ConfiguracionSmtpPanel />
 						) : null}
 
 						{activeAdminModule === 'Usuarios' && canCrearUsuarios ? (

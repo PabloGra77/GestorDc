@@ -9,12 +9,17 @@ final class Mailer
 {
     public static function send(array $params): bool
     {
-        $host = Config::get('SMTP_HOST');
-        $user = Config::get('SMTP_USER');
-        $pass = Config::get('SMTP_PASS');
-        $from = Config::get('SMTP_FROM') ?: $user;
-        $port = Config::getInt('SMTP_PORT', 587);
-        $secure = Config::getBool('SMTP_SECURE', false);
+        // La configuracion guardada en BD (panel admin) tiene prioridad; si no existe,
+        // se usa el .env como fallback.
+        $host = Settings::get('smtp_host', Config::get('SMTP_HOST'));
+        $user = Settings::get('smtp_user', Config::get('SMTP_USER'));
+        $pass = Settings::get('smtp_pass', Config::get('SMTP_PASS'));
+        $from = Settings::get('smtp_from', Config::get('SMTP_FROM')) ?: $user;
+        $port = (int)(Settings::get('smtp_port', (string)Config::getInt('SMTP_PORT', 587)));
+        $secureRaw = Settings::get('smtp_secure');
+        $secure = $secureRaw !== null
+            ? in_array(strtolower($secureRaw), ['1', 'true', 'yes', 'on'], true)
+            : Config::getBool('SMTP_SECURE', false);
 
         if (!$host || !$user || !$pass || !$from) {
             error_log('SMTP no configurado completamente. Se omite envio.');
