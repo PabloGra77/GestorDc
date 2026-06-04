@@ -26,6 +26,7 @@ interface CampoPlantilla {
   ocr_target?: string;
   validar_contra?: string;
   columnas?: string[];
+  conFactura?: boolean;
 }
 
 function parseFilas(v: unknown): Record<string, string>[] {
@@ -334,20 +335,38 @@ export function BandejaPanel() {
                           if (c.type === 'tabla-items') {
                             const cols = c.columnas && c.columnas.length ? c.columnas : ['Ítem', 'Valor'];
                             const filas = parseFilas(detalle.datosFormulario[c.key]);
+                            const hayFactura = filas.some((r) => '_factura' in r) || c.conFactura;
+                            const faltan = hayFactura ? filas.filter((r) => cols.some((col) => (r[col] || '').trim() !== '') && !r._factura).length : 0;
                             return (
                               <div key={c.key} className="bandeja-dato bandeja-dato-tabla">
                                 <span className="admin-help-text">{c.label}</span>
                                 {filas.length === 0 ? (
                                   <strong>—</strong>
                                 ) : (
-                                  <table className="bandeja-items-table">
-                                    <thead><tr>{cols.map((col) => <th key={col}>{col}</th>)}</tr></thead>
-                                    <tbody>
-                                      {filas.map((r, i) => (
-                                        <tr key={i}>{cols.map((col) => <td key={col}>{r[col] || ''}</td>)}</tr>
-                                      ))}
-                                    </tbody>
-                                  </table>
+                                  <>
+                                    <table className="bandeja-items-table">
+                                      <thead><tr>{cols.map((col) => <th key={col}>{col}</th>)}{hayFactura ? <th>Factura (IA)</th> : null}</tr></thead>
+                                      <tbody>
+                                        {filas.map((r, i) => {
+                                          let alertas: string[] = [];
+                                          if (r._facturaAlertas) { try { alertas = JSON.parse(r._facturaAlertas); } catch { alertas = []; } }
+                                          return (
+                                            <tr key={i}>
+                                              {cols.map((col) => <td key={col}>{r[col] || ''}</td>)}
+                                              {hayFactura ? (
+                                                <td>
+                                                  {r._factura
+                                                    ? <span title={alertas.join(' · ')}>{alertas.length ? '⚠' : '✓'} {r._factura}</span>
+                                                    : <span className="factura-falta">⚠ falta</span>}
+                                                </td>
+                                              ) : null}
+                                            </tr>
+                                          );
+                                        })}
+                                      </tbody>
+                                    </table>
+                                    {faltan > 0 ? <span className="factura-resumen warn">⚠ Faltan {faltan} factura(s) en esta solicitud.</span> : null}
+                                  </>
                                 )}
                               </div>
                             );

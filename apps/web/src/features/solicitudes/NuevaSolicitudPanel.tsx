@@ -43,6 +43,7 @@ interface CampoPlantilla {
   texto?: string;
   columnas?: string[];
   opciones?: string[];
+  conFactura?: boolean;
 }
 
 interface BloqueCampoMin {
@@ -73,15 +74,25 @@ interface NuevaSolicitudPanelProps {
   onCreada?: (info: { id: number; numeroRadicado: string }) => void;
 }
 
-/** Campo de tabla con varias filas (ej. varios viáticos en una sola solicitud). */
-function TablaItemsField({ columnas, value, onChange }: { columnas: string[]; value: string; onChange: (json: string) => void }) {
+interface ValidacionFactura { nombre: string; confianza: number; alertas: string[] }
+
+/** Campo de tabla con varias filas (ej. varios viáticos). Opcional: factura por fila validada por IA. */
+function TablaItemsField({ columnas, value, onChange, conFactura, onValidarFactura }: {
+  columnas: string[];
+  value: string;
+  onChange: (json: string) => void;
+  conFactura?: boolean;
+  onValidarFactura?: (file: File, valorEsperado: string) => Promise<ValidacionFactura>;
+}) {
   const cols = columnas.length ? columnas : ['Ítem', 'Valor'];
+  const colValor = cols.find((c) => c.toLowerCase().includes('valor')) || cols[cols.length - 1];
+  const [validando, setValidando] = useState<number | null>(null);
   const filas: Record<string, string>[] = useMemo(() => {
     if (!value) return [{}];
     try { const a = JSON.parse(value); return Array.isArray(a) && a.length ? a : [{}]; } catch { return [{}]; }
   }, [value]);
   function emit(next: Record<string, string>[]) {
-    const hayDatos = next.some((r) => Object.values(r).some((v) => (v || '').trim() !== ''));
+    const hayDatos = next.some((r) => cols.some((c) => (r[c] || '').trim() !== '') || r._factura);
     onChange(hayDatos ? JSON.stringify(next) : '');
   }
   function setCell(i: number, col: string, v: string) {
@@ -89,32 +100,75 @@ function TablaItemsField({ columnas, value, onChange }: { columnas: string[]; va
   }
   function addFila() { emit([...filas, {}]); }
   function delFila(i: number) { const next = filas.filter((_, ri) => ri !== i); emit(next.length ? next : [{}]); }
+  async function adjuntarFactura(i: number, file: File | null) {
+    if (!file || !onValidarFactura) return;
+    setValidando(i);
+    try {
+      const res = await onValidarFactura(file, filas[i]?.[colValor] || '');
+      emit(filas.map((r, ri) => (ri === i
+        ? { ...r, _factura: res.nombre, _facturaConf: String(Math.round(res.confianza)), _facturaAlertas: JSON.stringify(res.alertas) }
+        : r)));
+    } finally {
+      setValidando(null);
+    }
+  }
+  const filasConDatos = filas.filter((r) => cols.some((c) => (r[c] || '').trim() !== '')).length;
+  const filasConFactura = filas.filter((r) => r._factura).length;
+  const faltan = conFactura ? Math.max(0, filasConDatos - filasConFactura) : 0;
+
   return (
     <div className="tabla-items">
       <div className="tabla-items-scroll">
         <table>
           <thead>
-            <tr>{cols.map((c) => <th key={c}>{c}</th>)}<th aria-label="acciones" /></tr>
+            <tr>{cols.map((c) => <th key={c}>{c}</th>)}{conFactura ? <th>Factura (IA)</th> : null}<th aria-label="acciones" /></tr>
           </thead>
           <tbody>
-            {filas.map((r, i) => (
+            {filas.map((r, i) => {
+              let alertas: string[] = [];
+              if (r._facturaAlertas) { try { alertas = JSON.parse(r._facturaAlertas); } catch { alertas = []; } }
+              return (
               <tr key={i}>
                 {cols.map((col) => (
                   <td key={col}>
                     <input type="text" value={r[col] || ''} onChange={(e) => setCell(i, col, e.target.value)} placeholder={col} />
                   </td>
                 ))}
+                {conFactura ? (
+                  <td className="tabla-items-factura">
+                    {r._factura ? (
+                      <span className={alertas.length ? 'factura-warn' : 'factura-ok'} title={alertas.join(' · ')}>
+                        {alertas.length ? '⚠' : '✓'} {r._factura}
+                      </span>
+                    ) : (
+                      <span className="factura-falta">⚠ falta factura</span>
+                    )}
+                    <label className="factura-btn">
+                      {validando === i ? '⏳ Validando…' : (r._factura ? 'Cambiar' : 'Adjuntar')}
+                      <input type="file" accept="image/*,application/pdf" style={{ display: 'none' }} onChange={(e) => adjuntarFactura(i, e.target.files?.[0] ?? null)} />
+                    </label>
+                  </td>
+                ) : null}
                 <td>
                   {filas.length > 1 ? (
                     <button type="button" className="tabla-items-del" title="Quitar fila" onClick={() => delFila(i)}>✕</button>
                   ) : null}
                 </td>
               </tr>
-            ))}
+            );})}
           </tbody>
         </table>
       </div>
-      <button type="button" className="admin-ghost-button tabla-items-add" onClick={addFila}>➕ Agregar fila</button>
+      <div className="tabla-items-foot">
+        <button type="button" className="admin-ghost-button tabla-items-add" onClick={addFila}>➕ Agregar fila</button>
+        {conFactura ? (
+          faltan > 0 ? (
+            <span className="factura-resumen warn">⚠ La IA detectó que faltan {faltan} factura(s) por adjuntar.</span>
+          ) : filasConFactura > 0 ? (
+            <span className="factura-resumen ok">✓ Todas las filas tienen su factura adjunta.</span>
+          ) : null
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -316,6 +370,20 @@ export function NuevaSolicitudPanel({ onCreada }: NuevaSolicitudPanelProps) {
       [key]: { texto: ocr.text, confianza: ocr.confidence, alertas },
     }));
   }
+
+  // Valida la factura de una fila de tabla con OCR/IA y devuelve alertas (ej. valor no encontrado)
+  const validarFacturaFila = useCallback(async (file: File, valorEsperado: string): Promise<ValidacionFactura> => {
+    const ocr = await procesarArchivo(file);
+    if (!ocr) return { nombre: file.name, confianza: 0, alertas: ['No se pudo leer la factura.'] };
+    const alertas: string[] = [];
+    const limpio = (valorEsperado || '').replace(/\D/g, '');
+    if (limpio && limpio.length >= 3) {
+      const v = validarOcrContraDato(ocr.text, limpio, 'cc');
+      if (!v.coincide) alertas.push(`El valor ${Number(limpio).toLocaleString('es-CO')} no se identificó en la factura.`);
+    }
+    if (ocr.confidence < 50) alertas.push(`Factura leída con baja confiabilidad (${Math.round(ocr.confidence)}%); puede estar borrosa.`);
+    return { nombre: file.name, confianza: ocr.confidence, alertas };
+  }, [procesarArchivo]);
 
   const camposEnviar = useCallback(() => {
     return tipoSel?.camposPlantilla ?? [];
@@ -645,6 +713,8 @@ export function NuevaSolicitudPanel({ onCreada }: NuevaSolicitudPanelProps) {
                           columnas={c.columnas || []}
                           value={datos[c.key] || ''}
                           onChange={(json) => setDatos((p) => ({ ...p, [c.key]: json }))}
+                          conFactura={(c as { conFactura?: boolean }).conFactura}
+                          onValidarFactura={validarFacturaFila}
                         />
                       ) : c.type === 'direccion' ? (
                         <DireccionField

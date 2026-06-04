@@ -43,6 +43,8 @@ interface CampoPlantilla {
   columnas?: string[];
   /** Para campos tipo 'select': opciones de la lista desplegable */
   opciones?: string[];
+  /** Para 'tabla-items': cada fila lleva su propia factura validada por IA */
+  conFactura?: boolean;
 }
 
 interface PasoFlujo {
@@ -1641,6 +1643,13 @@ function PlantillaPdfEditor({ plantilla, onChange, campos, onCamposChange, onIns
                     onChange={(e) => patchCampoIdx(idx, { columnas: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) })}
                   />
                   <span className="plantilla-campo-mini-label">El solicitante podrá agregar varias filas (ej. varios viáticos).</span>
+                  <label className="ops-checkbox" style={{ fontSize: 12 }}>
+                    <input
+                      type="checkbox"
+                      checked={!!c.conFactura}
+                      onChange={(e) => patchCampoIdx(idx, { conFactura: e.target.checked })}
+                    /> Cada fila lleva su factura (la IA valida y avisa cuáles faltan)
+                  </label>
                 </>
               ) : null}
               {c.type === 'select' ? (

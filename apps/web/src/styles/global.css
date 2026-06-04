@@ -5067,6 +5067,27 @@ button.mail-tracking-search-button,
 .bandeja-dato-tabla { grid-column: 1 / -1; }
 .preview-form-tabla { display: grid; gap: 4px; }
 
+/* Factura por fila (validación IA) */
+.tabla-items-foot { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.tabla-items-factura { display: flex; flex-direction: column; gap: 3px; min-width: 130px; font-size: 11px; }
+.factura-ok { color: #1f9d57; font-weight: 600; }
+.factura-warn { color: #c08a00; font-weight: 600; }
+.factura-falta { color: #c0392b; font-weight: 600; }
+.factura-btn {
+  display: inline-block;
+  padding: 3px 8px;
+  border: 1px solid rgba(212, 175, 55, 0.5);
+  border-radius: 6px;
+  background: rgba(212, 175, 55, 0.12);
+  cursor: pointer;
+  font-size: 11px;
+  text-align: center;
+}
+.factura-btn:hover { background: rgba(212, 175, 55, 0.25); }
+.factura-resumen { font-size: 12px; font-weight: 600; }
+.factura-resumen.warn { color: #c0392b; }
+.factura-resumen.ok { color: #1f9d57; }
+
 .bandeja-trazado {
   list-style: none;
   padding: 0;
