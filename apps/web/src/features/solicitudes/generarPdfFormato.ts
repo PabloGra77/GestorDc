@@ -101,6 +101,12 @@ function aplicarPlaceholders(texto: string, s: SolicitudParaPdf): string {
   for (const [k, v] of Object.entries(subst)) {
     out = out.split(k).join(v);
   }
+  // Fallback: cualquier {{campoKey}} restante se reemplaza por el dato diligenciado
+  out = out.replace(/\{\{(\w+)\}\}/g, (m, k) => {
+    const raw = d[k];
+    if (raw == null || typeof raw === 'object') return '';
+    return String(raw);
+  });
   return out;
 }
 

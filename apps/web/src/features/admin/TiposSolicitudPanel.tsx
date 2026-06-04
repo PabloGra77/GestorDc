@@ -1170,7 +1170,11 @@ function PlantillaPdfEditor({ plantilla, onChange, campos, onCamposChange, onIns
       correo: 'juan.perez@ejemplo.com', ciudad: 'Bogotá D.C.', fecha: new Date().toLocaleDateString('es-CO'),
       valor: '$1.500.000', valorLetras: 'un millón quinientos mil pesos m/cte', concepto: 'Servicios profesionales',
     };
-    return texto.replace(/\{\{(\w+)\}\}/g, (m, k) => map[k] ?? m);
+    return texto.replace(/\{\{(\w+)\}\}/g, (m, k) => {
+      if (map[k] != null) return map[k];
+      if (campos.some((c) => c.key === k)) return ejemploCampoValor(k);
+      return m;
+    });
   }
 
   // El formulario se arma con los Datos definidos + los campos que ya están
@@ -1564,6 +1568,23 @@ function PlantillaPdfEditor({ plantilla, onChange, campos, onCamposChange, onIns
               + {p.label}
             </button>
           ))}
+          {datosIdx.length > 0 ? (
+            <>
+              <span className="plantilla-zoom-sep" />
+              <span className="admin-help-text">Tus datos:</span>
+              {datosIdx.map(({ c }) => (
+                <button
+                  key={c.key}
+                  type="button"
+                  className="plantilla-placeholder-chip"
+                  title={`Inserta el valor de "${c.label}" diligenciado por el solicitante`}
+                  onClick={() => insertarPlaceholder(`{{${c.key}}}`)}
+                >
+                  + {c.label}
+                </button>
+              ))}
+            </>
+          ) : null}
         </div>
       ) : null}
 
