@@ -1086,6 +1086,7 @@ function PlantillaPdfEditor({ plantilla, onChange, campos, onCamposChange, onIns
   const [ocultarOverlap, setOcultarOverlap] = useState(false);
   const [previewFormOpen, setPreviewFormOpen] = useState(false);
   const [zoomDoc, setZoomDoc] = useState(1);
+  const [vistaPreviaDatos, setVistaPreviaDatos] = useState(false);
   const pageRef = useRef<HTMLDivElement | null>(null);
 
   const ZOOM_MIN = 0.4;
@@ -1115,6 +1116,44 @@ function PlantillaPdfEditor({ plantilla, onChange, campos, onCamposChange, onIns
     } else if (b.tipo === 'campo') {
       actualizar(b.id, { etiqueta: (b.etiqueta || '') + ' ' + token } as Partial<PdfBloque>);
     }
+  }
+
+  // Valores de ejemplo para la vista previa "con datos" (cómo se vería diligenciado)
+  function ejemploCampoValor(key: string): string {
+    switch (key) {
+      case '__nombre': return 'Juan Pérez García';
+      case '__cedula': return '1.020.456.789';
+      case '__correo': return 'juan.perez@ejemplo.com';
+      case '__radicado': return 'X2026-CO0001';
+      case '__fecha': return new Date().toLocaleDateString('es-CO');
+      case '__ciudad': return 'Bogotá D.C.';
+    }
+    const c = campos.find((x) => x.key === key);
+    if (!c) return 'Ejemplo';
+    switch (c.type) {
+      case 'valor-pesos':
+      case 'number': return '1.500.000';
+      case 'email': return 'correo@ejemplo.com';
+      case 'date': return new Date().toLocaleDateString('es-CO');
+      case 'mes-anio': return 'mayo 2026';
+      case 'cc':
+      case 'nit': return '1.020.456.789';
+      case 'tipo-doc': return 'CC';
+      case 'banco-select': return 'Bancolombia';
+      case 'cuenta-bancaria': return '0123456789';
+      case 'direccion': return 'Carrera 7 #74-21, Bogotá';
+      case 'select': return 'Opción seleccionada';
+      case 'textarea': return 'Texto diligenciado por el solicitante.';
+      default: return c.label;
+    }
+  }
+  function aplicarEjemploTokens(texto: string): string {
+    const map: Record<string, string> = {
+      radicado: 'X2026-CO0001', nombre: 'Juan Pérez García', cedula: '1.020.456.789',
+      correo: 'juan.perez@ejemplo.com', ciudad: 'Bogotá D.C.', fecha: new Date().toLocaleDateString('es-CO'),
+      valor: '$1.500.000', valorLetras: 'un millón quinientos mil pesos m/cte', concepto: 'Servicios profesionales',
+    };
+    return texto.replace(/\{\{(\w+)\}\}/g, (m, k) => map[k] ?? m);
   }
 
   // Escala mm → pixeles (A4 = 210x297 mm). Base × zoom del editor (no del navegador).
@@ -1469,6 +1508,14 @@ function PlantillaPdfEditor({ plantilla, onChange, campos, onCamposChange, onIns
           <span className="plantilla-zoom-valor">{Math.round(zoomDoc * 100)}%</span>
           <button type="button" className="plantilla-zoom-btn" title="Acercar" onClick={() => ajustarZoom(0.1)}>+</button>
           <button type="button" className="plantilla-zoom-reset" title="Tamaño 100%" onClick={() => setZoomDoc(1)}>Ajustar</button>
+          <button
+            type="button"
+            className={`plantilla-zoom-reset${vistaPreviaDatos ? ' activo' : ''}`}
+            title="Ver cómo se vería la hoja diligenciada por el solicitante"
+            onClick={() => setVistaPreviaDatos((v) => !v)}
+          >
+            {vistaPreviaDatos ? '👁 Viendo con datos' : '👁 Ver con datos'}
+          </button>
           <span className="admin-help-text" style={{ marginLeft: 8 }}>Usa este zoom, no el del navegador.</span>
         </div>
         <div className="plantilla-hojas-canvas">
@@ -1505,17 +1552,22 @@ function PlantillaPdfEditor({ plantilla, onChange, campos, onCamposChange, onIns
                 ) : null}
                 {b.tipo === 'titulo' ? (
                   <div style={{ textAlign: b.alineacion === 'centro' ? 'center' : b.alineacion === 'derecha' ? 'right' : 'left', fontSize: b.tamano, fontWeight: b.negrita ? 700 : 400 }}>
-                    {b.texto}
+                    {vistaPreviaDatos ? aplicarEjemploTokens(b.texto) : b.texto}
                   </div>
                 ) : null}
                 {b.tipo === 'texto' ? (
                   <div style={{ textAlign: b.alineacion === 'centro' ? 'center' : b.alineacion === 'derecha' ? 'right' : 'left', fontSize: b.tamano }}>
-                    {b.texto}
+                    {vistaPreviaDatos ? aplicarEjemploTokens(b.texto) : b.texto}
                   </div>
                 ) : null}
                 {b.tipo === 'campo' ? (
                   <div style={{ fontSize: 11, textAlign: b.alineacion === 'centro' ? 'center' : b.alineacion === 'derecha' ? 'right' : 'left' }}>
-                    <strong>{b.etiqueta}</strong> <span style={{ color: '#999', borderBottom: '1px solid #999', display: 'inline-block', minWidth: 60 }}>[{b.campoKey}]</span>
+                    <strong>{b.etiqueta}</strong>{' '}
+                    {vistaPreviaDatos ? (
+                      <span style={{ borderBottom: '1px solid #555' }}>{ejemploCampoValor(b.campoKey)}</span>
+                    ) : (
+                      <span style={{ color: '#999', borderBottom: '1px solid #999', display: 'inline-block', minWidth: 60 }}>[{b.campoKey}]</span>
+                    )}
                   </div>
                 ) : null}
                 {b.tipo === 'tabla' ? (
@@ -1569,6 +1621,15 @@ function PlantillaPdfEditor({ plantilla, onChange, campos, onCamposChange, onIns
                   </div>
                 ) : null}
                 <span className="canvas-bloque-tag">{TIPOS_BLOQUE_LABELS[b.tipo]} · {b.x},{b.y}</span>
+                {isSel ? (
+                  <button
+                    type="button"
+                    className="canvas-bloque-del"
+                    title="Quitar este bloque de la hoja"
+                    onPointerDown={(e) => { e.stopPropagation(); }}
+                    onClick={(e) => { e.stopPropagation(); eliminar(b.id); }}
+                  >✕</button>
+                ) : null}
               </div>
             );
           })}
