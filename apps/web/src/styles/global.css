@@ -6813,6 +6813,29 @@ textarea {
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
 }
 .canvas-bloque-del:hover { background: #e74c3c; }
+/* Manijas de redimensionado (estilo Word) */
+.canvas-resize {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  background: #fff;
+  border: 2px solid var(--gold-bright, #D4AF37);
+  border-radius: 2px;
+  z-index: 12;
+  touch-action: none;
+}
+.canvas-resize-e {
+  right: -7px;
+  top: 50%;
+  transform: translateY(-50%);
+  cursor: ew-resize;
+}
+.canvas-resize-se {
+  right: -7px;
+  bottom: -7px;
+  cursor: nwse-resize;
+  border-radius: 50%;
+}
 .plantilla-zoom-reset.activo {
   background: var(--gold-bright, #D4AF37);
   color: #070B1D;

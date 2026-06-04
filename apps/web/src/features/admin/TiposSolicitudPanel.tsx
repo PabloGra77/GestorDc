@@ -1188,10 +1188,17 @@ function PlantillaPdfEditor({ plantilla, onChange, campos, onCamposChange, onIns
     if (k.includes('direccion') || k.includes('destino')) return 'direccion';
     return 'text';
   }
+  // Tokens {{...}} que el solicitante diligencia (los demás son automáticos)
+  const TOKEN_CAMPOS: Record<string, { key: string; label: string; type: CampoPlantilla['type'] }> = {
+    valor: { key: 'valorPesos', label: 'Valor a cobrar', type: 'valor-pesos' },
+    concepto: { key: 'observaciones', label: 'Concepto / observaciones', type: 'textarea' },
+    ciudad: { key: 'ciudad', label: 'Ciudad', type: 'text' },
+  };
   function camposDelFormulario(): CampoPlantilla[] {
     const vistos = new Set(campos.map((c) => c.key));
     const extra: CampoPlantilla[] = [];
     for (const b of (plantilla.bloques || [])) {
+      // 1) bloques tipo "campo"
       if (b.tipo === 'campo' && b.campoKey && !b.campoKey.startsWith('__') && !vistos.has(b.campoKey)) {
         vistos.add(b.campoKey);
         extra.push({
@@ -1201,6 +1208,18 @@ function PlantillaPdfEditor({ plantilla, onChange, campos, onCamposChange, onIns
           required: true,
           group: 'Datos del formato',
         });
+      }
+      // 2) tokens {{valor}}, {{concepto}}, etc. dentro de textos/títulos
+      if ((b.tipo === 'texto' || b.tipo === 'titulo') && b.texto) {
+        const re = /\{\{(\w+)\}\}/g;
+        let m: RegExpExecArray | null;
+        while ((m = re.exec(b.texto)) !== null) {
+          const def = TOKEN_CAMPOS[m[1]];
+          if (def && !vistos.has(def.key)) {
+            vistos.add(def.key);
+            extra.push({ ...def, required: true, group: 'Datos del formato' });
+          }
+        }
       }
     }
     return [...campos, ...extra];
@@ -1352,6 +1371,44 @@ function PlantillaPdfEditor({ plantilla, onChange, campos, onCamposChange, onIns
       const nx = Math.max(0, Math.min(210, startBx + dxMm));
       const ny = Math.max(0, Math.min(297, startBy + dyMm));
       actualizar(id, { x: Math.round(nx), y: Math.round(ny) } as Partial<PdfBloque>);
+    };
+    const up = (ev: PointerEvent) => {
+      try { target.releasePointerCapture(ev.pointerId); } catch { /* ignorar */ }
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  }
+
+  // Redimensionar como en Word: 'e' = lado derecho (ancho), 'se' = esquina (ancho + alto/tamaño)
+  function onResize(e: React.PointerEvent<HTMLSpanElement>, id: string, dir: 'e' | 'se') {
+    e.stopPropagation();
+    e.preventDefault();
+    const target = e.currentTarget;
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const b = bloques.find((x) => x.id === id);
+    if (!b) return;
+    const startW = b.w || 100;
+    const bb = b as unknown as { alto?: number; tamano?: number; ancho?: number };
+    const startAlto = bb.alto ?? 0;
+    const startTamano = bb.tamano ?? 0;
+    const startAncho = bb.ancho ?? 0;
+    setSeleccionadoId(id);
+    target.setPointerCapture(e.pointerId);
+
+    const move = (ev: PointerEvent) => {
+      const dxMm = (ev.clientX - startX) / SCALE;
+      const dyMm = (ev.clientY - startY) / SCALE;
+      const patch: Record<string, number> = { w: Math.max(10, Math.min(210, Math.round(startW + dxMm))) };
+      if (dir === 'se') {
+        if (b.tipo === 'caja') patch.alto = Math.max(5, Math.round(startAlto + dyMm));
+        else if (b.tipo === 'qr-radicado') { const t = Math.max(15, Math.round(startTamano + dyMm)); patch.tamano = t; }
+        else if (b.tipo === 'logo') patch.ancho = Math.max(10, Math.round(startAncho + dxMm));
+        else if (b.tipo === 'titulo' || b.tipo === 'texto') patch.tamano = Math.max(7, Math.min(40, Math.round(startTamano + dyMm / 2)));
+      }
+      actualizar(id, patch as Partial<PdfBloque>);
     };
     const up = (ev: PointerEvent) => {
       try { target.releasePointerCapture(ev.pointerId); } catch { /* ignorar */ }
@@ -1697,6 +1754,20 @@ function PlantillaPdfEditor({ plantilla, onChange, campos, onCamposChange, onIns
                     onPointerDown={(e) => { e.stopPropagation(); }}
                     onClick={(e) => { e.stopPropagation(); eliminar(b.id); }}
                   >✕</button>
+                ) : null}
+                {isSel ? (
+                  <>
+                    <span
+                      className="canvas-resize canvas-resize-e"
+                      title="Estirar el ancho"
+                      onPointerDown={(e) => onResize(e, b.id, 'e')}
+                    />
+                    <span
+                      className="canvas-resize canvas-resize-se"
+                      title="Cambiar tamaño"
+                      onPointerDown={(e) => onResize(e, b.id, 'se')}
+                    />
+                  </>
                 ) : null}
               </div>
             );
