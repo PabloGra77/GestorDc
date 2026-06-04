@@ -1173,6 +1173,39 @@ function PlantillaPdfEditor({ plantilla, onChange, campos, onCamposChange, onIns
     return texto.replace(/\{\{(\w+)\}\}/g, (m, k) => map[k] ?? m);
   }
 
+  // El formulario se arma con los Datos definidos + los campos que ya están
+  // colocados en la hoja (bloques tipo "campo"), para que el simulador refleje
+  // la plantilla aunque no se hayan agregado datos manualmente.
+  function adivinarTipoCampo(key: string): CampoPlantilla['type'] {
+    const k = key.toLowerCase();
+    if (k.startsWith('doc')) return 'file';
+    if (k.includes('valor') || k.includes('monto') || k.includes('suma')) return 'valor-pesos';
+    if (k.includes('fecha')) return 'date';
+    if (k.includes('correo') || k.includes('email')) return 'email';
+    if (k.includes('banco')) return 'banco-select';
+    if (k.includes('cuenta')) return 'cuenta-bancaria';
+    if (k.includes('concepto') || k.includes('observ') || k.includes('descrip')) return 'textarea';
+    if (k.includes('direccion') || k.includes('destino')) return 'direccion';
+    return 'text';
+  }
+  function camposDelFormulario(): CampoPlantilla[] {
+    const vistos = new Set(campos.map((c) => c.key));
+    const extra: CampoPlantilla[] = [];
+    for (const b of (plantilla.bloques || [])) {
+      if (b.tipo === 'campo' && b.campoKey && !b.campoKey.startsWith('__') && !vistos.has(b.campoKey)) {
+        vistos.add(b.campoKey);
+        extra.push({
+          key: b.campoKey,
+          label: (b.etiqueta || b.campoKey).replace(/[:]\s*$/, '').replace(/^[•☐]\s*/, '').trim() || b.campoKey,
+          type: adivinarTipoCampo(b.campoKey),
+          required: true,
+          group: 'Datos del formato',
+        });
+      }
+    }
+    return [...campos, ...extra];
+  }
+
   // Escala mm → pixeles (A4 = 210x297 mm). Base × zoom del editor (no del navegador).
   const SCALE_BASE = 2.6; // ~ A4 = 546 × 772 px a 100%
   const SCALE = SCALE_BASE * zoomDoc;
@@ -1553,7 +1586,7 @@ function PlantillaPdfEditor({ plantilla, onChange, campos, onCamposChange, onIns
         ) : null}
         <div className="plantilla-hojas-canvas">
         {vistaCentro === 'formulario' ? (
-          <div className="plantilla-form-live"><PreviewFormularioContenido campos={campos} plantillaPdf={plantilla} /></div>
+          <div className="plantilla-form-live"><PreviewFormularioContenido campos={camposDelFormulario()} plantillaPdf={plantilla} /></div>
         ) : Array.from({ length: totalPaginas }, (_, i) => i + 1).map((pg) => (
         <div
           key={pg}
@@ -1898,7 +1931,7 @@ function PlantillaPdfEditor({ plantilla, onChange, campos, onCamposChange, onIns
       <PreviewFormularioModal
         open={previewFormOpen}
         onClose={() => setPreviewFormOpen(false)}
-        campos={campos}
+        campos={camposDelFormulario()}
         plantillaPdf={plantilla}
         tipoNombre=""
       />
