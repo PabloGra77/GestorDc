@@ -6517,9 +6517,9 @@ textarea {
 /* ===== Editor en 3 columnas: DATOS | HOJAS | DOCUMENTOS ===== */
 .plantilla-3col {
   display: grid;
-  grid-template-columns: minmax(220px, 260px) minmax(0, auto) minmax(240px, 300px);
+  grid-template-columns: minmax(220px, 260px) minmax(0, 1fr) minmax(240px, 300px);
   gap: 16px;
-  align-items: start;
+  align-items: stretch;
 }
 @media (max-width: 1280px) {
   .plantilla-3col { grid-template-columns: 1fr; }
@@ -6543,11 +6543,58 @@ textarea {
 .plantilla-col-hojas {
   display: flex;
   flex-direction: column;
+  max-height: 85vh;
+  min-height: 420px;
+  border: 1px solid var(--gold-line, rgba(212, 175, 55, 0.45));
+  border-radius: 10px;
+  overflow: hidden;
+  background: #e9ecf1;
+}
+/* Barra de zoom tipo Docs */
+.plantilla-zoom-bar {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  display: flex;
   align-items: center;
-  gap: 24px;
-  max-height: 82vh;
-  overflow-y: auto;
-  padding: 4px;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #ffffff;
+  border-bottom: 1px solid rgba(212, 175, 55, 0.3);
+  color: #0F172A;
+}
+.plantilla-zoom-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1px solid rgba(212, 175, 55, 0.5);
+  background: rgba(212, 175, 55, 0.12);
+  color: #0F172A;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+}
+.plantilla-zoom-btn:hover { background: var(--gold-bright, #D4AF37); }
+.plantilla-zoom-valor { min-width: 46px; text-align: center; font-weight: 700; font-size: 13px; }
+.plantilla-zoom-reset {
+  padding: 5px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(212, 175, 55, 0.5);
+  background: transparent;
+  color: #0F172A;
+  cursor: pointer;
+  font-size: 12px;
+}
+.plantilla-zoom-reset:hover { background: rgba(212, 175, 55, 0.15); }
+/* Lienzo gris desplazable con las hojas centradas */
+.plantilla-hojas-canvas {
+  flex: 1;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 28px;
+  padding: 28px 16px;
 }
 .plantilla-col-head {
   display: flex;

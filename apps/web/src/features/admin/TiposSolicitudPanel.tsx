@@ -1085,7 +1085,14 @@ function PlantillaPdfEditor({ plantilla, onChange, campos, onCamposChange, onIns
   const [pantallaCompleta, setPantallaCompleta] = useState(false);
   const [ocultarOverlap, setOcultarOverlap] = useState(false);
   const [previewFormOpen, setPreviewFormOpen] = useState(false);
+  const [zoomDoc, setZoomDoc] = useState(1);
   const pageRef = useRef<HTMLDivElement | null>(null);
+
+  const ZOOM_MIN = 0.4;
+  const ZOOM_MAX = 1.8;
+  function ajustarZoom(delta: number) {
+    setZoomDoc((z) => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.round((z + delta) * 100) / 100)));
+  }
 
   useEffect(() => {
     if (!pantallaCompleta) return;
@@ -1110,8 +1117,9 @@ function PlantillaPdfEditor({ plantilla, onChange, campos, onCamposChange, onIns
     }
   }
 
-  // Escala mm → pixeles (A4 = 210x297 mm)
-  const SCALE = 2.6; // ~ A4 = 546 × 772 px
+  // Escala mm → pixeles (A4 = 210x297 mm). Base × zoom del editor (no del navegador).
+  const SCALE_BASE = 2.6; // ~ A4 = 546 × 772 px a 100%
+  const SCALE = SCALE_BASE * zoomDoc;
 
   function setBloques(next: PdfBloque[]) {
     onChange({ ...plantilla, bloques: next });
@@ -1456,6 +1464,14 @@ function PlantillaPdfEditor({ plantilla, onChange, campos, onCamposChange, onIns
 
         {/* CENTRO: todas las hojas de la plantilla */}
         <div className="plantilla-col-hojas">
+        <div className="plantilla-zoom-bar">
+          <button type="button" className="plantilla-zoom-btn" title="Alejar" onClick={() => ajustarZoom(-0.1)}>−</button>
+          <span className="plantilla-zoom-valor">{Math.round(zoomDoc * 100)}%</span>
+          <button type="button" className="plantilla-zoom-btn" title="Acercar" onClick={() => ajustarZoom(0.1)}>+</button>
+          <button type="button" className="plantilla-zoom-reset" title="Tamaño 100%" onClick={() => setZoomDoc(1)}>Ajustar</button>
+          <span className="admin-help-text" style={{ marginLeft: 8 }}>Usa este zoom, no el del navegador.</span>
+        </div>
+        <div className="plantilla-hojas-canvas">
         {Array.from({ length: totalPaginas }, (_, i) => i + 1).map((pg) => (
         <div
           key={pg}
@@ -1558,6 +1574,7 @@ function PlantillaPdfEditor({ plantilla, onChange, campos, onCamposChange, onIns
           })}
         </div>
         ))}
+        </div>{/* fin hojas-canvas */}
         </div>{/* fin col-hojas */}
 
         {/* DERECHA: documentos a adjuntar + validación IA */}
