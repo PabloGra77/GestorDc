@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { api } from '../../services/http/api';
 import { descargarPreviewPlantilla } from '../solicitudes/generarPdfFormato';
-import { PreviewFormularioModal } from '../../components/PreviewFormularioModal';
+import { PreviewFormularioModal, PreviewFormularioContenido } from '../../components/PreviewFormularioModal';
 import '../../styles/modulos-editor.css';
 
 interface Area {
@@ -463,6 +463,20 @@ export function TiposSolicitudPanel() {
     () => areasActivas.filter((a) => areasParticipantes.includes(a.id)),
     [areasActivas, areasParticipantes],
   );
+
+  // Orden de áreas para mostrar en el editor: inicial → … → final
+  const ordenAreasNombres = useMemo(() => {
+    const byId = new Map(areas.map((a) => [a.id, a.nombre]));
+    const ids = [...areasParticipantes];
+    ids.sort((a, b) => {
+      if (a === areaInicialId) return -1;
+      if (b === areaInicialId) return 1;
+      if (a === areaFinalId) return 1;
+      if (b === areaFinalId) return -1;
+      return 0;
+    });
+    return ids.map((id) => byId.get(id) || `Área #${id}`);
+  }, [areas, areasParticipantes, areaInicialId, areaFinalId]);
 
   function abrirEditor(t: TipoSolicitud | null) {
     setMsg('');
@@ -977,6 +991,7 @@ export function TiposSolicitudPanel() {
                     onChange={setPlantillaPdf}
                     campos={campos}
                     onCamposChange={setCampos}
+                    ordenAreas={ordenAreasNombres}
                     onInsertarConjunto={(conjuntoId, pagina) => {
                       const conjunto = BLOQUES_PREDEFINIDOS.find((b) => b.id === conjuntoId);
                       if (!conjunto) return;
@@ -1075,9 +1090,10 @@ interface EditorProps {
   campos: CampoPlantilla[];
   onCamposChange: (next: CampoPlantilla[]) => void;
   onInsertarConjunto: (conjuntoId: string, pagina: number) => void;
+  ordenAreas?: string[];
 }
 
-function PlantillaPdfEditor({ plantilla, onChange, campos, onCamposChange, onInsertarConjunto }: EditorProps) {
+function PlantillaPdfEditor({ plantilla, onChange, campos, onCamposChange, onInsertarConjunto, ordenAreas }: EditorProps) {
   const bloques = plantilla.bloques || [];
 
   const [seleccionadoId, setSeleccionadoId] = useState<string | null>(null);
@@ -1087,6 +1103,7 @@ function PlantillaPdfEditor({ plantilla, onChange, campos, onCamposChange, onIns
   const [previewFormOpen, setPreviewFormOpen] = useState(false);
   const [zoomDoc, setZoomDoc] = useState(1);
   const [vistaPreviaDatos, setVistaPreviaDatos] = useState(false);
+  const [vistaCentro, setVistaCentro] = useState<'hoja' | 'formulario'>('hoja');
   const pageRef = useRef<HTMLDivElement | null>(null);
 
   const ZOOM_MIN = 0.4;
@@ -1504,6 +1521,11 @@ function PlantillaPdfEditor({ plantilla, onChange, campos, onCamposChange, onIns
         {/* CENTRO: todas las hojas de la plantilla */}
         <div className="plantilla-col-hojas">
         <div className="plantilla-zoom-bar">
+          <div className="plantilla-vista-toggle">
+            <button type="button" className={vistaCentro === 'hoja' ? 'activo' : ''} onClick={() => setVistaCentro('hoja')}>🗎 Hoja</button>
+            <button type="button" className={vistaCentro === 'formulario' ? 'activo' : ''} onClick={() => setVistaCentro('formulario')}>📝 Formulario</button>
+          </div>
+          <span className="plantilla-zoom-sep" />
           <button type="button" className="plantilla-zoom-btn" title="Alejar" onClick={() => ajustarZoom(-0.1)}>−</button>
           <span className="plantilla-zoom-valor">{Math.round(zoomDoc * 100)}%</span>
           <button type="button" className="plantilla-zoom-btn" title="Acercar" onClick={() => ajustarZoom(0.1)}>+</button>
@@ -1518,8 +1540,21 @@ function PlantillaPdfEditor({ plantilla, onChange, campos, onCamposChange, onIns
           </button>
           <span className="admin-help-text" style={{ marginLeft: 8 }}>Usa este zoom, no el del navegador.</span>
         </div>
+        {ordenAreas && ordenAreas.length > 0 ? (
+          <div className="plantilla-flujo-areas-strip">
+            <strong>🏢 Áreas:</strong>
+            {ordenAreas.map((nom, i) => (
+              <span key={i} className="plantilla-flujo-area">
+                {i > 0 ? <span className="plantilla-flujo-flecha">→</span> : null}
+                {nom}{i === ordenAreas.length - 1 ? ' (final)' : ''}
+              </span>
+            ))}
+          </div>
+        ) : null}
         <div className="plantilla-hojas-canvas">
-        {Array.from({ length: totalPaginas }, (_, i) => i + 1).map((pg) => (
+        {vistaCentro === 'formulario' ? (
+          <div className="plantilla-form-live"><PreviewFormularioContenido campos={campos} plantillaPdf={plantilla} /></div>
+        ) : Array.from({ length: totalPaginas }, (_, i) => i + 1).map((pg) => (
         <div
           key={pg}
           className={`plantilla-page${pg === paginaActiva ? ' activa' : ''}`}

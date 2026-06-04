@@ -40,7 +40,8 @@ const TIPO_LABEL: Record<string, string> = {
   direccion: 'Dirección con mapa', file: 'Archivo (imagen o PDF)',
 };
 
-export function PreviewFormularioModal({ open, onClose, campos, plantillaPdf, tipoNombre }: Props) {
+/** Cuerpo del formulario (reutilizable: modal y vista en vivo dentro del editor). */
+export function PreviewFormularioContenido({ campos, plantillaPdf }: { campos: CampoMin[]; plantillaPdf?: PlantillaPdfMin | null }) {
   const gruposArr = useMemo(() => {
     const ordenados = ordenarCamposPorPlantilla(campos, plantillaPdf);
     const m = new Map<string, CampoMin[]>();
@@ -52,19 +53,7 @@ export function PreviewFormularioModal({ open, onClose, campos, plantillaPdf, ti
     return Array.from(m.entries());
   }, [campos, plantillaPdf]);
 
-  if (!open) return null;
-
-  const content = (
-    <div className="preview-form-overlay" onClick={onClose} role="dialog" aria-modal="true">
-      <div className="preview-form-modal card-surface" onClick={(e) => e.stopPropagation()}>
-        <header className="preview-form-head">
-          <div>
-            <h3>👁️ Vista previa del formulario</h3>
-            <p className="admin-help-text">Así se verá cuando un usuario haga la solicitud "{tipoNombre || 'sin nombre'}".</p>
-          </div>
-          <button type="button" className="admin-ghost-button" onClick={onClose}>✕ Cerrar</button>
-        </header>
-
+  return (
         <div className="preview-form-body">
           {gruposArr.length === 0 ? (
             <p className="admin-help-text">No hay campos definidos. Agrega campos en la sección 3 o usa los conjuntos predefinidos del editor.</p>
@@ -120,6 +109,24 @@ export function PreviewFormularioModal({ open, onClose, campos, plantillaPdf, ti
             </div>
           </section>
         </div>
+  );
+}
+
+export function PreviewFormularioModal({ open, onClose, campos, plantillaPdf, tipoNombre }: Props) {
+  if (!open) return null;
+
+  const content = (
+    <div className="preview-form-overlay" onClick={onClose} role="dialog" aria-modal="true">
+      <div className="preview-form-modal card-surface" onClick={(e) => e.stopPropagation()}>
+        <header className="preview-form-head">
+          <div>
+            <h3>👁️ Vista previa del formulario</h3>
+            <p className="admin-help-text">Así se verá cuando un usuario haga la solicitud "{tipoNombre || 'sin nombre'}".</p>
+          </div>
+          <button type="button" className="admin-ghost-button" onClick={onClose}>✕ Cerrar</button>
+        </header>
+
+        <PreviewFormularioContenido campos={campos} plantillaPdf={plantillaPdf} />
 
         <footer className="preview-form-footer">
           <p className="admin-help-text">
