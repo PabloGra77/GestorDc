@@ -45,7 +45,19 @@ interface CampoPlantilla {
   opciones?: string[];
   /** Para 'tabla-items': cada fila lleva su propia factura validada por IA */
   conFactura?: boolean;
+  /** Qué debe verificar la IA en la factura (total, establecimiento, fecha, múltiples, alteración) */
+  verificaciones?: string[];
+  /** Nombre esperado del establecimiento/proveedor (opcional, para la verificación) */
+  establecimientoEsperado?: string;
 }
+
+const VERIFICACIONES_FACTURA: Array<{ v: string; l: string }> = [
+  { v: 'total', l: 'Verificar el total / valor' },
+  { v: 'establecimiento', l: 'Verificar establecimiento / NIT' },
+  { v: 'fecha', l: 'Verificar que tenga fecha' },
+  { v: 'multiples', l: 'Detectar si hay varias facturas en el archivo' },
+  { v: 'alteracion', l: 'Señales de alteración / legibilidad (básico)' },
+];
 
 interface PasoFlujo {
   rol: string;
@@ -1647,9 +1659,35 @@ function PlantillaPdfEditor({ plantilla, onChange, campos, onCamposChange, onIns
                     <input
                       type="checkbox"
                       checked={!!c.conFactura}
-                      onChange={(e) => patchCampoIdx(idx, { conFactura: e.target.checked })}
+                      onChange={(e) => patchCampoIdx(idx, { conFactura: e.target.checked, verificaciones: e.target.checked && !c.verificaciones ? VERIFICACIONES_FACTURA.map((x) => x.v) : c.verificaciones })}
                     /> Cada fila lleva su factura (la IA valida y avisa cuáles faltan)
                   </label>
+                  {c.conFactura ? (
+                    <>
+                      <label className="plantilla-campo-mini-label">¿Qué debe verificar la IA en cada factura?</label>
+                      {VERIFICACIONES_FACTURA.map((vf) => {
+                        const activos = c.verificaciones ?? VERIFICACIONES_FACTURA.map((x) => x.v);
+                        const on = activos.includes(vf.v);
+                        return (
+                          <label key={vf.v} className="ops-checkbox" style={{ fontSize: 11 }}>
+                            <input
+                              type="checkbox"
+                              checked={on}
+                              onChange={() => patchCampoIdx(idx, { verificaciones: on ? activos.filter((x) => x !== vf.v) : [...activos, vf.v] })}
+                            /> {vf.l}
+                          </label>
+                        );
+                      })}
+                      {(c.verificaciones ?? []).includes('establecimiento') ? (
+                        <input
+                          type="text"
+                          placeholder="Establecimiento esperado (opcional, ej. Restaurante La Brasa)"
+                          value={c.establecimientoEsperado || ''}
+                          onChange={(e) => patchCampoIdx(idx, { establecimientoEsperado: e.target.value })}
+                        />
+                      ) : null}
+                    </>
+                  ) : null}
                 </>
               ) : null}
               {c.type === 'select' ? (

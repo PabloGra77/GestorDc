@@ -44,6 +44,8 @@ interface CampoPlantilla {
   columnas?: string[];
   opciones?: string[];
   conFactura?: boolean;
+  verificaciones?: string[];
+  establecimientoEsperado?: string;
 }
 
 interface BloqueCampoMin {
@@ -77,12 +79,14 @@ interface NuevaSolicitudPanelProps {
 interface ValidacionFactura { nombre: string; confianza: number; alertas: string[] }
 
 /** Campo de tabla con varias filas (ej. varios viáticos). Opcional: factura por fila validada por IA. */
-function TablaItemsField({ columnas, value, onChange, conFactura, onValidarFactura }: {
+function TablaItemsField({ columnas, value, onChange, conFactura, verificaciones, establecimiento, onValidarFactura }: {
   columnas: string[];
   value: string;
   onChange: (json: string) => void;
   conFactura?: boolean;
-  onValidarFactura?: (file: File, valorEsperado: string) => Promise<ValidacionFactura>;
+  verificaciones?: string[];
+  establecimiento?: string;
+  onValidarFactura?: (file: File, valorEsperado: string, opts: { verificaciones?: string[]; establecimiento?: string }) => Promise<ValidacionFactura>;
 }) {
   const cols = columnas.length ? columnas : ['Ítem', 'Valor'];
   const colValor = cols.find((c) => c.toLowerCase().includes('valor')) || cols[cols.length - 1];
@@ -104,7 +108,7 @@ function TablaItemsField({ columnas, value, onChange, conFactura, onValidarFactu
     if (!file || !onValidarFactura) return;
     setValidando(i);
     try {
-      const res = await onValidarFactura(file, filas[i]?.[colValor] || '');
+      const res = await onValidarFactura(file, filas[i]?.[colValor] || '', { verificaciones, establecimiento });
       emit(filas.map((r, ri) => (ri === i
         ? { ...r, _factura: res.nombre, _facturaConf: String(Math.round(res.confianza)), _facturaAlertas: JSON.stringify(res.alertas) }
         : r)));
@@ -371,17 +375,60 @@ export function NuevaSolicitudPanel({ onCreada }: NuevaSolicitudPanelProps) {
     }));
   }
 
-  // Valida la factura de una fila de tabla con OCR/IA y devuelve alertas (ej. valor no encontrado)
-  const validarFacturaFila = useCallback(async (file: File, valorEsperado: string): Promise<ValidacionFactura> => {
+  // Valida la factura de una fila con OCR/IA según los complementos configurados
+  const validarFacturaFila = useCallback(async (
+    file: File,
+    valorEsperado: string,
+    opts: { verificaciones?: string[]; establecimiento?: string },
+  ): Promise<ValidacionFactura> => {
     const ocr = await procesarArchivo(file);
     if (!ocr) return { nombre: file.name, confianza: 0, alertas: ['No se pudo leer la factura.'] };
+    const checks = opts.verificaciones && opts.verificaciones.length
+      ? opts.verificaciones
+      : ['total', 'establecimiento', 'fecha', 'multiples', 'alteracion'];
+    const texto = ocr.text;
+    const t = texto.toLowerCase();
     const alertas: string[] = [];
-    const limpio = (valorEsperado || '').replace(/\D/g, '');
-    if (limpio && limpio.length >= 3) {
-      const v = validarOcrContraDato(ocr.text, limpio, 'cc');
-      if (!v.coincide) alertas.push(`El valor ${Number(limpio).toLocaleString('es-CO')} no se identificó en la factura.`);
+
+    // Total / valor de la fila
+    if (checks.includes('total')) {
+      const limpio = (valorEsperado || '').replace(/\D/g, '');
+      if (limpio.length >= 3) {
+        const v = validarOcrContraDato(texto, limpio, 'cc');
+        if (!v.coincide) alertas.push(`El total ${Number(limpio).toLocaleString('es-CO')} no se identificó en la factura.`);
+      }
     }
-    if (ocr.confidence < 50) alertas.push(`Factura leída con baja confiabilidad (${Math.round(ocr.confidence)}%); puede estar borrosa.`);
+    // Establecimiento / NIT
+    if (checks.includes('establecimiento')) {
+      const hayNit = /\bnit\b/.test(t) || /\b\d{9,}\b/.test(texto.replace(/[.\s-]/g, ''));
+      if (opts.establecimiento && opts.establecimiento.trim()) {
+        const v = validarOcrContraDato(texto, opts.establecimiento, 'texto');
+        if (!v.coincide) alertas.push(`No se identificó el establecimiento "${opts.establecimiento}" en la factura.`);
+      } else if (!hayNit) {
+        alertas.push('No se detectó NIT ni datos del establecimiento; verifica que sea una factura válida.');
+      }
+    }
+    // Fecha
+    if (checks.includes('fecha')) {
+      const tieneFecha = /\d{1,2}[/\-.]\d{1,2}[/\-.]\d{2,4}/.test(texto) || /\d{4}[/\-.]\d{1,2}[/\-.]\d{1,2}/.test(texto)
+        || /(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)/.test(t);
+      if (!tieneFecha) alertas.push('No se detectó una fecha en la factura.');
+    }
+    // Varias facturas en el mismo archivo
+    if (checks.includes('multiples')) {
+      const nTotales = (t.match(/total/g) || []).length;
+      const nNits = (t.match(/nit/g) || []).length;
+      if (nTotales >= 2 || nNits >= 2) alertas.push('Parece haber varias facturas en el archivo; verifica que la fila corresponda a la correcta.');
+    }
+    // Señales básicas de alteración / legibilidad (no es análisis forense)
+    if (checks.includes('alteracion')) {
+      const marcadores = ['factura', 'total', 'nit', 'valor', 'fecha', 'cantidad'].filter((k) => t.includes(k)).length;
+      if (ocr.confidence < 45) {
+        alertas.push(`Lectura de muy baja calidad (${Math.round(ocr.confidence)}%): el documento puede estar borroso, editado o no ser una factura. Requiere revisión manual.`);
+      } else if (marcadores <= 1) {
+        alertas.push('El documento no tiene la estructura típica de una factura; requiere revisión manual.');
+      }
+    }
     return { nombre: file.name, confianza: ocr.confidence, alertas };
   }, [procesarArchivo]);
 
@@ -713,7 +760,9 @@ export function NuevaSolicitudPanel({ onCreada }: NuevaSolicitudPanelProps) {
                           columnas={c.columnas || []}
                           value={datos[c.key] || ''}
                           onChange={(json) => setDatos((p) => ({ ...p, [c.key]: json }))}
-                          conFactura={(c as { conFactura?: boolean }).conFactura}
+                          conFactura={c.conFactura}
+                          verificaciones={c.verificaciones}
+                          establecimiento={c.establecimientoEsperado}
                           onValidarFactura={validarFacturaFila}
                         />
                       ) : c.type === 'direccion' ? (
