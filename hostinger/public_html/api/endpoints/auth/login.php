@@ -27,7 +27,7 @@ $row = $stmt->fetch();
 
 // Hash dummy fijo para igualar tiempo cuando el usuario no existe / cuenta inactiva.
 // Asi password_verify se ejecuta siempre y se elimina la enumeracion por timing.
-$DUMMY_HASH = '$2y$12$Cz0z0z0z0z0z0z0z0z0z0eXm6vWj6kQk5HnH6F8jK0pCQp1xL9wXm';
+$DUMMY_HASH = '$2y$12$GuJAIgi8SGWHyjXOdpYZI.nSJldVeE8G0ijdlcM4Nr.A7P4SBZl4G';
 $hashAComparar = ($row && (int)$row['activo'] === 1 && !empty($row['password_hash']))
     ? (string)$row['password_hash']
     : $DUMMY_HASH;

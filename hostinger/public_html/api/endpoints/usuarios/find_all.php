@@ -1,7 +1,8 @@
 <?php
 declare(strict_types=1);
 
-Auth::requireUser();
+// Listado completo de usuarios: solo administradores (evita exposición masiva de PII)
+Auth::requireAdmin();
 
 $pdo = Db::pdo();
 $rows = $pdo->query(

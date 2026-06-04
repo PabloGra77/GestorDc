@@ -153,6 +153,8 @@ final class Mailer
 
     private static function extractAddress(string $s): string
     {
+        // Defensa contra inyección de cabeceras: eliminar CR/LF y NUL
+        $s = str_replace(["\r", "\n", "\0"], '', $s);
         if (preg_match('/<([^>]+)>/', $s, $m)) return $m[1];
         return trim($s);
     }
