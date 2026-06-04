@@ -41,6 +41,8 @@ interface CampoPlantilla {
   validar_contra?: string;
   /** Para campos tipo 'tabla-items': columnas que llena el solicitante (varias filas) */
   columnas?: string[];
+  /** Para campos tipo 'select': opciones de la lista desplegable */
+  opciones?: string[];
 }
 
 interface PasoFlujo {
@@ -1639,6 +1641,17 @@ function PlantillaPdfEditor({ plantilla, onChange, campos, onCamposChange, onIns
                     onChange={(e) => patchCampoIdx(idx, { columnas: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) })}
                   />
                   <span className="plantilla-campo-mini-label">El solicitante podrá agregar varias filas (ej. varios viáticos).</span>
+                </>
+              ) : null}
+              {c.type === 'select' ? (
+                <>
+                  <label className="plantilla-campo-mini-label">Opciones de la lista (separadas por coma)</label>
+                  <input
+                    type="text"
+                    placeholder="Ej. Solicitar anticipo, Legalizar con facturas"
+                    value={(c.opciones || []).join(', ')}
+                    onChange={(e) => patchCampoIdx(idx, { opciones: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) })}
+                  />
                 </>
               ) : null}
             </div>

@@ -10,6 +10,7 @@ interface CampoMin {
   group?: string;
   texto?: string;
   columnas?: string[];
+  opciones?: string[];
 }
 
 interface BloqueCampoMin {
@@ -86,6 +87,7 @@ export function PreviewFormularioContenido({ campos, plantillaPdf }: { campos: C
                       ) : c.type === 'select' || c.type === 'tipo-doc' || c.type === 'banco-select' ? (
                         <select disabled>
                           <option>— elige una opción —</option>
+                          {(c.opciones || []).map((o) => <option key={o}>{o}</option>)}
                         </select>
                       ) : c.type === 'file' ? (
                         <div className="preview-form-file">📎 Adjuntar archivo (imagen o PDF)</div>

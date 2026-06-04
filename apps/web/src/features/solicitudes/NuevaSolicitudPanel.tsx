@@ -42,6 +42,7 @@ interface CampoPlantilla {
   ocr_target?: string;
   texto?: string;
   columnas?: string[];
+  opciones?: string[];
 }
 
 interface BloqueCampoMin {
@@ -628,6 +629,16 @@ export function NuevaSolicitudPanel({ onCreada }: NuevaSolicitudPanelProps) {
                           {BANCOS_COLOMBIA.map((b) => (
                             <option key={b} value={b}>{b}</option>
                           ))}
+                        </select>
+                      ) : c.type === 'select' && (c.opciones?.length ?? 0) > 0 ? (
+                        <select
+                          id={`f-${c.key}`}
+                          value={datos[c.key] || ''}
+                          onChange={(e) => setDatos((p) => ({ ...p, [c.key]: e.target.value }))}
+                          required={c.required}
+                        >
+                          <option value="">— selecciona —</option>
+                          {(c.opciones || []).map((o) => <option key={o} value={o}>{o}</option>)}
                         </select>
                       ) : c.type === 'tabla-items' ? (
                         <TablaItemsField
