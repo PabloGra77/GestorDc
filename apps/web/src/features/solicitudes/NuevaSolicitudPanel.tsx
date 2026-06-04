@@ -35,11 +35,13 @@ interface CampoPlantilla {
     | 'nit'
     | 'cuenta-bancaria'
     | 'banco-select'
-    | 'direccion';
+    | 'direccion'
+    | 'tabla-items';
   required: boolean;
   group?: string;
   ocr_target?: string;
   texto?: string;
+  columnas?: string[];
 }
 
 interface BloqueCampoMin {
@@ -68,6 +70,52 @@ interface TipoSolicitud {
 
 interface NuevaSolicitudPanelProps {
   onCreada?: (info: { id: number; numeroRadicado: string }) => void;
+}
+
+/** Campo de tabla con varias filas (ej. varios viáticos en una sola solicitud). */
+function TablaItemsField({ columnas, value, onChange }: { columnas: string[]; value: string; onChange: (json: string) => void }) {
+  const cols = columnas.length ? columnas : ['Ítem', 'Valor'];
+  const filas: Record<string, string>[] = useMemo(() => {
+    if (!value) return [{}];
+    try { const a = JSON.parse(value); return Array.isArray(a) && a.length ? a : [{}]; } catch { return [{}]; }
+  }, [value]);
+  function emit(next: Record<string, string>[]) {
+    const hayDatos = next.some((r) => Object.values(r).some((v) => (v || '').trim() !== ''));
+    onChange(hayDatos ? JSON.stringify(next) : '');
+  }
+  function setCell(i: number, col: string, v: string) {
+    emit(filas.map((r, ri) => (ri === i ? { ...r, [col]: v } : r)));
+  }
+  function addFila() { emit([...filas, {}]); }
+  function delFila(i: number) { const next = filas.filter((_, ri) => ri !== i); emit(next.length ? next : [{}]); }
+  return (
+    <div className="tabla-items">
+      <div className="tabla-items-scroll">
+        <table>
+          <thead>
+            <tr>{cols.map((c) => <th key={c}>{c}</th>)}<th aria-label="acciones" /></tr>
+          </thead>
+          <tbody>
+            {filas.map((r, i) => (
+              <tr key={i}>
+                {cols.map((col) => (
+                  <td key={col}>
+                    <input type="text" value={r[col] || ''} onChange={(e) => setCell(i, col, e.target.value)} placeholder={col} />
+                  </td>
+                ))}
+                <td>
+                  {filas.length > 1 ? (
+                    <button type="button" className="tabla-items-del" title="Quitar fila" onClick={() => delFila(i)}>✕</button>
+                  ) : null}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <button type="button" className="admin-ghost-button tabla-items-add" onClick={addFila}>➕ Agregar fila</button>
+    </div>
+  );
 }
 
 export function NuevaSolicitudPanel({ onCreada }: NuevaSolicitudPanelProps) {
@@ -581,6 +629,12 @@ export function NuevaSolicitudPanel({ onCreada }: NuevaSolicitudPanelProps) {
                             <option key={b} value={b}>{b}</option>
                           ))}
                         </select>
+                      ) : c.type === 'tabla-items' ? (
+                        <TablaItemsField
+                          columnas={c.columnas || []}
+                          value={datos[c.key] || ''}
+                          onChange={(json) => setDatos((p) => ({ ...p, [c.key]: json }))}
+                        />
                       ) : c.type === 'direccion' ? (
                         <DireccionField
                           value={datos[c.key] || ''}

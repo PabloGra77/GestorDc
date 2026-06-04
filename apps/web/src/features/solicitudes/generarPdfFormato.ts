@@ -79,13 +79,38 @@ interface SolicitudParaPdf {
   plantillaPdf?: PlantillaPdf | null;
 }
 
+// Fecha de la solicitud (creación) en formato largo; cae a hoy solo si no hay dato.
+function fechaSolicitud(s: SolicitudParaPdf): string {
+  const raw = s.creadoEn;
+  const d = raw ? new Date(raw.replace(' ', 'T')) : new Date();
+  const valida = !isNaN(d.getTime()) ? d : new Date();
+  return valida.toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric' });
+}
+
+// Busca en los datos una tabla de ítems (campo tipo 'tabla-items' guardado como JSON array)
+function tablaItemsDeDatos(s: SolicitudParaPdf): { columnas: string[]; filas: Record<string, string>[] } | null {
+  const d = s.datosFormulario || {};
+  for (const k of Object.keys(d)) {
+    const v = d[k];
+    if (typeof v === 'string' && v.trim().startsWith('[')) {
+      try {
+        const a = JSON.parse(v);
+        if (Array.isArray(a) && a.length && a[0] && typeof a[0] === 'object') {
+          return { columnas: Object.keys(a[0]), filas: a };
+        }
+      } catch { /* no era tabla */ }
+    }
+  }
+  return null;
+}
+
 function aplicarPlaceholders(texto: string, s: SolicitudParaPdf): string {
   const d = s.datosFormulario || {};
   const valor = String(d.valorPesos ?? d.valor ?? '');
   const valorLetras = String(d.valorPesos__letras ?? d.valorLetras ?? '');
   const concepto = String(d.observaciones ?? d.concepto ?? d.descripcion ?? '');
   const ciudad = String(d.lugarExpedicion ?? d.ciudad ?? '');
-  const fecha = new Date().toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric' });
+  const fecha = fechaSolicitud(s);
   const nombre = s.solicitanteNombre || '';
   const cedula = s.solicitanteDocumento || '';
   const subst: Record<string, string> = {
@@ -115,7 +140,7 @@ function valorCampo(s: SolicitudParaPdf, key: string): string {
   if (key === '__nombre') return s.solicitanteNombre || '';
   if (key === '__cedula') return s.solicitanteDocumento || '';
   if (key === '__correo') return s.solicitanteCorreo || '';
-  if (key === '__fecha') return new Date().toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric' });
+  if (key === '__fecha') return fechaSolicitud(s);
   if (key === '__ciudad') {
     const d = s.datosFormulario || {};
     return String(d.lugarExpedicion ?? d.ciudad ?? 'Bogotá');
@@ -252,43 +277,46 @@ async function generarPdfPlantilla(s: SolicitudParaPdf, pl: PlantillaPdf, filena
         doc.text(valor, x, baseLine, opt);
       }
     } else if (b.tipo === 'tabla') {
-      const cols = b.columnas && b.columnas.length > 0 ? b.columnas : ['FECHA', 'ITEM', 'VALOR'];
-      const numCols = cols.length;
+      const items = tablaItemsDeDatos(s);
+      const cols = items ? items.columnas : (b.columnas && b.columnas.length > 0 ? b.columnas : ['FECHA', 'ITEM', 'VALOR']);
+      const numCols = cols.length || 1;
       const colWidth = b.w / numCols;
-      const headY = baseY + 5;
+      // Encabezado
       doc.setFillColor(15, 23, 42);
       doc.rect(b.x, baseY, b.w, 7, 'F');
       doc.setTextColor(212, 175, 55);
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(9);
-      cols.forEach((c, i) => doc.text(c, b.x + i * colWidth + 2, headY));
+      cols.forEach((c, i) => doc.text(String(c), b.x + i * colWidth + 2, baseY + 5, { maxWidth: colWidth - 4 }));
+      // Filas de datos
       doc.setTextColor(15, 23, 42);
       doc.setFont('helvetica', 'normal');
-      const fechaItem = s.creadoEn
-        ? new Date(s.creadoEn.replace(' ', 'T')).toLocaleDateString('es-CO')
-        : new Date().toLocaleDateString('es-CO');
-      const concepto = String(s.datosFormulario?.observaciones ?? s.datosFormulario?.concepto ?? s.tipoNombre);
-      const valor = String(s.datosFormulario?.valorPesos ?? '');
-      const datosFila = [
-        fechaItem,
-        concepto,
-        valor ? `$ ${Number(valor).toLocaleString('es-CO')}` : '',
-      ];
-      const dataRowY = baseY + 13;
-      cols.forEach((_, i) => {
-        const txt = datosFila[i] || '';
-        doc.text(txt, b.x + i * colWidth + 2, dataRowY, { maxWidth: colWidth - 4 });
-      });
-      doc.setDrawColor(180, 180, 180);
-      for (let i = 0; i < 6; i++) {
-        const yy = baseY + 7 + i * 5;
-        doc.line(b.x, yy, b.x + b.w, yy);
-        for (let c = 1; c < numCols; c++) {
-          doc.line(b.x + c * colWidth, baseY + 7, b.x + c * colWidth, baseY + 7 + 5 * 5);
-        }
+      let filas: string[][];
+      if (items) {
+        filas = items.filas.map((r) => cols.map((c) => String(r[c] ?? '')));
+      } else {
+        const concepto = String(s.datosFormulario?.observaciones ?? s.datosFormulario?.concepto ?? '');
+        const valor = String(s.datosFormulario?.valorPesos ?? '');
+        filas = [[fechaSolicitud(s), concepto, valor ? `$ ${Number(valor).toLocaleString('es-CO')}` : ''].slice(0, numCols)];
       }
-      doc.line(b.x, baseY, b.x, baseY + 32);
-      doc.line(b.x + b.w, baseY, b.x + b.w, baseY + 32);
+      const rowH = 6;
+      const totalRows = Math.max(filas.length, items ? filas.length : 3);
+      doc.setDrawColor(180, 180, 180);
+      doc.setLineWidth(0.2);
+      for (let r = 0; r < totalRows; r++) {
+        const rowTop = baseY + 7 + r * rowH;
+        const fila = filas[r];
+        if (fila) {
+          fila.forEach((txt, i) => doc.text(String(txt || ''), b.x + i * colWidth + 2, rowTop + 4, { maxWidth: colWidth - 4 }));
+        }
+        doc.line(b.x, rowTop + rowH, b.x + b.w, rowTop + rowH);
+      }
+      const bottom = baseY + 7 + totalRows * rowH;
+      doc.line(b.x, baseY, b.x, bottom);
+      doc.line(b.x + b.w, baseY, b.x + b.w, bottom);
+      for (let c = 1; c < numCols; c++) {
+        doc.line(b.x + c * colWidth, baseY, b.x + c * colWidth, bottom);
+      }
     } else if (b.tipo === 'divider') {
       doc.setDrawColor(212, 175, 55);
       doc.setLineWidth(0.5);

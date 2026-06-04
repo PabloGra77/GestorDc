@@ -9,6 +9,7 @@ interface CampoMin {
   required: boolean;
   group?: string;
   texto?: string;
+  columnas?: string[];
 }
 
 interface BloqueCampoMin {
@@ -72,6 +73,14 @@ export function PreviewFormularioContenido({ campos, plantillaPdf }: { campos: C
                       </label>
                       {c.type === 'texto-fijo' ? (
                         <div className="preview-form-fijo">{c.texto || c.label}</div>
+                      ) : c.type === 'tabla-items' ? (
+                        <div className="preview-form-tabla">
+                          <table>
+                            <thead><tr>{(c.columnas && c.columnas.length ? c.columnas : ['Ítem', 'Valor']).map((col) => <th key={col}>{col}</th>)}</tr></thead>
+                            <tbody><tr>{(c.columnas && c.columnas.length ? c.columnas : ['Ítem', 'Valor']).map((col) => <td key={col}>&nbsp;</td>)}</tr></tbody>
+                          </table>
+                          <small className="admin-help-text">➕ El solicitante puede agregar varias filas</small>
+                        </div>
                       ) : c.type === 'textarea' ? (
                         <textarea disabled rows={3} placeholder={`Ej. ${c.label.toLowerCase()}…`} />
                       ) : c.type === 'select' || c.type === 'tipo-doc' || c.type === 'banco-select' ? (

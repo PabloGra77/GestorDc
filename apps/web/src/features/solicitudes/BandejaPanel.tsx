@@ -25,6 +25,12 @@ interface CampoPlantilla {
   group?: string;
   ocr_target?: string;
   validar_contra?: string;
+  columnas?: string[];
+}
+
+function parseFilas(v: unknown): Record<string, string>[] {
+  if (typeof v !== 'string' || !v.trim()) return [];
+  try { const a = JSON.parse(v); return Array.isArray(a) ? a : []; } catch { return []; }
 }
 
 interface Movimiento {
@@ -325,6 +331,27 @@ export function BandejaPanel() {
                       {detalle.camposPlantilla
                         .filter((c) => c.type !== 'file')
                         .map((c) => {
+                          if (c.type === 'tabla-items') {
+                            const cols = c.columnas && c.columnas.length ? c.columnas : ['Ítem', 'Valor'];
+                            const filas = parseFilas(detalle.datosFormulario[c.key]);
+                            return (
+                              <div key={c.key} className="bandeja-dato bandeja-dato-tabla">
+                                <span className="admin-help-text">{c.label}</span>
+                                {filas.length === 0 ? (
+                                  <strong>—</strong>
+                                ) : (
+                                  <table className="bandeja-items-table">
+                                    <thead><tr>{cols.map((col) => <th key={col}>{col}</th>)}</tr></thead>
+                                    <tbody>
+                                      {filas.map((r, i) => (
+                                        <tr key={i}>{cols.map((col) => <td key={col}>{r[col] || ''}</td>)}</tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                )}
+                              </div>
+                            );
+                          }
                           const f = formatearValor(c, detalle.datosFormulario[c.key]);
                           return (
                             <div key={c.key} className="bandeja-dato">

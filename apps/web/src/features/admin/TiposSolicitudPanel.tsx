@@ -31,13 +31,16 @@ interface CampoPlantilla {
     | 'nit'
     | 'cuenta-bancaria'
     | 'banco-select'
-    | 'direccion';
+    | 'direccion'
+    | 'tabla-items';
   required: boolean;
   group?: string;
   ocr_target?: string;
   texto?: string;
   /** Para campos tipo 'file': key del dato que la IA debe encontrar/validar dentro del adjunto */
   validar_contra?: string;
+  /** Para campos tipo 'tabla-items': columnas que llena el solicitante (varias filas) */
+  columnas?: string[];
 }
 
 interface PasoFlujo {
@@ -282,6 +285,7 @@ const TIPOS_CAMPO = [
   { v: 'cuenta-bancaria', l: 'Numero cuenta bancaria' },
   { v: 'banco-select', l: 'Banco (lista colombiana)' },
   { v: 'direccion', l: 'Dirección + ciudad + país (con mapa y clima)' },
+  { v: 'tabla-items', l: 'Tabla de varias filas (ej. varios viáticos)' },
   { v: 'file', l: 'Archivo / documento' },
 ];
 
@@ -1625,6 +1629,18 @@ function PlantillaPdfEditor({ plantilla, onChange, campos, onCamposChange, onIns
                   onClick={() => patchCampoIdx(idx, { required: !c.required })}
                 >{c.required ? '● Obligatorio' : '○ Opcional'}</button>
               </div>
+              {c.type === 'tabla-items' ? (
+                <>
+                  <label className="plantilla-campo-mini-label">Columnas (separadas por coma)</label>
+                  <input
+                    type="text"
+                    placeholder="Ej. Fecha, Destino, Concepto, Valor"
+                    value={(c.columnas || []).join(', ')}
+                    onChange={(e) => patchCampoIdx(idx, { columnas: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) })}
+                  />
+                  <span className="plantilla-campo-mini-label">El solicitante podrá agregar varias filas (ej. varios viáticos).</span>
+                </>
+              ) : null}
             </div>
           ))}
         </div>
