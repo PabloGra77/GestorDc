@@ -79,6 +79,9 @@ $routes = [
     ['POST',   '#^/solicitudes/(?P<id>\d+)/rechazar$#',          'solicitudes/rechazar'],
     ['POST',   '#^/solicitudes/(?P<id>\d+)/remitir$#',           'solicitudes/remitir'],
 
+    // Verificación forense de documentos
+    ['POST',   '#^/forense$#',                                   'forense/analizar'],
+
     // Configuracion (solo admin)
     ['GET',    '#^/config/smtp$#',                               'config/smtp_get'],
     ['PUT',    '#^/config/smtp$#',                               'config/smtp_update'],

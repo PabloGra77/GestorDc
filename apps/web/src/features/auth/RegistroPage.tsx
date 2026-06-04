@@ -7,6 +7,19 @@ const API_PUBLICO = '/api/index.php/publico';
 interface Area { id: number; nombre: string; descripcion: string | null }
 interface Rol { id: number; nombre: string; descripcion: string | null }
 
+const TIPOS_DOCUMENTO = [
+  { v: 'CC', l: 'Cédula de ciudadanía' },
+  { v: 'CE', l: 'Cédula de extranjería' },
+  { v: 'TI', l: 'Tarjeta de identidad' },
+  { v: 'PP', l: 'Pasaporte' },
+  { v: 'PEP', l: 'PEP / PPT' },
+];
+
+// Normaliza nombres: primera letra en mayúscula, el resto en minúscula (config de plataforma).
+function capitalizarNombre(s: string): string {
+  return s.trim().toLowerCase().replace(/(^|[\s-])([a-záéíóúñü])/g, (_m, sep, ch) => sep + ch.toUpperCase());
+}
+
 export function RegistroPage() {
   const navigate = useNavigate();
   const logoSrc = usePayopsLogo();
@@ -16,6 +29,8 @@ export function RegistroPage() {
   const [segundoNombre, setSegundoNombre] = useState('');
   const [primerApellido, setPrimerApellido] = useState('');
   const [segundoApellido, setSegundoApellido] = useState('');
+  const [tipoDocumento, setTipoDocumento] = useState('CC');
+  const [numeroDocumento, setNumeroDocumento] = useState('');
   const [correo, setCorreo] = useState('');
   const [areaId, setAreaId] = useState<number | ''>('');
   const [rolId, setRolId] = useState<number | ''>('');
@@ -43,6 +58,10 @@ export function RegistroPage() {
       setErr('El correo debe ser del dominio @ipsgoleman.com.co');
       return;
     }
+    if (!numeroDocumento.trim()) {
+      setErr('Ingresa tu número de documento');
+      return;
+    }
     if (!areaId || !rolId) {
       setErr('Selecciona area y rol');
       return;
@@ -53,10 +72,12 @@ export function RegistroPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          primerNombre: primerNombre.trim(),
-          segundoNombre: segundoNombre.trim() || null,
-          primerApellido: primerApellido.trim(),
-          segundoApellido: segundoApellido.trim() || null,
+          primerNombre: capitalizarNombre(primerNombre),
+          segundoNombre: capitalizarNombre(segundoNombre) || null,
+          primerApellido: capitalizarNombre(primerApellido),
+          segundoApellido: capitalizarNombre(segundoApellido) || null,
+          tipoDocumento,
+          numeroDocumento: numeroDocumento.trim(),
           correo: correo.trim().toLowerCase(),
           areaId: Number(areaId),
           rolId: Number(rolId),
@@ -133,6 +154,15 @@ export function RegistroPage() {
             <span className="payops-brand-line-text">PAYOPS</span>
             <span className="payops-brand-line-segment" />
           </div>
+          <div className="payops-brand-welcome">
+            <h2>Bienvenido a Payops</h2>
+            <p>La plataforma documental de Goleman IPS. Crea tu cuenta y radica tus solicitudes desde donde estés.</p>
+            <ul className="payops-brand-features">
+              <li><span aria-hidden="true">📱</span> Instálala como app en tu celular</li>
+              <li><span aria-hidden="true">💻</span> Y también en tu PC, desde el navegador</li>
+              <li><span aria-hidden="true">🔒</span> Acceso seguro con tu correo corporativo</li>
+            </ul>
+          </div>
         </div>
       </aside>
 
@@ -170,6 +200,32 @@ export function RegistroPage() {
                 <label htmlFor="reg-sa">Segundo apellido</label>
                 <div className="payops-input-wrap">
                   <input id="reg-sa" type="text" value={segundoApellido} onChange={(e) => setSegundoApellido(e.target.value)} maxLength={80} />
+                </div>
+              </div>
+            </div>
+
+            <div className="payops-registro-row">
+              <div className="payops-field">
+                <label htmlFor="reg-td">Tipo de documento *</label>
+                <div className="payops-input-wrap">
+                  <select id="reg-td" value={tipoDocumento} onChange={(e) => setTipoDocumento(e.target.value)} required>
+                    {TIPOS_DOCUMENTO.map((t) => <option key={t.v} value={t.v}>{t.v} · {t.l}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div className="payops-field">
+                <label htmlFor="reg-nd">Número de documento *</label>
+                <div className="payops-input-wrap">
+                  <input
+                    id="reg-nd"
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="Sin puntos ni comas"
+                    value={numeroDocumento}
+                    onChange={(e) => setNumeroDocumento(e.target.value.replace(/[^\dA-Za-z]/g, ''))}
+                    required
+                    maxLength={20}
+                  />
                 </div>
               </div>
             </div>

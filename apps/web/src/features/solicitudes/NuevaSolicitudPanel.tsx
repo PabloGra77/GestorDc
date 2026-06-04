@@ -78,6 +78,15 @@ interface NuevaSolicitudPanelProps {
 
 interface ValidacionFactura { nombre: string; confianza: number; alertas: string[] }
 
+function leerComoDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '');
+    reader.onerror = () => reject(new Error('No se pudo leer el archivo'));
+    reader.readAsDataURL(file);
+  });
+}
+
 /** Campo de tabla con varias filas (ej. varios viáticos). Opcional: factura por fila validada por IA. */
 function TablaItemsField({ columnas, value, onChange, conFactura, verificaciones, establecimiento, onValidarFactura }: {
   columnas: string[];
@@ -369,6 +378,17 @@ export function NuevaSolicitudPanel({ onCreada }: NuevaSolicitudPanelProps) {
       alertas.push(`La inteligencia artificial leyó el documento con baja confiabilidad (${Math.round(ocr.confidence)}%). El archivo puede estar borroso o ser ilegible.`);
     }
 
+    // Verificación forense en el servidor (metadatos / EXIF / ELA)
+    try {
+      const dataUrl = await leerComoDataUrl(file);
+      const fr = await api.post<{ hallazgos?: Array<{ severidad: string; texto: string }> }>(
+        '/forense', { archivoBase64: dataUrl, nombre: file.name },
+      );
+      for (const h of fr.data?.hallazgos || []) {
+        if (h.severidad === 'alta' || h.severidad === 'media') alertas.push(`🔎 ${h.texto}`);
+      }
+    } catch { /* complementario */ }
+
     setOcrPorCampo((p) => ({
       ...p,
       [key]: { texto: ocr.text, confianza: ocr.confidence, alertas },
@@ -429,6 +449,18 @@ export function NuevaSolicitudPanel({ onCreada }: NuevaSolicitudPanelProps) {
         alertas.push('El documento no tiene la estructura típica de una factura; requiere revisión manual.');
       }
     }
+
+    // Verificación forense en el servidor (metadatos PDF, EXIF, ELA)
+    try {
+      const dataUrl = await leerComoDataUrl(file);
+      const fr = await api.post<{ nivelRiesgo?: string; hallazgos?: Array<{ severidad: string; texto: string }> }>(
+        '/forense', { archivoBase64: dataUrl, nombre: file.name },
+      );
+      for (const h of fr.data?.hallazgos || []) {
+        if (h.severidad === 'alta' || h.severidad === 'media') alertas.push(`🔎 ${h.texto}`);
+      }
+    } catch { /* el análisis forense es complementario; si falla, no bloquea */ }
+
     return { nombre: file.name, confianza: ocr.confidence, alertas };
   }, [procesarArchivo]);
 

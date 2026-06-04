@@ -3186,6 +3186,51 @@ body:has(.payops-login),
   -webkit-text-fill-color: transparent;
 }
 
+/* Panel de bienvenida en registro/login */
+.payops-brand-welcome {
+  margin-top: 28px;
+  max-width: 420px;
+  text-align: center;
+  animation: direccionFadeIn 0.6s ease-out;
+}
+.payops-brand-welcome h2 {
+  margin: 0 0 8px;
+  font-size: 26px;
+  font-weight: 800;
+  background: linear-gradient(180deg, #F3D77B 0%, #D4AF37 70%, #A78629 100%);
+  -webkit-background-clip: text;
+          background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.payops-brand-welcome p {
+  margin: 0 0 16px;
+  color: #C8CEE0;
+  font-size: 14px;
+  line-height: 1.6;
+}
+.payops-brand-features {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+  text-align: left;
+}
+.payops-brand-features li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #E6E9F2;
+  font-size: 13.5px;
+  background: rgba(212, 175, 55, 0.08);
+  border: 1px solid rgba(212, 175, 55, 0.25);
+  border-radius: 10px;
+  padding: 9px 14px;
+}
+.payops-brand-features li span { font-size: 18px; }
+[data-theme="light"] .payops-brand-welcome p { color: #4A5573; }
+[data-theme="light"] .payops-brand-features li { color: #0F172A; background: rgba(212, 175, 55, 0.12); }
+
 /* === Columna derecha: formulario === */
 .payops-login-form-col {
   position: relative;

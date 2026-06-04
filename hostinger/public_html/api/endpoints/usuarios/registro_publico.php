@@ -8,14 +8,27 @@ declare(strict_types=1);
 Throttle::hit('reg-pub:' . Throttle::clientIp(), 3, 60);
 Throttle::hit('reg-pub-hour:' . Throttle::clientIp(), 10, 3600);
 
+// Normaliza nombres: primera letra de cada palabra en mayúscula, el resto en minúscula.
+$capitalizar = static function (string $s): string {
+    $s = trim($s);
+    if ($s === '') return '';
+    return preg_replace_callback('/(^|[\s\-])(\p{Ll})/u', static fn($m) => $m[1] . mb_strtoupper($m[2], 'UTF-8'), mb_strtolower($s, 'UTF-8'));
+};
+
 $body = Request::body();
-$primerNombre   = trim((string)($body['primerNombre'] ?? ''));
-$segundoNombre  = trim((string)($body['segundoNombre'] ?? '')) ?: null;
-$primerApellido = trim((string)($body['primerApellido'] ?? ''));
-$segundoApellido = trim((string)($body['segundoApellido'] ?? '')) ?: null;
+$primerNombre   = $capitalizar((string)($body['primerNombre'] ?? ''));
+$segundoNombre  = $capitalizar((string)($body['segundoNombre'] ?? '')) ?: null;
+$primerApellido = $capitalizar((string)($body['primerApellido'] ?? ''));
+$segundoApellido = $capitalizar((string)($body['segundoApellido'] ?? '')) ?: null;
+$tipoDocumento  = strtoupper(trim((string)($body['tipoDocumento'] ?? '')));
+$numeroDocumento = trim((string)($body['numeroDocumento'] ?? ''));
 $correo         = strtolower(trim((string)($body['correo'] ?? '')));
 $rolId          = (int)($body['rolId'] ?? 0);
 $areaId         = (int)($body['areaId'] ?? 0);
+
+$tiposDocValidos = ['CC', 'CE', 'TI', 'PP', 'PEP', 'NIT'];
+if ($tipoDocumento !== '' && !in_array($tipoDocumento, $tiposDocValidos, true)) $tipoDocumento = '';
+if (strlen($numeroDocumento) > 20) Response::error('Número de documento demasiado largo', 400);
 
 if ($primerNombre === '' || $primerApellido === '' || $correo === '') {
     Response::error('Primer nombre, apellido y correo son obligatorios', 400);
@@ -65,7 +78,7 @@ try {
           tipo_documento, numero_documento, nombre_completo, correo, area,
           permisos, password_hash, must_change_password, activo, rol_id, area_id, nivel_aprobacion)
          VALUES
-         (:pn, :sn, :pa, :sa, '', '', :nc, :co, :ar,
+         (:pn, :sn, :pa, :sa, :td, :nd, :nc, :co, :ar,
           :pe, :ph, 1, 0, :ri, :ai, NULL)"
     );
     $ins->execute([
@@ -73,6 +86,8 @@ try {
         ':sn' => $segundoNombre,
         ':pa' => $primerApellido,
         ':sa' => $segundoApellido,
+        ':td' => $tipoDocumento,
+        ':nd' => $numeroDocumento,
         ':nc' => $nombreCompleto,
         ':co' => $correo,
         ':ar' => (string)$rol['nombre'],
