@@ -122,7 +122,7 @@ function valorCampo(s: SolicitudParaPdf, key: string): string {
   return String(raw);
 }
 
-async function generarPdfPlantilla(s: SolicitudParaPdf, pl: PlantillaPdf, filenameOverride?: string): Promise<void> {
+async function generarPdfPlantilla(s: SolicitudParaPdf, pl: PlantillaPdf, filenameOverride?: string, opts?: { bloburl?: boolean }): Promise<string | void> {
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
@@ -374,7 +374,20 @@ async function generarPdfPlantilla(s: SolicitudParaPdf, pl: PlantillaPdf, filena
     doc.text(`Payops · Goleman IPS · ${i}/${totalPages}`, pageWidth / 2, pageHeight - 6, { align: 'center' });
   }
 
+  if (opts?.bloburl) {
+    return doc.output('bloburl') as unknown as string;
+  }
   doc.save(filenameOverride || `Payops_${s.numeroRadicado}.pdf`);
+}
+
+/**
+ * Genera el PDF del formato diligenciado y devuelve un blob URL para mostrarlo
+ * embebido (iframe), sin descargarlo. Solo aplica si el tipo tiene plantilla PDF.
+ */
+export async function generarFormatoBlobUrl(s: SolicitudParaPdf): Promise<string | null> {
+  if (!s.plantillaPdf) return null;
+  const url = await generarPdfPlantilla(s, s.plantillaPdf, undefined, { bloburl: true });
+  return typeof url === 'string' ? url : null;
 }
 
 export async function descargarPreviewPlantilla(

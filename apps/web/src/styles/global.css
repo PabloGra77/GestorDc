@@ -4994,6 +4994,28 @@ button.mail-tracking-search-button,
   white-space: nowrap;
 }
 .bandeja-mapa-link:hover { text-decoration: underline; }
+.bandeja-formato-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.bandeja-pdf-preview {
+  width: 100%;
+  height: 70vh;
+  min-height: 520px;
+  border: 1px solid var(--gold-line, rgba(212, 175, 55, 0.45));
+  border-radius: 10px;
+  background: #e9ecf1;
+}
+.bandeja-comparacion {
+  margin-top: 4px;
+  font-size: 12px;
+  padding: 6px 10px;
+  border-left: 3px solid var(--gold-bright, #D4AF37);
+  background: rgba(212, 175, 55, 0.08);
+  border-radius: 0 6px 6px 0;
+}
 
 .bandeja-trazado {
   list-style: none;
@@ -6676,6 +6698,7 @@ textarea {
 /* Hoja A4 simulada */
 .plantilla-page {
   position: relative;
+  flex: 0 0 auto; /* nunca encoger: mantiene el alto A4 dentro del lienzo flex */
   background: #FFFFFF;
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
   border: 1px solid rgba(212, 175, 55, 0.4);

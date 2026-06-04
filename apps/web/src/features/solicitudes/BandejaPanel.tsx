@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { api } from '../../services/http/api';
 import { SignaturePad } from '../../components/SignaturePad';
 import { etiquetaDocumento } from '../../utils/documentoLabels';
+import { generarPdfFormato, generarFormatoBlobUrl } from './generarPdfFormato';
 
 interface Item {
   id: number;
@@ -23,6 +24,7 @@ interface CampoPlantilla {
   type: string;
   group?: string;
   ocr_target?: string;
+  validar_contra?: string;
 }
 
 interface Movimiento {
@@ -55,6 +57,8 @@ interface Detalle {
   flujoAprobacion: Array<{ rol: string; label: string; orden: number }>;
   movimientos: Movimiento[];
   creadoEn: string;
+  firmas?: Record<string, string> | null;
+  plantillaPdf?: { bloques?: unknown[] } | null;
 }
 
 interface AreaMini { id: number; nombre: string; activo: boolean }
@@ -141,6 +145,21 @@ export function BandejaPanel() {
   const [accionando, setAccionando] = useState<string | null>(null);
   const [areas, setAreas] = useState<AreaMini[]>([]);
   const [areaRemitir, setAreaRemitir] = useState<number | ''>('');
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [generandoPdf, setGenerandoPdf] = useState(false);
+
+  // Genera el formato diligenciado (PDF) para verlo embebido cuando se abre un detalle
+  useEffect(() => {
+    let cancel = false;
+    setPdfUrl(null);
+    if (!detalle || !detalle.plantillaPdf?.bloques?.length) return;
+    setGenerandoPdf(true);
+    generarFormatoBlobUrl(detalle as unknown as Parameters<typeof generarFormatoBlobUrl>[0])
+      .then((url) => { if (!cancel) setPdfUrl(url); })
+      .catch(() => { if (!cancel) setPdfUrl(null); })
+      .finally(() => { if (!cancel) setGenerandoPdf(false); });
+    return () => { cancel = true; };
+  }, [detalle]);
 
   const cargar = useCallback(async () => {
     setLoading(true);
@@ -277,6 +296,30 @@ export function BandejaPanel() {
                       </div>
                     ) : null}
 
+                    <div className="bandeja-formato-head">
+                      <h4>Formato diligenciado</h4>
+                      <button
+                        type="button"
+                        className="admin-ghost-button"
+                        onClick={() => generarPdfFormato(detalle as unknown as Parameters<typeof generarPdfFormato>[0])}
+                      >
+                        📥 Descargar PDF
+                      </button>
+                    </div>
+                    {detalle.plantillaPdf?.bloques?.length ? (
+                      generandoPdf ? (
+                        <p className="admin-help-text">Generando el PDF del formato…</p>
+                      ) : pdfUrl ? (
+                        <iframe className="bandeja-pdf-preview" src={pdfUrl} title="Formato diligenciado" />
+                      ) : (
+                        <p className="admin-help-text">No se pudo generar la vista del PDF. Usa “Descargar PDF”.</p>
+                      )
+                    ) : (
+                      <p className="admin-help-text">
+                        Este tipo de solicitud no tiene plantilla PDF personalizada. Con “Descargar PDF” obtienes el formato estándar con los datos.
+                      </p>
+                    )}
+
                     <h4>Datos diligenciados</h4>
                     <div className="bandeja-datos">
                       {detalle.camposPlantilla
@@ -323,6 +366,13 @@ export function BandejaPanel() {
                         .filter((c) => c.type === 'file')
                         .map((c) => {
                           const doc = formatearDocumento(detalle.documentos[c.key]);
+                          // Comparación: dato que la IA debe verificar dentro del adjunto
+                          const campoDato = c.validar_contra
+                            ? detalle.camposPlantilla.find((d) => d.key === c.validar_contra)
+                            : undefined;
+                          const valorEsperado = campoDato
+                            ? formatearValor(campoDato, detalle.datosFormulario[campoDato.key]).texto
+                            : null;
                           return (
                             <li key={c.key}>
                               <strong>{c.label}:</strong>{' '}
@@ -339,6 +389,11 @@ export function BandejaPanel() {
                                 <span className="admin-help-text"> · IA: {Math.round(doc.confianza)}% de coincidencia</span>
                               ) : null}
                               {c.ocr_target ? <span className="admin-help-text"> · esperado: {etiquetaDocumento(c.ocr_target)}</span> : null}
+                              {campoDato && valorEsperado && valorEsperado !== '—' ? (
+                                <div className="bandeja-comparacion">
+                                  🔎 La IA debe verificar que <strong>{campoDato.label}</strong> (“{valorEsperado}”) aparezca en este adjunto.
+                                </div>
+                              ) : null}
                             </li>
                           );
                         })}
