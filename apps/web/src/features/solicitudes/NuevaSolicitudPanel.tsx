@@ -36,16 +36,44 @@ interface CampoPlantilla {
     | 'cuenta-bancaria'
     | 'banco-select'
     | 'direccion'
+    | 'persona'
+    | 'calculado'
     | 'tabla-items';
   required: boolean;
   group?: string;
   ocr_target?: string;
   texto?: string;
+  operandos?: string[];
+  operacion?: 'suma' | 'resta' | 'multiplicacion' | 'division';
   columnas?: string[];
   opciones?: string[];
   conFactura?: boolean;
   verificaciones?: string[];
   establecimientoEsperado?: string;
+}
+
+// Texto numérico/monetario → número (formato colombiano: punto = miles, coma = decimal)
+function parseNumeroForm(texto: string): number {
+  const limpio = String(texto ?? '').replace(/[^0-9,.-]/g, '').trim();
+  if (!limpio) return 0;
+  const n = parseFloat(limpio.replace(/\./g, '').replace(',', '.'));
+  return isNaN(n) ? 0 : n;
+}
+
+// Combina valores según la operación del campo calculado
+function calcularCampo(operandos: string[], operacion: string, datos: Record<string, string>): number {
+  const vals = operandos.map((k) => parseNumeroForm(datos[k] || ''));
+  if (vals.length === 0) return 0;
+  return vals.reduce((acc, v, i) => {
+    if (i === 0) return v;
+    switch (operacion) {
+      case 'resta': return acc - v;
+      case 'multiplicacion': return acc * v;
+      case 'division': return v === 0 ? acc : acc / v;
+      case 'suma':
+      default: return acc + v;
+    }
+  });
 }
 
 interface BloqueCampoMin {
@@ -203,6 +231,7 @@ export function NuevaSolicitudPanel({ onCreada }: NuevaSolicitudPanelProps) {
   const [enviando, setEnviando] = useState(false);
   const [firmaSolicitante, setFirmaSolicitante] = useState('');
   const [subPaso, setSubPaso] = useState(0);
+  const [personas, setPersonas] = useState<string[]>([]);
   const { procesarArchivo, running: ocrRunning, progress: ocrProgress } = useOcrDocument();
 
   useEffect(() => {
@@ -221,6 +250,32 @@ export function NuevaSolicitudPanel({ onCreada }: NuevaSolicitudPanelProps) {
       .finally(() => setLoading(false));
     return () => { cancel = true; };
   }, []);
+
+  // Nombres de usuarios para autocompletar campos tipo "persona" (no crítico si falla)
+  useEffect(() => {
+    let cancel = false;
+    api.get<Array<{ nombreCompleto?: string }>>('/usuarios/nombres')
+      .then((r) => { if (!cancel) setPersonas(r.data.map((u) => u.nombreCompleto || '').filter(Boolean)); })
+      .catch(() => { /* silencioso */ });
+    return () => { cancel = true; };
+  }, []);
+
+  // Mantener actualizados los campos calculados cuando cambian sus operandos
+  useEffect(() => {
+    if (!tipoSel) return;
+    const calculados = (tipoSel.camposPlantilla || []).filter((c) => c.type === 'calculado');
+    if (calculados.length === 0) return;
+    setDatos((prev) => {
+      let cambio = false;
+      const next = { ...prev };
+      for (const c of calculados) {
+        const r = calcularCampo(c.operandos || [], c.operacion || 'suma', prev);
+        const txt = String(Math.round(r * 100) / 100);
+        if (next[c.key] !== txt) { next[c.key] = txt; cambio = true; }
+      }
+      return cambio ? next : prev;
+    });
+  }, [datos, tipoSel]);
 
   const tiposDelArea = useMemo(() => {
     if (!areaSel) return [];
@@ -829,6 +884,36 @@ export function NuevaSolicitudPanel({ onCreada }: NuevaSolicitudPanelProps) {
                           <option value="bus">Bus / transporte público</option>
                           <option value="otro">Otro</option>
                         </select>
+                      ) : c.type === 'calculado' ? (
+                        <div className="valor-pesos-wrap">
+                          <input
+                            id={`f-${c.key}`}
+                            type="text"
+                            value={`$ ${formatearMiles(datos[c.key] || '0')}`}
+                            readOnly
+                            tabIndex={-1}
+                            style={{ background: '#f3f4f6', fontWeight: 700 }}
+                          />
+                          <div className="valor-pesos-preview">
+                            <span>Se calcula automáticamente: {(c.operandos || []).map((k) => tipoSel?.camposPlantilla.find((x) => x.key === k)?.label || k).join(c.operacion === 'resta' ? ' − ' : c.operacion === 'multiplicacion' ? ' × ' : c.operacion === 'division' ? ' ÷ ' : ' + ')}</span>
+                          </div>
+                        </div>
+                      ) : c.type === 'persona' ? (
+                        <>
+                          <input
+                            id={`f-${c.key}`}
+                            type="text"
+                            list={`dl-${c.key}`}
+                            autoComplete="off"
+                            value={datos[c.key] || ''}
+                            onChange={(e) => setDatos((p) => ({ ...p, [c.key]: e.target.value }))}
+                            required={c.required}
+                            placeholder="Escribe y elige de la lista…"
+                          />
+                          <datalist id={`dl-${c.key}`}>
+                            {personas.map((n, i) => <option key={i} value={n} />)}
+                          </datalist>
+                        </>
                       ) : (
                         <input
                           id={`f-${c.key}`}

@@ -32,11 +32,16 @@ interface CampoPlantilla {
     | 'cuenta-bancaria'
     | 'banco-select'
     | 'direccion'
+    | 'persona'
+    | 'calculado'
     | 'tabla-items';
   required: boolean;
   group?: string;
   ocr_target?: string;
   texto?: string;
+  /** Para 'calculado': campos que se combinan y la operación (suma, resta, etc.) */
+  operandos?: string[];
+  operacion?: 'suma' | 'resta' | 'multiplicacion' | 'division';
   /** Para campos tipo 'file': key del dato que la IA debe encontrar/validar dentro del adjunto */
   validar_contra?: string;
   /** Para campos tipo 'tabla-items': columnas que llena el solicitante (varias filas) */
@@ -381,9 +386,41 @@ const TIPOS_CAMPO = [
   { v: 'cuenta-bancaria', l: 'Numero cuenta bancaria' },
   { v: 'banco-select', l: 'Banco (lista colombiana)' },
   { v: 'direccion', l: 'Dirección + ciudad + país (con mapa y clima)' },
+  { v: 'persona', l: 'Nombre con autocompletar (usuarios del sistema)' },
+  { v: 'calculado', l: 'Calculado (suma/resta/× /÷ de otros campos)' },
   { v: 'tabla-items', l: 'Tabla de varias filas (ej. varios viáticos)' },
   { v: 'file', l: 'Archivo / documento' },
 ];
+
+const OPERACIONES_CALCULO: Array<{ v: 'suma' | 'resta' | 'multiplicacion' | 'division'; l: string; sim: string }> = [
+  { v: 'suma', l: 'Sumar (+)', sim: '+' },
+  { v: 'resta', l: 'Restar (−)', sim: '−' },
+  { v: 'multiplicacion', l: 'Multiplicar (×)', sim: '×' },
+  { v: 'division', l: 'Dividir (÷)', sim: '÷' },
+];
+
+// Combina varios valores numéricos según la operación. Compartido por editor, formulario y PDF.
+function calcularOperacion(valores: number[], operacion: 'suma' | 'resta' | 'multiplicacion' | 'division'): number {
+  if (valores.length === 0) return 0;
+  return valores.reduce((acc, v, i) => {
+    if (i === 0) return v;
+    switch (operacion) {
+      case 'suma': return acc + v;
+      case 'resta': return acc - v;
+      case 'multiplicacion': return acc * v;
+      case 'division': return v === 0 ? acc : acc / v;
+      default: return acc;
+    }
+  });
+}
+
+// Texto monetario/numérico → número (formato colombiano: punto = miles, coma = decimal)
+function parseNumeroEditor(texto: string): number {
+  const limpio = String(texto ?? '').replace(/[^0-9,.-]/g, '').trim();
+  if (!limpio) return 0;
+  const n = parseFloat(limpio.replace(/\./g, '').replace(',', '.'));
+  return isNaN(n) ? 0 : n;
+}
 
 const BLOQUES_PREDEFINIDOS: Array<{ id: string; nombre: string; descripcion: string; campos: CampoPlantilla[] }> = [
   {
@@ -1263,6 +1300,12 @@ function PlantillaPdfEditor({ plantilla, onChange, campos, onCamposChange, onIns
       case 'direccion': return 'Carrera 7 #74-21, Bogotá';
       case 'select': return 'Opción seleccionada';
       case 'textarea': return 'Texto diligenciado por el solicitante.';
+      case 'persona': return 'Camilo Restrepo';
+      case 'calculado': {
+        const vals = (c.operandos || []).map((k) => parseNumeroEditor(ejemploCampoValor(k)));
+        const r = calcularOperacion(vals, c.operacion || 'suma');
+        return r.toLocaleString('es-CO');
+      }
       default: return c.label;
     }
   }
@@ -1776,14 +1819,17 @@ function PlantillaPdfEditor({ plantilla, onChange, campos, onCamposChange, onIns
         {/* IZQUIERDA: datos que llena el solicitante */}
         <div className="plantilla-col-datos">
           <div className="plantilla-col-head">
-            <strong>🧾 Datos del solicitante</strong>
-            <button type="button" className="admin-ghost-button" onClick={agregarDato}>+ Dato</button>
+            <strong>🧾 Campos del formulario</strong>
+            <button type="button" className="admin-ghost-button" onClick={agregarDato}>+ Campo</button>
           </div>
-          <p className="admin-help-text">Lo que diligencia el solicitante. Toca ↘ para colocarlo en la hoja.</p>
-          {datosIdx.length === 0 ? <p className="admin-help-text">Sin datos aún. Agrega uno con “+ Dato”.</p> : null}
-          {datosIdx.map(({ c, idx }) => (
-            <div key={idx} className="plantilla-campo-item">
+          <p className="admin-help-text">Lo que la persona va a llenar. Define la <strong>etiqueta</strong> y el <strong>tipo</strong>, y con <strong>↘</strong> lo colocas en la hoja. El check <span style={{ color: '#16a34a' }}>✓</span> indica que ya está en el documento.</p>
+          {datosIdx.length === 0 ? <p className="admin-help-text">Sin campos aún. Agrega uno con “+ Campo”.</p> : null}
+          {datosIdx.map(({ c, idx }) => {
+            const enHoja = !!c.key && bloques.some((b) => b.tipo === 'campo' && b.campoKey === c.key);
+            return (
+            <div key={idx} className={`plantilla-campo-item${enHoja ? ' en-hoja' : ''}`}>
               <div className="plantilla-campo-item-row">
+                <span className="plantilla-campo-estado" title={enHoja ? 'Ya está en la hoja' : 'Aún no está en la hoja'}>{enHoja ? '✓' : '○'}</span>
                 <input
                   className="plantilla-campo-item-label"
                   type="text"
@@ -1794,10 +1840,10 @@ function PlantillaPdfEditor({ plantilla, onChange, campos, onCamposChange, onIns
                 <button
                   type="button"
                   className="plantilla-campo-insertar"
-                  title="Colocar este dato en la hoja activa"
+                  title={enHoja ? 'Colocar otra vez en la hoja activa' : 'Colocar este campo en la hoja activa'}
                   onClick={() => { const pos = nuevaPos(); agregar({ id: nuevoId(), ...pos, tipo: 'campo', campoKey: c.key, etiqueta: `${c.label}:`, alineacion: 'izquierda' }); }}
                 >↘</button>
-                <button type="button" className="campo-modulo-del" title="Eliminar dato" onClick={() => eliminarCampoIdx(idx)}>🗑</button>
+                <button type="button" className="campo-modulo-del" title="Eliminar campo" onClick={() => eliminarCampoIdx(idx)}>🗑</button>
               </div>
               <div className="plantilla-campo-item-row">
                 <select value={c.type} onChange={(e) => patchCampoIdx(idx, { type: e.target.value as CampoPlantilla['type'] })}>
@@ -1865,8 +1911,49 @@ function PlantillaPdfEditor({ plantilla, onChange, campos, onCamposChange, onIns
                   />
                 </>
               ) : null}
+              {c.type === 'persona' ? (
+                <span className="plantilla-campo-mini-label">Al escribir, el solicitante verá sugerencias de los usuarios registrados (ej. “cami” → Camilo).</span>
+              ) : null}
+              {c.type === 'calculado' ? (
+                <>
+                  <label className="plantilla-campo-mini-label">Operación</label>
+                  <select
+                    value={c.operacion || 'suma'}
+                    onChange={(e) => patchCampoIdx(idx, { operacion: e.target.value as CampoPlantilla['operacion'] })}
+                  >
+                    {OPERACIONES_CALCULO.map((op) => <option key={op.v} value={op.v}>{op.l}</option>)}
+                  </select>
+                  <label className="plantilla-campo-mini-label">Campos a combinar (en orden)</label>
+                  {campos.filter((x) => x.key && x.key !== c.key && ['valor-pesos', 'number', 'calculado'].includes(x.type)).length === 0 ? (
+                    <span className="plantilla-campo-mini-label">Agrega primero campos de tipo “Valor en pesos” o “Número” para poder combinarlos.</span>
+                  ) : (
+                    campos.filter((x) => x.key && x.key !== c.key && ['valor-pesos', 'number', 'calculado'].includes(x.type)).map((x) => {
+                      const sel = (c.operandos || []).includes(x.key);
+                      return (
+                        <label key={x.key} className="ops-checkbox" style={{ fontSize: 12 }}>
+                          <input
+                            type="checkbox"
+                            checked={sel}
+                            onChange={() => {
+                              const actuales = c.operandos || [];
+                              const next = sel ? actuales.filter((k) => k !== x.key) : [...actuales, x.key];
+                              patchCampoIdx(idx, { operandos: next });
+                            }}
+                          /> {x.label || x.key}
+                        </label>
+                      );
+                    })
+                  )}
+                  {(c.operandos || []).length > 0 ? (
+                    <span className="plantilla-campo-mini-label">
+                      = {(c.operandos || []).map((k) => campos.find((x) => x.key === k)?.label || k).join(` ${OPERACIONES_CALCULO.find((op) => op.v === (c.operacion || 'suma'))?.sim} `)}
+                    </span>
+                  ) : null}
+                </>
+              ) : null}
             </div>
-          ))}
+            );
+          })}
         </div>
 
         {/* CENTRO: todas las hojas de la plantilla */}

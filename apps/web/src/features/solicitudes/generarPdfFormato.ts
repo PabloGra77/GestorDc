@@ -5,6 +5,8 @@ interface CampoPlantilla {
   label: string;
   type: string;
   group?: string;
+  operandos?: string[];
+  operacion?: 'suma' | 'resta' | 'multiplicacion' | 'division';
 }
 
 interface Movimiento {
@@ -156,6 +158,28 @@ function valorCampo(s: SolicitudParaPdf, key: string): string {
   if (key === '__ciudad') {
     const d = s.datosFormulario || {};
     return String(d.lugarExpedicion ?? d.ciudad ?? 'Bogotá');
+  }
+  // Campo calculado: si tiene definición, recalcula desde sus operandos y formatea como moneda
+  const def = (s.camposPlantilla || []).find((c) => c.key === key);
+  if (def && def.type === 'calculado') {
+    const datos = s.datosFormulario || {};
+    const operandos = def.operandos || [];
+    const vals = operandos.map((k) => parseMoneda(String(datos[k] ?? '')));
+    let total = 0;
+    if (vals.length > 0) {
+      total = vals.reduce((acc, v, i) => {
+        if (i === 0) return v;
+        switch (def.operacion) {
+          case 'resta': return acc - v;
+          case 'multiplicacion': return acc * v;
+          case 'division': return v === 0 ? acc : acc / v;
+          default: return acc + v;
+        }
+      });
+    } else {
+      total = parseMoneda(String(datos[key] ?? ''));
+    }
+    return `$ ${(Math.round(total * 100) / 100).toLocaleString('es-CO')}`;
   }
   const raw = (s.datosFormulario || {})[key];
   if (raw == null) return '';

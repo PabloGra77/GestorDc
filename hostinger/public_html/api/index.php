@@ -38,6 +38,7 @@ $routes = [
     ['POST',   '#^/usuarios$#',                                  'usuarios/create'],
     ['POST',   '#^/usuarios/bulk$#',                             'usuarios/bulk_create'],
     ['GET',    '#^/usuarios/reporte$#',                          'usuarios/reporte'],
+    ['GET',    '#^/usuarios/nombres$#',                          'usuarios/nombres'],
     ['GET',    '#^/usuarios$#',                                  'usuarios/find_all'],
     ['GET',    '#^/usuarios/(?P<id>\d+)$#',                      'usuarios/find_one'],
     ['PATCH',  '#^/usuarios/(?P<id>\d+)$#',                      'usuarios/update'],
