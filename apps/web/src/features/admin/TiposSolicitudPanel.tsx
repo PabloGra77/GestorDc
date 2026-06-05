@@ -83,11 +83,12 @@ interface BloqueBase {
 }
 
 type PdfBloque = BloqueBase & (
+  | { tipo: 'encabezado'; titulo: string; subtitulo: string; area: string; codigo: string; fecha: string; version: string; paginaTexto: string; src?: string }
   | { tipo: 'logo'; alineacion: PdfAlineacion; ancho: number; src?: string }
   | { tipo: 'titulo'; texto: string; alineacion: PdfAlineacion; tamano: number; negrita: boolean }
   | { tipo: 'texto'; texto: string; alineacion: PdfAlineacion; tamano: number }
   | { tipo: 'campo'; campoKey: string; etiqueta: string; alineacion: PdfAlineacion }
-  | { tipo: 'tabla'; columnas: string[] }
+  | { tipo: 'tabla'; columnas: string[]; conTotal?: boolean; etiquetaTotal?: string }
   | { tipo: 'divider' }
   | { tipo: 'firma'; etiqueta: string; campoFirma: 'profesional' | 'coordinador' | 'contabilidad' }
   | { tipo: 'caja'; alto: number; relleno: boolean; etiqueta?: string }
@@ -121,19 +122,20 @@ function nuevoId() {
 function plantillaCuentaCobro(): PdfBloque[] {
   return [
     // Página 1: Cuenta de cobro principal
-    { id: nuevoId(), pagina: 1, x: 18, y: 14, w: 36, tipo: 'logo', alineacion: 'izquierda', ancho: 36, src: '/logo-payops-dark.png' },
-    { id: nuevoId(), pagina: 1, x: 18, y: 38, w: 110, tipo: 'texto', texto: 'Ciudad y fecha: {{ciudad}}, {{fecha}}', alineacion: 'izquierda', tamano: 11 },
-    { id: nuevoId(), pagina: 1, x: 18, y: 52, w: 174, tipo: 'titulo', texto: 'CUENTA DE COBRO N° {{radicado}}', alineacion: 'centro', tamano: 14, negrita: true },
-    { id: nuevoId(), pagina: 1, x: 18, y: 66, w: 174, tipo: 'titulo', texto: 'IPS GOLEMAN SERVICIO INTEGRAL SAS', alineacion: 'centro', tamano: 11, negrita: true },
-    { id: nuevoId(), pagina: 1, x: 18, y: 74, w: 174, tipo: 'titulo', texto: 'NIT 900.231.82', alineacion: 'centro', tamano: 11, negrita: true },
-    { id: nuevoId(), pagina: 1, x: 18, y: 86, w: 174, tipo: 'titulo', texto: 'DEBE A:', alineacion: 'centro', tamano: 11, negrita: true },
-    { id: nuevoId(), pagina: 1, x: 18, y: 96, w: 174, tipo: 'campo', campoKey: '__nombre', etiqueta: 'NOMBRE:', alineacion: 'izquierda' },
-    { id: nuevoId(), pagina: 1, x: 18, y: 108, w: 174, tipo: 'campo', campoKey: '__cedula', etiqueta: 'C.C:', alineacion: 'izquierda' },
-    { id: nuevoId(), pagina: 1, x: 18, y: 124, w: 174, tipo: 'texto', texto: 'La suma de: {{valor}} ({{valorLetras}})', alineacion: 'izquierda', tamano: 11 },
-    { id: nuevoId(), pagina: 1, x: 18, y: 134, w: 174, tipo: 'texto', texto: 'Por concepto de: {{concepto}}', alineacion: 'izquierda', tamano: 11 },
-    { id: nuevoId(), pagina: 1, x: 18, y: 146, w: 174, tipo: 'tabla', columnas: ['FECHA', 'ITEM', 'VALOR'] },
-    { id: nuevoId(), pagina: 1, x: 18, y: 240, w: 70, tipo: 'firma', etiqueta: 'Firma del solicitante', campoFirma: 'profesional' },
-    { id: nuevoId(), pagina: 1, x: 100, y: 240, w: 70, tipo: 'firma', etiqueta: 'Coordinador / Director', campoFirma: 'coordinador' },
+    { id: nuevoId(), pagina: 1, x: 18, y: 10, w: 174, tipo: 'encabezado', titulo: 'FORMATO CUENTA DE COBRO', subtitulo: 'DIRECCION FINANCIERA', area: 'CONTABILIDAD', codigo: 'DF-CON-FR-003', fecha: '23/01/2026', version: '2', paginaTexto: '1 de 1', src: '/logo-payops-dark.png' },
+    { id: nuevoId(), pagina: 1, x: 18, y: 46, w: 110, tipo: 'texto', texto: 'Ciudad y fecha: {{ciudad}}, {{fecha}}', alineacion: 'izquierda', tamano: 11 },
+    { id: nuevoId(), pagina: 1, x: 18, y: 58, w: 174, tipo: 'titulo', texto: 'CUENTA DE COBRO N° {{radicado}}', alineacion: 'centro', tamano: 14, negrita: true },
+    { id: nuevoId(), pagina: 1, x: 18, y: 70, w: 174, tipo: 'titulo', texto: 'IPS GOLEMAN SERVICIO INTEGRAL SAS', alineacion: 'centro', tamano: 11, negrita: true },
+    { id: nuevoId(), pagina: 1, x: 18, y: 78, w: 174, tipo: 'titulo', texto: 'NIT 900.231.82', alineacion: 'centro', tamano: 11, negrita: true },
+    { id: nuevoId(), pagina: 1, x: 18, y: 90, w: 174, tipo: 'titulo', texto: 'DEBE A:', alineacion: 'centro', tamano: 11, negrita: true },
+    { id: nuevoId(), pagina: 1, x: 18, y: 100, w: 174, tipo: 'campo', campoKey: '__nombre', etiqueta: 'NOMBRE:', alineacion: 'izquierda' },
+    { id: nuevoId(), pagina: 1, x: 18, y: 112, w: 174, tipo: 'campo', campoKey: '__cedula', etiqueta: 'C.C:', alineacion: 'izquierda' },
+    { id: nuevoId(), pagina: 1, x: 18, y: 126, w: 174, tipo: 'texto', texto: 'La suma de: {{valor}}', alineacion: 'izquierda', tamano: 11 },
+    { id: nuevoId(), pagina: 1, x: 18, y: 136, w: 174, tipo: 'texto', texto: 'Por concepto de: {{concepto}} — Discriminados así:', alineacion: 'izquierda', tamano: 11 },
+    { id: nuevoId(), pagina: 1, x: 18, y: 148, w: 174, tipo: 'tabla', columnas: ['FECHA', 'ITEM', 'VALOR'], conTotal: true, etiquetaTotal: 'TOTAL' },
+    { id: nuevoId(), pagina: 1, x: 18, y: 214, w: 174, tipo: 'campo', campoKey: 'numeroCuenta', etiqueta: 'Por favor efectuar el pago a mi cuenta N°:', alineacion: 'izquierda' },
+    { id: nuevoId(), pagina: 1, x: 18, y: 226, w: 174, tipo: 'campo', campoKey: 'banco', etiqueta: 'Banco / Tipo de cuenta:', alineacion: 'izquierda' },
+    { id: nuevoId(), pagina: 1, x: 18, y: 252, w: 80, tipo: 'firma', etiqueta: 'Firma del solicitante', campoFirma: 'profesional' },
     // Página 2: Soportes documentales adjuntos
     { id: nuevoId(), pagina: 2, x: 18, y: 18, w: 174, tipo: 'titulo', texto: 'ANEXOS · SOPORTES DOCUMENTALES', alineacion: 'centro', tamano: 13, negrita: true },
     { id: nuevoId(), pagina: 2, x: 18, y: 28, w: 174, tipo: 'divider' },
@@ -231,8 +233,83 @@ function plantillaGenerica(): PdfBloque[] {
   ];
 }
 
+// DF-CON-FR-004 · Anticipo de gastos de viaje o trámites correspondientes
+function plantillaAnticipoGastos(): PdfBloque[] {
+  return [
+    { id: nuevoId(), pagina: 1, x: 18, y: 10, w: 174, tipo: 'encabezado', titulo: 'ANTICIPO DE GASTOS DE VIAJE O TRAMITES CORRESPONDIENTES', subtitulo: 'DIRECCION FINANCIERA', area: 'CONTABILIDAD', codigo: 'DF-CON-FR-004', fecha: '16/01/2026', version: '2', paginaTexto: '1 de 1', src: '/logo-payops-dark.png' },
+    { id: nuevoId(), pagina: 1, x: 18, y: 48, w: 174, tipo: 'titulo', texto: 'REFERENCIA: ANTICIPO DE GASTOS DE VIAJE O TRAMITES CORRESPONDIENTE', alineacion: 'centro', tamano: 11, negrita: true },
+    { id: nuevoId(), pagina: 1, x: 18, y: 64, w: 174, tipo: 'campo', campoKey: 'dirigidoA', etiqueta: 'A:', alineacion: 'izquierda' },
+    { id: nuevoId(), pagina: 1, x: 18, y: 80, w: 174, tipo: 'texto', texto: 'FECHA: {{fecha}}. Yo, {{nombre}} identificado con CC {{cedula}}, autorizo de manera expresa a IPS GOLEMAN SERVICIOS INTEGRALES SAS, para que en el evento que no se realice la legalización en un término máximo de cinco (5) días hábiles siguientes a la finalización del viaje del colaborador o terminación de los tramites solicitados por la empresa, sea descontado el valor de $ {{valor}}, correspondiente al Anticipo de gastos de viaje y entrega de anticipo para tramites de la empresa, correspondiente a: {{concepto}}', alineacion: 'izquierda', tamano: 11 },
+    { id: nuevoId(), pagina: 1, x: 18, y: 132, w: 174, tipo: 'texto', texto: 'Este descuento será aplicable a conceptos de pago de salarios, primas extralegales, primas legales. Igualmente, que en caso de retiro o desvinculación de la empresa autorizo a que el saldo que en cualquier momento se encuentre en mi contra, sea descontado de mi liquidación de salarios y prestaciones sociales finales, vacaciones, auxilios y en general cualquier concepto que deba cancelarme la Empresa.', alineacion: 'izquierda', tamano: 11 },
+    { id: nuevoId(), pagina: 1, x: 18, y: 210, w: 90, tipo: 'firma', etiqueta: 'Firma', campoFirma: 'profesional' },
+    { id: nuevoId(), pagina: 1, x: 18, y: 240, w: 174, tipo: 'campo', campoKey: '__nombre', etiqueta: 'Nombre completo:', alineacion: 'izquierda' },
+    { id: nuevoId(), pagina: 1, x: 18, y: 250, w: 174, tipo: 'campo', campoKey: 'cargo', etiqueta: 'Cargo:', alineacion: 'izquierda' },
+    { id: nuevoId(), pagina: 1, x: 18, y: 260, w: 174, tipo: 'campo', campoKey: '__cedula', etiqueta: 'C.C.:', alineacion: 'izquierda' },
+    { id: nuevoId(), pagina: 1, x: 18, y: 270, w: 174, tipo: 'campo', campoKey: 'telefono', etiqueta: 'Teléfono:', alineacion: 'izquierda' },
+    { id: nuevoId(), pagina: 1, x: 18, y: 280, w: 174, tipo: 'campo', campoKey: 'direccion', etiqueta: 'Dirección:', alineacion: 'izquierda' },
+  ];
+}
+
+// PRE-PPL-FR-026 · Formato informe de visita (Programas Especiales · Modelo Especial PPL) — 4 páginas
+function plantillaInformeVisitaPPL(): PdfBloque[] {
+  const enc = (pag: number, p: string): PdfBloque => ({ id: nuevoId(), pagina: pag, x: 18, y: 10, w: 174, tipo: 'encabezado', titulo: 'FORMATO INFORME DE VISITA', subtitulo: 'PROGRAMAS ESPECIALES', area: 'MODELO ESPECIAL PPL', codigo: 'PRE-PPL-FR-026', fecha: '22/05/2025', version: '1', paginaTexto: p, src: '/logo-payops-dark.png' });
+  return [
+    // Página 1
+    enc(1, '1 de 4'),
+    { id: nuevoId(), pagina: 1, x: 18, y: 46, w: 174, tipo: 'campo', campoKey: 'fechaCobertura', etiqueta: 'Fecha de cobertura:', alineacion: 'izquierda' },
+    { id: nuevoId(), pagina: 1, x: 18, y: 56, w: 174, tipo: 'campo', campoKey: 'establecimientoVisitado', etiqueta: 'Establecimiento visitado:', alineacion: 'izquierda' },
+    { id: nuevoId(), pagina: 1, x: 18, y: 66, w: 174, tipo: 'campo', campoKey: 'profesionalResponsable', etiqueta: 'Profesional responsable:', alineacion: 'izquierda' },
+    { id: nuevoId(), pagina: 1, x: 18, y: 76, w: 174, tipo: 'campo', campoKey: 'regional', etiqueta: 'Regional:', alineacion: 'izquierda' },
+    { id: nuevoId(), pagina: 1, x: 18, y: 92, w: 174, tipo: 'titulo', texto: '1. OBJETIVOS DE LA VISITA', alineacion: 'izquierda', tamano: 12, negrita: true },
+    { id: nuevoId(), pagina: 1, x: 18, y: 102, w: 174, tipo: 'campo', campoKey: 'objetivosVisita', etiqueta: '', alineacion: 'izquierda' },
+    { id: nuevoId(), pagina: 1, x: 18, y: 120, w: 174, tipo: 'titulo', texto: '2. METODOLOGÍA', alineacion: 'izquierda', tamano: 12, negrita: true },
+    { id: nuevoId(), pagina: 1, x: 18, y: 130, w: 174, tipo: 'campo', campoKey: 'metodologiaPlaneacion', etiqueta: 'Planeación:', alineacion: 'izquierda' },
+    { id: nuevoId(), pagina: 1, x: 18, y: 150, w: 174, tipo: 'campo', campoKey: 'metodologiaEjecucion', etiqueta: 'Ejecución clínica:', alineacion: 'izquierda' },
+    // Página 2
+    enc(2, '2 de 4'),
+    { id: nuevoId(), pagina: 2, x: 18, y: 46, w: 174, tipo: 'campo', campoKey: 'registroTecnico', etiqueta: 'Registro técnico:', alineacion: 'izquierda' },
+    { id: nuevoId(), pagina: 2, x: 18, y: 64, w: 174, tipo: 'titulo', texto: '3. RESULTADOS', alineacion: 'izquierda', tamano: 12, negrita: true },
+    { id: nuevoId(), pagina: 2, x: 18, y: 74, w: 174, tipo: 'campo', campoKey: 'resultados', etiqueta: '', alineacion: 'izquierda' },
+    { id: nuevoId(), pagina: 2, x: 18, y: 94, w: 174, tipo: 'titulo', texto: '4. HALLAZGOS RELEVANTES', alineacion: 'izquierda', tamano: 12, negrita: true },
+    { id: nuevoId(), pagina: 2, x: 18, y: 104, w: 174, tipo: 'campo', campoKey: 'hallazgos', etiqueta: '', alineacion: 'izquierda' },
+    { id: nuevoId(), pagina: 2, x: 18, y: 130, w: 174, tipo: 'titulo', texto: '5. COMPROMISOS', alineacion: 'izquierda', tamano: 12, negrita: true },
+    { id: nuevoId(), pagina: 2, x: 18, y: 140, w: 174, tipo: 'campo', campoKey: 'compromisos', etiqueta: '', alineacion: 'izquierda' },
+    { id: nuevoId(), pagina: 2, x: 18, y: 160, w: 174, tipo: 'titulo', texto: '6. CONCLUSIÓN', alineacion: 'izquierda', tamano: 12, negrita: true },
+    { id: nuevoId(), pagina: 2, x: 18, y: 170, w: 174, tipo: 'campo', campoKey: 'conclusion', etiqueta: '', alineacion: 'izquierda' },
+    // Página 3 — firmas
+    enc(3, '3 de 4'),
+    { id: nuevoId(), pagina: 3, x: 18, y: 50, w: 174, tipo: 'titulo', texto: 'FIRMA DEL PROFESIONAL RESPONSABLE', alineacion: 'izquierda', tamano: 11, negrita: true },
+    { id: nuevoId(), pagina: 3, x: 18, y: 62, w: 174, tipo: 'campo', campoKey: '__nombre', etiqueta: 'Nombre:', alineacion: 'izquierda' },
+    { id: nuevoId(), pagina: 3, x: 18, y: 72, w: 174, tipo: 'campo', campoKey: 'cargo', etiqueta: 'Cargo:', alineacion: 'izquierda' },
+    { id: nuevoId(), pagina: 3, x: 18, y: 82, w: 174, tipo: 'campo', campoKey: '__cedula', etiqueta: 'Documento:', alineacion: 'izquierda' },
+    { id: nuevoId(), pagina: 3, x: 18, y: 92, w: 90, tipo: 'firma', etiqueta: 'Firma', campoFirma: 'profesional' },
+    { id: nuevoId(), pagina: 3, x: 18, y: 140, w: 174, tipo: 'titulo', texto: 'AVAL DEL DIRECTOR DEL ERON', alineacion: 'izquierda', tamano: 11, negrita: true },
+    { id: nuevoId(), pagina: 3, x: 18, y: 152, w: 174, tipo: 'campo', campoKey: 'nombreDirector', etiqueta: 'Nombre del director:', alineacion: 'izquierda' },
+    { id: nuevoId(), pagina: 3, x: 18, y: 162, w: 90, tipo: 'firma', etiqueta: 'Firma del director', campoFirma: 'coordinador' },
+    { id: nuevoId(), pagina: 3, x: 18, y: 200, w: 174, tipo: 'campo', campoKey: 'selloEstablecimiento', etiqueta: 'Sello del establecimiento:', alineacion: 'izquierda' },
+    // Página 4 — certificación de asistencia
+    enc(4, '4 de 4'),
+    { id: nuevoId(), pagina: 4, x: 18, y: 46, w: 174, tipo: 'titulo', texto: 'CERTIFICACIÓN DE ASISTENCIA A ACTIVIDADES PROFESIONALES EN EL ERON', alineacion: 'centro', tamano: 10, negrita: true },
+    { id: nuevoId(), pagina: 4, x: 18, y: 60, w: 174, tipo: 'campo', campoKey: 'lugar', etiqueta: 'Lugar:', alineacion: 'izquierda' },
+    { id: nuevoId(), pagina: 4, x: 18, y: 70, w: 174, tipo: 'campo', campoKey: 'nombreEstablecimientoEron', etiqueta: 'Nombre del Establecimiento (ERON):', alineacion: 'izquierda' },
+    { id: nuevoId(), pagina: 4, x: 18, y: 80, w: 174, tipo: 'campo', campoKey: 'fechaActividad', etiqueta: 'Fecha de la actividad:', alineacion: 'izquierda' },
+    { id: nuevoId(), pagina: 4, x: 18, y: 92, w: 174, tipo: 'texto', texto: 'Por medio del presente documento, se certifica que el(la) profesional:', alineacion: 'izquierda', tamano: 10 },
+    { id: nuevoId(), pagina: 4, x: 18, y: 102, w: 174, tipo: 'campo', campoKey: '__nombre', etiqueta: 'Nombre completo del profesional:', alineacion: 'izquierda' },
+    { id: nuevoId(), pagina: 4, x: 18, y: 112, w: 174, tipo: 'campo', campoKey: 'cargo', etiqueta: 'Cargo o especialidad:', alineacion: 'izquierda' },
+    { id: nuevoId(), pagina: 4, x: 18, y: 124, w: 174, tipo: 'texto', texto: 'Asistió a las instalaciones de este establecimiento en cumplimiento de sus funciones, realizando actividades programadas dentro del marco del programa de salud mental PPL.', alineacion: 'izquierda', tamano: 10 },
+    { id: nuevoId(), pagina: 4, x: 18, y: 146, w: 174, tipo: 'campo', campoKey: 'horaIngreso', etiqueta: 'Hora de ingreso al ERON:', alineacion: 'izquierda' },
+    { id: nuevoId(), pagina: 4, x: 18, y: 156, w: 174, tipo: 'campo', campoKey: 'horaSalida', etiqueta: 'Hora de salida del ERON:', alineacion: 'izquierda' },
+    { id: nuevoId(), pagina: 4, x: 18, y: 168, w: 174, tipo: 'campo', campoKey: 'descripcionActividad', etiqueta: 'Descripción breve de la actividad realizada:', alineacion: 'izquierda' },
+    { id: nuevoId(), pagina: 4, x: 18, y: 190, w: 174, tipo: 'campo', campoKey: 'nombreFuncionarioCertifica', etiqueta: 'Nombre del funcionario que certifica:', alineacion: 'izquierda' },
+    { id: nuevoId(), pagina: 4, x: 18, y: 200, w: 174, tipo: 'campo', campoKey: 'cargoCertifica', etiqueta: 'Cargo:', alineacion: 'izquierda' },
+    { id: nuevoId(), pagina: 4, x: 18, y: 230, w: 90, tipo: 'firma', etiqueta: 'Firma coordinación', campoFirma: 'coordinador' },
+  ];
+}
+
 const PLANTILLAS_EJEMPLO: Array<{ id: string; nombre: string; build: () => PdfBloque[] }> = [
-  { id: 'cuenta-cobro', nombre: 'Cuenta de cobro (con anexos)', build: plantillaCuentaCobro },
+  { id: 'cuenta-cobro', nombre: 'Cuenta de cobro (DF-CON-FR-003)', build: plantillaCuentaCobro },
+  { id: 'anticipo-gastos', nombre: 'Anticipo de gastos de viaje (DF-CON-FR-004)', build: plantillaAnticipoGastos },
+  { id: 'informe-visita-ppl', nombre: 'Informe de visita PPL (PRE-PPL-FR-026)', build: plantillaInformeVisitaPPL },
   { id: 'viaticos', nombre: 'Solicitud de viáticos', build: plantillaViaticos },
   { id: 'adres', nombre: 'Certificado ADRES', build: plantillaAdres },
   { id: 'eps', nombre: 'Certificado EPS', build: plantillaEps },
@@ -242,6 +319,8 @@ const PLANTILLAS_EJEMPLO: Array<{ id: string; nombre: string; build: () => PdfBl
 
 function inferirPlantillaPorNombre(nombre: string): PdfBloque[] {
   const lower = nombre.toLowerCase();
+  if (lower.includes('anticipo')) return plantillaAnticipoGastos();
+  if (lower.includes('informe') && (lower.includes('visita') || lower.includes('ppl'))) return plantillaInformeVisitaPPL();
   if (lower.includes('viatic') || lower.includes('viaje')) return plantillaViaticos();
   if (lower.includes('adres')) return plantillaAdres();
   if (lower.includes('eps')) return plantillaEps();
@@ -255,6 +334,7 @@ const PLANTILLA_PDF_DEFAULT: PlantillaPdf = {
 };
 
 const TIPOS_BLOQUE_LABELS: Record<string, string> = {
+  encabezado: '▤ Encabezado',
   logo: '🏷️ Logo',
   titulo: '🅷 Título',
   texto: '📝 Texto',
@@ -1024,7 +1104,7 @@ export function TiposSolicitudPanel() {
                       if (nuevos.length === 0) return;
                       const bloquesPag = (plantillaPdf.bloques || []).filter((b) => (b.pagina ?? 1) === pagina);
                       const maxBottom = bloquesPag.reduce((acc, b) => {
-                        const h = b.tipo === 'tabla' ? 36 : b.tipo === 'firma' ? 36 : b.tipo === 'logo' ? 18 : 10;
+                        const h = b.tipo === 'encabezado' ? 30 : b.tipo === 'tabla' ? 36 : b.tipo === 'firma' ? 36 : b.tipo === 'logo' ? 18 : 10;
                         return Math.max(acc, b.y + h);
                       }, 18);
                       let yActual = Math.min(260, maxBottom + 6);
@@ -1124,6 +1204,8 @@ function PlantillaPdfEditor({ plantilla, onChange, campos, onCamposChange, onIns
   const [zoomDoc, setZoomDoc] = useState(1);
   const [vistaPreviaDatos, setVistaPreviaDatos] = useState(false);
   const [vistaCentro, setVistaCentro] = useState<'hoja' | 'formulario'>('hoja');
+  const [arrastrando, setArrastrando] = useState(false);
+  const [guias, setGuias] = useState<{ x: number[]; y: number[] }>({ x: [], y: [] });
   const pageRef = useRef<HTMLDivElement | null>(null);
 
   const ZOOM_MIN = 0.4;
@@ -1331,7 +1413,7 @@ function PlantillaPdfEditor({ plantilla, onChange, campos, onCamposChange, onIns
     const bloquesPag = bloques.filter((b) => (b.pagina ?? 1) === paginaActiva);
     if (bloquesPag.length === 0) return { x: 18, y: 30, w: 174 };
     const maxBottom = bloquesPag.reduce((acc, b) => {
-      const h = b.tipo === 'tabla' ? 36 : b.tipo === 'firma' ? 36 : b.tipo === 'logo' ? 18 : 10;
+      const h = b.tipo === 'encabezado' ? 30 : b.tipo === 'tabla' ? 36 : b.tipo === 'firma' ? 36 : b.tipo === 'logo' ? 18 : 10;
       return Math.max(acc, b.y + h);
     }, 0);
     const nextY = Math.min(280, maxBottom + 4);
@@ -1340,6 +1422,7 @@ function PlantillaPdfEditor({ plantilla, onChange, campos, onCamposChange, onIns
 
   // Bloques que se superponen: aproximación con bounding box rectangular
   function alturaEstimada(b: PdfBloque): number {
+    if (b.tipo === 'encabezado') return 30;
     if (b.tipo === 'tabla') return 36;
     if (b.tipo === 'firma') return 36;
     if (b.tipo === 'logo') return 18;
@@ -1375,6 +1458,54 @@ function PlantillaPdfEditor({ plantilla, onChange, campos, onCamposChange, onIns
     setSeleccionadoId(null);
   }
 
+  // Márgenes de la hoja (mm) usados como guías fijas, estilo regla de Word/Canva
+  const MARGEN_IZQ = 18;
+  const MARGEN_DER = 210 - 18; // 192
+  const CENTRO_HOJA = 105;
+  const MARGEN_SUP = 14;
+  const SNAP_MM = 1.8; // umbral de imantado (~5px a 100%)
+
+  // Calcula posición imantada a los márgenes, al centro de la hoja y a los
+  // bordes/centros de los demás bloques. Devuelve también las líneas-guía a pintar.
+  function calcularSnap(nx: number, ny: number, w: number, id: string, pagina: number) {
+    const otros = bloques.filter((o) => o.id !== id && (o.pagina ?? 1) === pagina);
+
+    // Objetivos verticales (eje X): márgenes, centro y bordes de otros bloques
+    const objX: number[] = [MARGEN_IZQ, CENTRO_HOJA, MARGEN_DER];
+    for (const o of otros) {
+      const ow = o.w || 100;
+      objX.push(o.x, o.x + ow / 2, o.x + ow);
+    }
+    // Bordes del bloque arrastrado: izquierdo, centro y derecho
+    const bordesX = [{ e: nx, off: 0 }, { e: nx + w / 2, off: w / 2 }, { e: nx + w, off: w }];
+    let mejorX: { delta: number; linea: number } | null = null;
+    for (const { e } of bordesX) {
+      for (const t of objX) {
+        const d = t - e;
+        if (Math.abs(d) <= SNAP_MM && (!mejorX || Math.abs(d) < Math.abs(mejorX.delta))) {
+          mejorX = { delta: d, linea: t };
+        }
+      }
+    }
+
+    // Objetivos horizontales (eje Y): margen superior y top de otros bloques
+    const objY: number[] = [MARGEN_SUP];
+    for (const o of otros) objY.push(o.y);
+    let mejorY: { delta: number; linea: number } | null = null;
+    for (const t of objY) {
+      const d = t - ny;
+      if (Math.abs(d) <= SNAP_MM && (!mejorY || Math.abs(d) < Math.abs(mejorY.delta))) {
+        mejorY = { delta: d, linea: t };
+      }
+    }
+
+    return {
+      x: mejorX ? nx + mejorX.delta : nx,
+      y: mejorY ? ny + mejorY.delta : ny,
+      guias: { x: mejorX ? [mejorX.linea] : [], y: mejorY ? [mejorY.linea] : [] },
+    };
+  }
+
   // Drag handling
   function onPointerDown(e: React.PointerEvent<HTMLDivElement>, id: string) {
     const target = e.currentTarget;
@@ -1384,20 +1515,32 @@ function PlantillaPdfEditor({ plantilla, onChange, campos, onCamposChange, onIns
     if (!b) return;
     const startBx = b.x;
     const startBy = b.y;
+    const w = b.w || 100;
+    const pagina = b.pagina ?? 1;
     setSeleccionadoId(id);
+    setArrastrando(true);
     target.setPointerCapture(e.pointerId);
 
     const move = (ev: PointerEvent) => {
-      const dxPx = ev.clientX - startX;
-      const dyPx = ev.clientY - startY;
-      const dxMm = dxPx / SCALE;
-      const dyMm = dyPx / SCALE;
-      const nx = Math.max(0, Math.min(210, startBx + dxMm));
-      const ny = Math.max(0, Math.min(297, startBy + dyMm));
+      const dxMm = (ev.clientX - startX) / SCALE;
+      const dyMm = (ev.clientY - startY) / SCALE;
+      let nx = Math.max(0, Math.min(210, startBx + dxMm));
+      let ny = Math.max(0, Math.min(297, startBy + dyMm));
+      // Imantado inteligente (se desactiva manteniendo Alt, como en Canva/Figma)
+      if (!ev.altKey) {
+        const snap = calcularSnap(nx, ny, w, id, pagina);
+        nx = snap.x;
+        ny = snap.y;
+        setGuias(snap.guias);
+      } else {
+        setGuias({ x: [], y: [] });
+      }
       actualizar(id, { x: Math.round(nx), y: Math.round(ny) } as Partial<PdfBloque>);
     };
     const up = (ev: PointerEvent) => {
       try { target.releasePointerCapture(ev.pointerId); } catch { /* ignorar */ }
+      setArrastrando(false);
+      setGuias({ x: [], y: [] });
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', up);
     };
@@ -1419,13 +1562,31 @@ function PlantillaPdfEditor({ plantilla, onChange, campos, onCamposChange, onIns
     const startAlto = bb.alto ?? 0;
     const startTamano = bb.tamano ?? 0;
     const startAncho = bb.ancho ?? 0;
+    const bx = b.x;
+    const pagina = b.pagina ?? 1;
     setSeleccionadoId(id);
+    setArrastrando(true);
     target.setPointerCapture(e.pointerId);
 
     const move = (ev: PointerEvent) => {
       const dxMm = (ev.clientX - startX) / SCALE;
       const dyMm = (ev.clientY - startY) / SCALE;
-      const patch: Record<string, number> = { w: Math.max(10, Math.min(210, Math.round(startW + dxMm))) };
+      let nuevoW = Math.max(10, Math.min(210 - bx, startW + dxMm));
+      // Imantar el borde derecho a márgenes / centro / bordes de otros bloques
+      if (!ev.altKey) {
+        const otros = bloques.filter((o) => o.id !== id && (o.pagina ?? 1) === pagina);
+        const objX: number[] = [MARGEN_IZQ, CENTRO_HOJA, MARGEN_DER];
+        for (const o of otros) { const ow = o.w || 100; objX.push(o.x, o.x + ow / 2, o.x + ow); }
+        const borde = bx + nuevoW;
+        let mejor: { delta: number; linea: number } | null = null;
+        for (const t of objX) {
+          const d = t - borde;
+          if (Math.abs(d) <= SNAP_MM && (!mejor || Math.abs(d) < Math.abs(mejor.delta))) mejor = { delta: d, linea: t };
+        }
+        if (mejor) { nuevoW += mejor.delta; setGuias({ x: [mejor.linea], y: [] }); }
+        else setGuias({ x: [], y: [] });
+      }
+      const patch: Record<string, number> = { w: Math.max(10, Math.round(nuevoW)) };
       if (dir === 'se') {
         if (b.tipo === 'caja') patch.alto = Math.max(5, Math.round(startAlto + dyMm));
         else if (b.tipo === 'qr-radicado') { const t = Math.max(15, Math.round(startTamano + dyMm)); patch.tamano = t; }
@@ -1436,6 +1597,8 @@ function PlantillaPdfEditor({ plantilla, onChange, campos, onCamposChange, onIns
     };
     const up = (ev: PointerEvent) => {
       try { target.releasePointerCapture(ev.pointerId); } catch { /* ignorar */ }
+      setArrastrando(false);
+      setGuias({ x: [], y: [] });
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', up);
     };
@@ -1499,6 +1662,7 @@ function PlantillaPdfEditor({ plantilla, onChange, campos, onCamposChange, onIns
           📝 Cómo se ve el formulario
         </button>
         <span className="admin-help-text" style={{ marginLeft: 8 }}><strong>Agregar bloque:</strong> <span style={{ fontWeight: 400 }}>(pasa el mouse para ver qué hace cada uno)</span></span>
+        <button type="button" className="bloque-rapido-btn" title="Encabezado oficial: recuadro con logo, título del formato y Código/Fecha/Versión/Página (como en los formatos de Goleman)." onClick={() => { agregar({ id: nuevoId(), x: 18, y: 12, w: 174, tipo: 'encabezado', titulo: 'NOMBRE DEL FORMATO', subtitulo: 'DIRECCION FINANCIERA', area: 'CONTABILIDAD', codigo: 'DF-CON-FR-000', fecha: new Date().toLocaleDateString('es-CO'), version: '1', paginaTexto: '1 de 1', src: '/logo-payops-dark.png' }); }}>▤ Encabezado</button>
         <button type="button" className="bloque-rapido-btn" title="Inserta el logo de Goleman IPS. Puedes cambiar la imagen y la alineación en el panel derecho." onClick={() => { const p = nuevaPos(); agregar({ id: nuevoId(), ...p, w: 40, tipo: 'logo', alineacion: 'izquierda', ancho: 36, src: '/logo-payops-dark.png' }); }}>🏷️ Logo</button>
         <button type="button" className="bloque-rapido-btn" title="Texto grande de encabezado (ej. el nombre del documento). Configura tamaño y negrita." onClick={() => { const p = nuevaPos(); agregar({ id: nuevoId(), ...p, tipo: 'titulo', texto: 'Nuevo título', alineacion: 'centro', tamano: 14, negrita: true }); }}>🅷 Título</button>
         <button type="button" className="bloque-rapido-btn" title="Párrafo de texto normal. Admite variables como {{nombre}}, {{fecha}}, {{valor}}." onClick={() => { const p = nuevaPos(); agregar({ id: nuevoId(), ...p, tipo: 'texto', texto: 'Texto del documento', alineacion: 'izquierda', tamano: 11 }); }}>📝 Texto</button>
@@ -1725,7 +1889,7 @@ function PlantillaPdfEditor({ plantilla, onChange, campos, onCamposChange, onIns
           >
             {vistaPreviaDatos ? '👁 Viendo con datos' : '👁 Ver con datos'}
           </button>
-          <span className="admin-help-text" style={{ marginLeft: 8 }}>Usa este zoom, no el del navegador.</span>
+          <span className="admin-help-text" style={{ marginLeft: 8 }}>Los campos se alinean solos al arrastrar · mantén <kbd>Alt</kbd> para mover libre.</span>
         </div>
         {ordenAreas && ordenAreas.length > 0 ? (
           <div className="plantilla-flujo-areas-strip">
@@ -1744,12 +1908,23 @@ function PlantillaPdfEditor({ plantilla, onChange, campos, onCamposChange, onIns
         ) : Array.from({ length: totalPaginas }, (_, i) => i + 1).map((pg) => (
         <div
           key={pg}
-          className={`plantilla-page${pg === paginaActiva ? ' activa' : ''}`}
+          className={`plantilla-page${pg === paginaActiva ? ' activa' : ''}${pg === paginaActiva && arrastrando ? ' arrastrando' : ''}`}
           ref={pg === paginaActiva ? pageRef : undefined}
           style={{ width: 210 * SCALE, height: 297 * SCALE }}
           onClick={() => { setPaginaActiva(pg); setSeleccionadoId(null); }}
         >
           <div className="plantilla-page-num">Página {pg} de {totalPaginas}</div>
+          {/* Líneas-guía de alineación (estilo Canva): aparecen al imantar */}
+          {pg === paginaActiva && (guias.x.length > 0 || guias.y.length > 0) ? (
+            <div className="plantilla-guias">
+              {guias.x.map((gx, i) => (
+                <span key={`gx${i}`} className="plantilla-guia plantilla-guia-v" style={{ left: gx * SCALE }} />
+              ))}
+              {guias.y.map((gy, i) => (
+                <span key={`gy${i}`} className="plantilla-guia plantilla-guia-h" style={{ top: gy * SCALE }} />
+              ))}
+            </div>
+          ) : null}
           {bloques.filter((b) => (b.pagina ?? 1) === pg).map((b) => {
             const left = b.x * SCALE;
             const top = b.y * SCALE;
@@ -1763,6 +1938,30 @@ function PlantillaPdfEditor({ plantilla, onChange, campos, onCamposChange, onIns
                 onPointerDown={(e) => onPointerDown(e, b.id)}
                 onClick={(e) => { e.stopPropagation(); setSeleccionadoId(b.id); }}
               >
+                {b.tipo === 'encabezado' ? (
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 8, tableLayout: 'fixed' }}>
+                    <tbody>
+                      <tr>
+                        <td rowSpan={4} style={{ border: '1px solid #333', width: '24%', textAlign: 'center', verticalAlign: 'middle', padding: 3 }}>
+                          <img src={b.src || '/logo-payops-dark.png'} alt="Logo" style={{ maxWidth: '100%', maxHeight: 40, objectFit: 'contain' }} />
+                        </td>
+                        <td rowSpan={2} style={{ border: '1px solid #333', textAlign: 'center', fontWeight: 700, padding: '3px 4px', verticalAlign: 'middle' }}>{b.titulo}</td>
+                        <td style={{ border: '1px solid #333', width: '27%', padding: '2px 4px' }}><strong>Código:</strong> {b.codigo}</td>
+                      </tr>
+                      <tr>
+                        <td style={{ border: '1px solid #333', padding: '2px 4px' }}><strong>Fecha:</strong> {b.fecha}</td>
+                      </tr>
+                      <tr>
+                        <td style={{ border: '1px solid #333', textAlign: 'center', fontWeight: 700, padding: '3px 4px' }}>{b.subtitulo}</td>
+                        <td style={{ border: '1px solid #333', padding: '2px 4px' }}><strong>Versión:</strong> {b.version}</td>
+                      </tr>
+                      <tr>
+                        <td style={{ border: '1px solid #333', textAlign: 'center', fontWeight: 700, padding: '3px 4px' }}>{b.area}</td>
+                        <td style={{ border: '1px solid #333', padding: '2px 4px' }}><strong>Página:</strong> {b.paginaTexto}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                ) : null}
                 {b.tipo === 'logo' ? (
                   <div className="canvas-logo" style={{ width: '100%', textAlign: b.alineacion === 'centro' ? 'center' : b.alineacion === 'derecha' ? 'right' : 'left' }}>
                     <img
@@ -1800,6 +1999,12 @@ function PlantillaPdfEditor({ plantilla, onChange, campos, onCamposChange, onIns
                     <tbody>
                       <tr>{b.columnas.map((_, i) => <td key={i} style={{ border: '1px solid #ccc', padding: '4px 6px', minHeight: 18 }}>&nbsp;</td>)}</tr>
                       <tr>{b.columnas.map((_, i) => <td key={i} style={{ border: '1px solid #ccc', padding: '4px 6px' }}>&nbsp;</td>)}</tr>
+                      {b.conTotal ? (
+                        <tr>
+                          <td colSpan={Math.max(1, b.columnas.length - 1)} style={{ border: '1px solid #ccc', padding: '4px 6px', textAlign: 'right', fontWeight: 700, background: '#f3f4f6' }}>{b.etiquetaTotal || 'TOTAL'}</td>
+                          <td style={{ border: '1px solid #ccc', padding: '4px 6px', fontWeight: 700, background: '#f3f4f6', color: '#6366F1' }}>$ ∑</td>
+                        </tr>
+                      ) : null}
                     </tbody>
                   </table>
                 ) : null}
@@ -1954,6 +2159,33 @@ function PlantillaPdfEditor({ plantilla, onChange, campos, onCamposChange, onIns
                   {[1, 2, 3, 4, 5].map((p) => <option key={p} value={p}>Página {p}</option>)}
                 </select>
 
+                {sel.tipo === 'encabezado' ? (
+                  <>
+                    <label>Título del formato</label>
+                    <input type="text" value={sel.titulo} onChange={(e) => actualizar(sel.id, { titulo: e.target.value })} placeholder="ej. ANTICIPO DE GASTOS DE VIAJE" />
+                    <label>Dirección / proceso</label>
+                    <input type="text" value={sel.subtitulo} onChange={(e) => actualizar(sel.id, { subtitulo: e.target.value })} placeholder="ej. DIRECCION FINANCIERA" />
+                    <label>Área</label>
+                    <input type="text" value={sel.area} onChange={(e) => actualizar(sel.id, { area: e.target.value })} placeholder="ej. CONTABILIDAD" />
+                    <label>Código</label>
+                    <input type="text" value={sel.codigo} onChange={(e) => actualizar(sel.id, { codigo: e.target.value })} placeholder="ej. DF-CON-FR-004" />
+                    <div className="plantilla-edit-row">
+                      <label>Fecha</label>
+                      <input type="text" value={sel.fecha} onChange={(e) => actualizar(sel.id, { fecha: e.target.value })} />
+                      <label>Versión</label>
+                      <input type="text" value={sel.version} onChange={(e) => actualizar(sel.id, { version: e.target.value })} />
+                      <label>Página</label>
+                      <input type="text" value={sel.paginaTexto} onChange={(e) => actualizar(sel.id, { paginaTexto: e.target.value })} placeholder="1 de 1" />
+                    </div>
+                    <label>Logo</label>
+                    <select value={sel.src || ''} onChange={(e) => actualizar(sel.id, { src: e.target.value || undefined })}>
+                      {LOGOS_DISPONIBLES.map((l) => (
+                        <option key={l.id} value={l.src}>{l.nombre}</option>
+                      ))}
+                    </select>
+                  </>
+                ) : null}
+
                 {sel.tipo === 'logo' ? (
                   <>
                     <label>Imagen del logo</label>
@@ -2028,6 +2260,16 @@ function PlantillaPdfEditor({ plantilla, onChange, campos, onCamposChange, onIns
                   <>
                     <label>Columnas (separadas por coma)</label>
                     <input type="text" value={sel.columnas.join(', ')} onChange={(e) => actualizar(sel.id, { columnas: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) })} />
+                    <label className="ops-checkbox">
+                      <input type="checkbox" checked={!!sel.conTotal} onChange={(e) => actualizar(sel.id, { conTotal: e.target.checked } as Partial<PdfBloque>)} /> Fila de total (suma automática de la última columna)
+                    </label>
+                    {sel.conTotal ? (
+                      <>
+                        <label>Etiqueta del total</label>
+                        <input type="text" value={sel.etiquetaTotal || ''} onChange={(e) => actualizar(sel.id, { etiquetaTotal: e.target.value } as Partial<PdfBloque>)} placeholder="TOTAL" />
+                        <span className="admin-help-text">Suma los valores numéricos de la última columna (ej. VALOR) que llena el solicitante.</span>
+                      </>
+                    ) : null}
                   </>
                 ) : null}
 

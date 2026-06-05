@@ -26,11 +26,12 @@ interface BloqueBase {
 }
 
 type PdfBloque = BloqueBase & (
+  | { tipo: 'encabezado'; titulo: string; subtitulo: string; area: string; codigo: string; fecha: string; version: string; paginaTexto: string; src?: string }
   | { tipo: 'logo'; alineacion: PdfAlineacion; ancho: number; src?: string }
   | { tipo: 'titulo'; texto: string; alineacion: PdfAlineacion; tamano: number; negrita: boolean }
   | { tipo: 'texto'; texto: string; alineacion: PdfAlineacion; tamano: number }
   | { tipo: 'campo'; campoKey: string; etiqueta: string; alineacion: PdfAlineacion }
-  | { tipo: 'tabla'; columnas: string[] }
+  | { tipo: 'tabla'; columnas: string[]; conTotal?: boolean; etiquetaTotal?: string }
   | { tipo: 'divider' }
   | { tipo: 'firma'; etiqueta: string; campoFirma: 'profesional' | 'coordinador' | 'contabilidad' }
   | { tipo: 'caja'; alto: number; relleno: boolean; etiqueta?: string }
@@ -85,6 +86,17 @@ function fechaSolicitud(s: SolicitudParaPdf): string {
   const d = raw ? new Date(raw.replace(' ', 'T')) : new Date();
   const valida = !isNaN(d.getTime()) ? d : new Date();
   return valida.toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric' });
+}
+
+// Convierte un texto monetario ("$ 1.500.000", "1500000", "1,500,000.50") a número.
+// Formato colombiano: el punto es separador de miles. Devuelve 0 si no hay dígitos.
+function parseMoneda(texto: string): number {
+  const limpio = String(texto).replace(/[^0-9,.-]/g, '').trim();
+  if (!limpio) return 0;
+  // Quita separadores de miles (puntos) y usa coma decimal si existe
+  const normal = limpio.replace(/\./g, '').replace(',', '.');
+  const n = parseFloat(normal);
+  return isNaN(n) ? 0 : n;
 }
 
 // Busca en los datos una tabla de ítems (campo tipo 'tabla-items' guardado como JSON array)
@@ -183,6 +195,7 @@ async function generarPdfPlantilla(s: SolicitudParaPdf, pl: PlantillaPdf, filena
   const urlsACargar = new Set<string>();
   for (const b of bloques) {
     if (b.tipo === 'logo') urlsACargar.add(b.src || LOGO_DEFAULT);
+    if (b.tipo === 'encabezado') urlsACargar.add(b.src || LOGO_DEFAULT);
     if (b.tipo === 'imagen' && b.src) urlsACargar.add(b.src);
   }
   for (const url of urlsACargar) {
@@ -209,7 +222,59 @@ async function generarPdfPlantilla(s: SolicitudParaPdf, pl: PlantillaPdf, filena
 
     for (const b of bloquesPag) {
     const baseY = b.y;
-    if (b.tipo === 'logo') {
+    if (b.tipo === 'encabezado') {
+      // Recuadro oficial: 3 columnas (logo | título/proceso/área | código/fecha/versión/página)
+      const filaH = 7;
+      const totalH = filaH * 4;
+      const colLogoW = b.w * 0.24;
+      const colMetaW = b.w * 0.27;
+      const colTitX = b.x + colLogoW;
+      const colMetaX = b.x + b.w - colMetaW;
+      const colTitW = colMetaX - colTitX;
+      doc.setDrawColor(60, 60, 60);
+      doc.setLineWidth(0.3);
+      // Marco exterior
+      doc.rect(b.x, baseY, b.w, totalH);
+      // Líneas verticales
+      doc.line(colTitX, baseY, colTitX, baseY + totalH);
+      doc.line(colMetaX, baseY, colMetaX, baseY + totalH);
+      // Líneas horizontales de la columna meta (4 filas)
+      for (let i = 1; i < 4; i++) doc.line(colMetaX, baseY + filaH * i, b.x + b.w, baseY + filaH * i);
+      // Separadores de la columna central (título ocupa 2 filas)
+      doc.line(colTitX, baseY + filaH * 2, colMetaX, baseY + filaH * 2);
+      doc.line(colTitX, baseY + filaH * 3, colMetaX, baseY + filaH * 3);
+      // Logo
+      const dataUrl = logoCache.get(b.src || LOGO_DEFAULT) || null;
+      if (dataUrl) {
+        try {
+          const lw = Math.min(colLogoW - 4, 30);
+          const lh = lw * 0.55;
+          doc.addImage(dataUrl, 'PNG', b.x + (colLogoW - lw) / 2, baseY + (totalH - lh) / 2, lw, lh);
+        } catch { /* ignorar */ }
+      }
+      // Columna central
+      doc.setTextColor(15, 23, 42);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      doc.text(doc.splitTextToSize(b.titulo || '', colTitW - 4), colTitX + colTitW / 2, baseY + filaH, { align: 'center', baseline: 'middle' });
+      doc.setFontSize(8);
+      doc.text(b.subtitulo || '', colTitX + colTitW / 2, baseY + filaH * 2.5, { align: 'center', baseline: 'middle' });
+      doc.text(b.area || '', colTitX + colTitW / 2, baseY + filaH * 3.5, { align: 'center', baseline: 'middle' });
+      // Columna meta
+      doc.setFontSize(7.5);
+      const metaTx = colMetaX + 2;
+      const metas: Array<[string, string]> = [
+        ['Código:', b.codigo || ''], ['Fecha:', b.fecha || ''],
+        ['Versión:', b.version || ''], ['Página:', b.paginaTexto || ''],
+      ];
+      metas.forEach(([k, v], i) => {
+        const y = baseY + filaH * i + filaH / 2;
+        doc.setFont('helvetica', 'bold');
+        doc.text(k, metaTx, y, { baseline: 'middle' });
+        doc.setFont('helvetica', 'normal');
+        doc.text(String(v), metaTx + doc.getTextWidth(k) + 1.5, y, { baseline: 'middle' });
+      });
+    } else if (b.tipo === 'logo') {
       const ancho = Math.max(20, Math.min(80, b.ancho || 36));
       const alto = ancho * 0.55; // proporción aproximada
       let lx = b.x;
@@ -316,6 +381,27 @@ async function generarPdfPlantilla(s: SolicitudParaPdf, pl: PlantillaPdf, filena
       doc.line(b.x + b.w, baseY, b.x + b.w, bottom);
       for (let c = 1; c < numCols; c++) {
         doc.line(b.x + c * colWidth, baseY, b.x + c * colWidth, bottom);
+      }
+      // Fila de total automática (suma de la columna de valores)
+      if (b.conTotal && numCols >= 2) {
+        const colTotalIdx = (() => {
+          const i = cols.findIndex((c) => String(c).toUpperCase().includes('VALOR'));
+          return i >= 0 ? i : numCols - 1;
+        })();
+        const suma = filas.reduce((acc, fila) => acc + parseMoneda(fila[colTotalIdx] ?? ''), 0);
+        const totalH = 7;
+        const totBottom = bottom + totalH;
+        doc.setFillColor(240, 240, 244);
+        doc.rect(b.x, bottom, b.w, totalH, 'F');
+        doc.setDrawColor(60, 60, 60);
+        doc.setLineWidth(0.3);
+        doc.rect(b.x, bottom, b.w, totalH);
+        doc.line(b.x + colTotalIdx * colWidth, bottom, b.x + colTotalIdx * colWidth, totBottom);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(9);
+        doc.setTextColor(15, 23, 42);
+        doc.text(b.etiquetaTotal || 'TOTAL', b.x + colTotalIdx * colWidth - 2, bottom + 5, { align: 'right' });
+        doc.text(`$ ${suma.toLocaleString('es-CO')}`, b.x + colTotalIdx * colWidth + 2, bottom + 5);
       }
     } else if (b.tipo === 'divider') {
       doc.setDrawColor(212, 175, 55);

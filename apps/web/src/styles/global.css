@@ -6893,56 +6893,83 @@ textarea {
   z-index: 2200;
 }
 
-/* Hoja A4 simulada */
+/* Hoja A4 simulada — estilo documento moderno (Word/Canva) */
 .plantilla-page {
   position: relative;
   flex: 0 0 auto; /* nunca encoger: mantiene el alto A4 dentro del lienzo flex */
   background: #FFFFFF;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
-  border: 1px solid rgba(212, 175, 55, 0.4);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18), 0 18px 50px rgba(8, 11, 29, 0.45);
+  border-radius: 4px;
+  border: 1px solid rgba(15, 23, 42, 0.12);
   color: #0F172A;
   overflow: hidden;
-  /* Líneas guía sutiles (cada 50px = ~19mm) */
+  /* Cuadrícula tenue tipo plano (cada 25px) + cuadrícula mayor (cada 50px) */
   background-image:
-    linear-gradient(to right, rgba(0, 0, 0, 0.04) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(0, 0, 0, 0.04) 1px, transparent 1px);
-  background-size: 50px 50px;
+    linear-gradient(to right, rgba(15, 23, 42, 0.025) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(15, 23, 42, 0.025) 1px, transparent 1px),
+    linear-gradient(to right, rgba(15, 23, 42, 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(15, 23, 42, 0.05) 1px, transparent 1px);
+  background-size: 25px 25px, 25px 25px, 50px 50px, 50px 50px;
+  transition: box-shadow 0.15s ease;
 }
+/* Marco de márgenes (zona útil de impresión) — guía permanente tipo Word */
+.plantilla-page::before {
+  content: "";
+  position: absolute;
+  inset: 5.3% 8.6%; /* ≈ 14mm vertical, 18mm horizontal sobre A4 */
+  border: 1px dashed rgba(15, 23, 42, 0.14);
+  border-radius: 2px;
+  pointer-events: none;
+  z-index: 0;
+}
+.plantilla-page.arrastrando {
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18), 0 0 0 2px rgba(99, 102, 241, 0.45), 0 18px 50px rgba(8, 11, 29, 0.5);
+}
+.plantilla-page.arrastrando::before { border-color: rgba(99, 102, 241, 0.35); }
+
+/* Líneas-guía de alineación (imantado tipo Canva/Figma) */
+.plantilla-guias { position: absolute; inset: 0; pointer-events: none; z-index: 30; }
+.plantilla-guia { position: absolute; background: #E11D74; box-shadow: 0 0 0 0.5px rgba(255, 255, 255, 0.6); }
+.plantilla-guia-v { top: 0; bottom: 0; width: 1.5px; transform: translateX(-0.75px); }
+.plantilla-guia-h { left: 0; right: 0; height: 1.5px; transform: translateY(-0.75px); }
 
 .plantilla-canvas-bloque {
   position: absolute;
   padding: 4px 6px;
-  border: 1px dashed transparent;
+  border: 1px solid transparent;
   cursor: grab;
   user-select: none;
-  border-radius: 4px;
+  border-radius: 5px;
   background: transparent;
-  transition: background 0.1s, border-color 0.1s;
+  transition: background 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease;
 }
 .plantilla-canvas-bloque:hover {
-  border-color: rgba(212, 175, 55, 0.6);
-  background: rgba(212, 175, 55, 0.04);
+  border-color: rgba(99, 102, 241, 0.55);
+  background: rgba(99, 102, 241, 0.05);
+  box-shadow: 0 1px 6px rgba(99, 102, 241, 0.12);
 }
 .plantilla-canvas-bloque:active { cursor: grabbing; }
 .plantilla-canvas-bloque.seleccionado {
-  border: 2px solid var(--gold, #D4AF37);
-  background: rgba(212, 175, 55, 0.08);
-  box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.25);
+  border: 1.5px solid #6366F1;
+  background: rgba(99, 102, 241, 0.07);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2), 0 6px 18px rgba(99, 102, 241, 0.18);
   z-index: 10;
 }
 .plantilla-canvas-bloque .canvas-bloque-tag {
   position: absolute;
-  top: -18px;
+  top: -19px;
   left: 0;
   font-size: 9px;
-  background: var(--gold, #D4AF37);
-  color: #0F172A;
-  padding: 2px 6px;
-  border-radius: 3px;
+  background: #6366F1;
+  color: #fff;
+  padding: 2px 7px;
+  border-radius: 4px;
   font-weight: 700;
+  letter-spacing: 0.2px;
   opacity: 0;
   pointer-events: none;
   white-space: nowrap;
+  box-shadow: 0 2px 6px rgba(99, 102, 241, 0.35);
 }
 .plantilla-canvas-bloque.seleccionado .canvas-bloque-tag,
 .plantilla-canvas-bloque:hover .canvas-bloque-tag {
@@ -6972,10 +6999,11 @@ textarea {
   width: 12px;
   height: 12px;
   background: #fff;
-  border: 2px solid var(--gold-bright, #D4AF37);
-  border-radius: 2px;
+  border: 2px solid #6366F1;
+  border-radius: 3px;
   z-index: 12;
   touch-action: none;
+  box-shadow: 0 1px 4px rgba(99, 102, 241, 0.4);
 }
 .canvas-resize-e {
   right: -7px;
