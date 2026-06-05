@@ -135,7 +135,7 @@ function plantillaCuentaCobro(): PdfBloque[] {
     { id: nuevoId(), pagina: 1, x: 18, y: 90, w: 174, tipo: 'titulo', texto: 'DEBE A:', alineacion: 'centro', tamano: 11, negrita: true },
     { id: nuevoId(), pagina: 1, x: 18, y: 100, w: 174, tipo: 'campo', campoKey: '__nombre', etiqueta: 'NOMBRE:', alineacion: 'izquierda' },
     { id: nuevoId(), pagina: 1, x: 18, y: 112, w: 174, tipo: 'campo', campoKey: '__cedula', etiqueta: 'C.C:', alineacion: 'izquierda' },
-    { id: nuevoId(), pagina: 1, x: 18, y: 126, w: 174, tipo: 'texto', texto: 'La suma de: {{valor}}', alineacion: 'izquierda', tamano: 11 },
+    { id: nuevoId(), pagina: 1, x: 18, y: 126, w: 174, tipo: 'texto', texto: 'La suma de: {{valor}} ({{valorLetras}})', alineacion: 'izquierda', tamano: 11 },
     { id: nuevoId(), pagina: 1, x: 18, y: 136, w: 174, tipo: 'texto', texto: 'Por concepto de: {{concepto}} — Discriminados así:', alineacion: 'izquierda', tamano: 11 },
     { id: nuevoId(), pagina: 1, x: 18, y: 148, w: 174, tipo: 'tabla', columnas: ['FECHA', 'ITEM', 'VALOR'], conTotal: true, etiquetaTotal: 'TOTAL' },
     { id: nuevoId(), pagina: 1, x: 18, y: 214, w: 174, tipo: 'campo', campoKey: 'numeroCuenta', etiqueta: 'Por favor efectuar el pago a mi cuenta N°:', alineacion: 'izquierda' },
@@ -334,8 +334,10 @@ function inferirPlantillaPorNombre(nombre: string): PdfBloque[] {
   return plantillaGenerica();
 }
 
+// Plantilla inicial para un tipo NUEVO: genérica y neutral (no cuenta de cobro),
+// para no confundir. El admin elige el formato real con "escoge un ejemplo".
 const PLANTILLA_PDF_DEFAULT: PlantillaPdf = {
-  bloques: plantillaCuentaCobro(),
+  bloques: plantillaGenerica(),
 };
 
 const TIPOS_BLOQUE_LABELS: Record<string, string> = {

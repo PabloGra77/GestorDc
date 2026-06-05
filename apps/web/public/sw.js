@@ -1,5 +1,5 @@
 // Payops Service Worker — cache simple "stale-while-revalidate"
-const CACHE_NAME = 'payops-v4';
+const CACHE_NAME = 'payops-v5';
 const ASSETS = [
   '/',
   '/login',

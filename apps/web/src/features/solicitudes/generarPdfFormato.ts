@@ -241,8 +241,11 @@ async function generarPdfPlantilla(s: SolicitudParaPdf, pl: PlantillaPdf, filena
 
   for (let pIdx = 0; pIdx < numerosPagina.length; pIdx++) {
     if (pIdx > 0) doc.addPage();
-    dibujarRadicadoEsquina();
     const bloquesPag = paginas.get(numerosPagina[pIdx]) || [];
+    // Si la página tiene encabezado oficial, NO se dibuja el radicado en la esquina
+    // (evita que se encime con el recuadro; el radicado va dentro del formato vía {{radicado}}).
+    const tieneEncabezado = bloquesPag.some((b) => b.tipo === 'encabezado');
+    if (!tieneEncabezado) dibujarRadicadoEsquina();
 
     for (const b of bloquesPag) {
     const baseY = b.y;
@@ -276,20 +279,20 @@ async function generarPdfPlantilla(s: SolicitudParaPdf, pl: PlantillaPdf, filena
           doc.addImage(dataUrl, 'PNG', b.x + (colLogoW - lw) / 2, baseY + (totalH - lh) / 2, lw, lh);
         } catch { /* ignorar */ }
       }
-      // Columna central
+      // Columna central (los campos admiten tokens: {{radicado}}, {{fecha}}, etc.)
       doc.setTextColor(15, 23, 42);
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(9);
-      doc.text(doc.splitTextToSize(b.titulo || '', colTitW - 4), colTitX + colTitW / 2, baseY + filaH, { align: 'center', baseline: 'middle' });
+      doc.text(doc.splitTextToSize(aplicarPlaceholders(b.titulo || '', s), colTitW - 4), colTitX + colTitW / 2, baseY + filaH, { align: 'center', baseline: 'middle' });
       doc.setFontSize(8);
-      doc.text(b.subtitulo || '', colTitX + colTitW / 2, baseY + filaH * 2.5, { align: 'center', baseline: 'middle' });
-      doc.text(b.area || '', colTitX + colTitW / 2, baseY + filaH * 3.5, { align: 'center', baseline: 'middle' });
+      doc.text(aplicarPlaceholders(b.subtitulo || '', s), colTitX + colTitW / 2, baseY + filaH * 2.5, { align: 'center', baseline: 'middle' });
+      doc.text(aplicarPlaceholders(b.area || '', s), colTitX + colTitW / 2, baseY + filaH * 3.5, { align: 'center', baseline: 'middle' });
       // Columna meta
       doc.setFontSize(7.5);
       const metaTx = colMetaX + 2;
       const metas: Array<[string, string]> = [
-        ['Código:', b.codigo || ''], ['Fecha:', b.fecha || ''],
-        ['Versión:', b.version || ''], ['Página:', b.paginaTexto || ''],
+        ['Código:', aplicarPlaceholders(b.codigo || '', s)], ['Fecha:', aplicarPlaceholders(b.fecha || '', s)],
+        ['Versión:', aplicarPlaceholders(b.version || '', s)], ['Página:', aplicarPlaceholders(b.paginaTexto || '', s)],
       ];
       metas.forEach(([k, v], i) => {
         const y = baseY + filaH * i + filaH / 2;

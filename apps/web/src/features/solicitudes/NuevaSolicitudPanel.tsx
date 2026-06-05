@@ -79,9 +79,65 @@ function calcularCampo(operandos: string[], operacion: string, datos: Record<str
 interface BloqueCampoMin {
   tipo: string;
   campoKey?: string;
+  etiqueta?: string;
+  texto?: string;
   pagina?: number;
   y?: number;
   x?: number;
+}
+
+// Adivina el tipo de un campo por su clave (mismo criterio que el editor de plantillas)
+function adivinarTipoCampo(key: string): CampoPlantilla['type'] {
+  const k = key.toLowerCase();
+  if (k.startsWith('doc')) return 'file';
+  if (k.includes('valor') || k.includes('monto') || k.includes('suma')) return 'valor-pesos';
+  if (k.includes('fecha')) return 'date';
+  if (k.includes('correo') || k.includes('email')) return 'email';
+  if (k.includes('banco')) return 'banco-select';
+  if (k.includes('cuenta')) return 'cuenta-bancaria';
+  if (k.includes('concepto') || k.includes('observ') || k.includes('descrip')) return 'textarea';
+  if (k.includes('direccion') || k.includes('destino')) return 'direccion';
+  return 'text';
+}
+
+const TOKEN_CAMPOS: Record<string, { key: string; label: string; type: CampoPlantilla['type'] }> = {
+  valor: { key: 'valorPesos', label: 'Valor a cobrar', type: 'valor-pesos' },
+  concepto: { key: 'observaciones', label: 'Concepto / observaciones', type: 'textarea' },
+  ciudad: { key: 'ciudad', label: 'Ciudad', type: 'text' },
+};
+
+// Une los campos definidos del tipo con los que están colocados en la hoja
+// (bloques "campo" y tokens {{valor}}/{{concepto}}/{{ciudad}}), para que el
+// formulario PREGUNTE todo lo que el documento necesita aunque no se haya
+// agregado manualmente como dato.
+function camposCompletos(campos: CampoPlantilla[], plantillaPdf?: PlantillaPdfMin | null): CampoPlantilla[] {
+  const vistos = new Set(campos.map((c) => c.key));
+  const extra: CampoPlantilla[] = [];
+  const bloques = (plantillaPdf?.bloques || []) as BloqueCampoMin[];
+  for (const b of bloques) {
+    if (b.tipo === 'campo' && b.campoKey && !b.campoKey.startsWith('__') && !vistos.has(b.campoKey)) {
+      vistos.add(b.campoKey);
+      extra.push({
+        key: b.campoKey,
+        label: (b.etiqueta || b.campoKey).replace(/[:]\s*$/, '').replace(/^[•☐]\s*/, '').trim() || b.campoKey,
+        type: adivinarTipoCampo(b.campoKey),
+        required: true,
+        group: 'Datos del formato',
+      });
+    }
+    if ((b.tipo === 'texto' || b.tipo === 'titulo') && b.texto) {
+      const re = /\{\{(\w+)\}\}/g;
+      let m: RegExpExecArray | null;
+      while ((m = re.exec(b.texto)) !== null) {
+        const def = TOKEN_CAMPOS[m[1]];
+        if (def && !vistos.has(def.key)) {
+          vistos.add(def.key);
+          extra.push({ ...def, required: true, group: 'Datos del formato' });
+        }
+      }
+    }
+  }
+  return [...campos, ...extra];
 }
 
 interface PlantillaPdfMin {
@@ -288,7 +344,8 @@ export function NuevaSolicitudPanel({ onCreada }: NuevaSolicitudPanelProps) {
 
   const camposPorGrupo = useMemo(() => {
     if (!tipoSel) return new Map<string, CampoPlantilla[]>();
-    const camposOrdenados = ordenarCamposPorPlantilla(tipoSel.camposPlantilla, tipoSel.plantillaPdf);
+    const todos = camposCompletos(tipoSel.camposPlantilla, tipoSel.plantillaPdf);
+    const camposOrdenados = ordenarCamposPorPlantilla(todos, tipoSel.plantillaPdf);
     const m = new Map<string, CampoPlantilla[]>();
     for (const c of camposOrdenados) {
       const g = c.group || 'Datos';
@@ -520,7 +577,8 @@ export function NuevaSolicitudPanel({ onCreada }: NuevaSolicitudPanelProps) {
   }, [procesarArchivo]);
 
   const camposEnviar = useCallback(() => {
-    return tipoSel?.camposPlantilla ?? [];
+    if (!tipoSel) return [];
+    return camposCompletos(tipoSel.camposPlantilla, tipoSel.plantillaPdf);
   }, [tipoSel]);
 
   async function enviar(event: React.FormEvent<HTMLFormElement>) {

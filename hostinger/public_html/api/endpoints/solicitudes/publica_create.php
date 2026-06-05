@@ -189,13 +189,13 @@ try {
     try {
         require_once __DIR__ . '/_flujo.php';
         FlujoHelpers::notificarSolicitante(
-            ['solicitante_correo' => $solCorreo, 'numero_radicado' => $numero],
+            ['solicitante_correo' => $solCorreo, 'numero_radicado' => $numero, 'solicitante_nombre' => $solNombre],
             "Solicitud {$numero} recibida",
-            "Tu solicitud fue recibida correctamente.\n\n" .
-            "Numero de radicado: {$numero}\n" .
-            "Tipo: {$tipo['nombre']}\n" .
-            "Area: {$tipo['area_nombre']}\n\n" .
-            "Puedes consultar el estado en cualquier momento ingresando tu numero de radicado y cedula en /radicacion-cuenta-cobro-ops"
+            "Recibimos tu solicitud correctamente y ya entró al flujo de validación.\n\n" .
+            "Tipo de solicitud: {$tipo['nombre']}\n" .
+            "Área responsable: {$tipo['area_nombre']}\n\n" .
+            "Guarda tu número de radicado. Puedes consultar el estado en cualquier momento ingresando tu radicado y número de documento en la opción “Consultar estado” del portal.\n\n" .
+            "Te avisaremos por este medio cuando haya novedades."
         );
     } catch (Throwable $e) {
         error_log('[publica_create email] ' . $e->getMessage());

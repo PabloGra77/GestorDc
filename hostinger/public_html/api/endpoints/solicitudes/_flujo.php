@@ -97,9 +97,64 @@ final class FlujoHelpers
                 'to'      => [$correo],
                 'subject' => $asunto,
                 'text'    => $texto,
+                'html'    => self::emailHtml($asunto, $texto, $sol),
             ]);
         } catch (Throwable $e) {
             error_log('[flujo notif] ' . $e->getMessage());
         }
+    }
+
+    /**
+     * Envoltorio HTML con identidad Payops · Goleman IPS para los correos.
+     * Convierte el texto plano (con saltos de línea) en párrafos seguros.
+     */
+    public static function emailHtml(string $asunto, string $texto, array $sol): string
+    {
+        $radicado = htmlspecialchars((string)($sol['numero_radicado'] ?? ''), ENT_QUOTES, 'UTF-8');
+        $nombre   = trim((string)($sol['solicitante_nombre'] ?? ''));
+        $saludo   = $nombre !== '' ? 'Hola, ' . htmlspecialchars($nombre, ENT_QUOTES, 'UTF-8') . ':' : 'Hola:';
+        $tituloSeguro = htmlspecialchars($asunto, ENT_QUOTES, 'UTF-8');
+
+        // Párrafos: separa por líneas en blanco y respeta saltos simples
+        $cuerpo = '';
+        foreach (preg_split('/\n{2,}/', trim($texto)) ?: [] as $par) {
+            $par = nl2br(htmlspecialchars($par, ENT_QUOTES, 'UTF-8'));
+            $cuerpo .= '<p style="margin:0 0 14px;color:#334155;font-size:15px;line-height:1.65;">' . $par . '</p>';
+        }
+
+        $chip = '';
+        if ($radicado !== '') {
+            $chip = '<table role="presentation" cellpadding="0" cellspacing="0" style="margin:8px 0 20px;">'
+                . '<tr><td style="background:#F8FAFC;border:1px solid #E2E8F0;border-left:4px solid #D4AF37;border-radius:8px;padding:14px 18px;">'
+                . '<span style="display:block;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#94A3B8;font-weight:700;">Número de radicado</span>'
+                . '<span style="display:block;font-size:22px;font-weight:800;color:#0F172A;font-family:Consolas,Menlo,monospace;margin-top:2px;">' . $radicado . '</span>'
+                . '</td></tr></table>';
+        }
+
+        return '<!doctype html><html lang="es"><head><meta charset="utf-8">'
+            . '<meta name="viewport" content="width=device-width,initial-scale=1"></head>'
+            . '<body style="margin:0;padding:0;background:#EEF2F7;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">'
+            . '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#EEF2F7;padding:24px 12px;">'
+            . '<tr><td align="center">'
+            . '<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#FFFFFF;border-radius:14px;overflow:hidden;box-shadow:0 6px 24px rgba(8,11,29,.10);">'
+            // Encabezado
+            . '<tr><td style="background:#070B1D;padding:22px 28px;">'
+            . '<span style="color:#FFFFFF;font-size:20px;font-weight:800;letter-spacing:.5px;">Payops</span>'
+            . '<span style="color:#D4AF37;font-size:13px;font-weight:600;"> · Goleman IPS</span>'
+            . '</td></tr>'
+            // Cuerpo
+            . '<tr><td style="padding:28px 28px 8px;">'
+            . '<h1 style="margin:0 0 6px;font-size:19px;color:#0F172A;">' . $tituloSeguro . '</h1>'
+            . '<p style="margin:0 0 16px;color:#0F172A;font-size:15px;font-weight:600;">' . $saludo . '</p>'
+            . $chip
+            . $cuerpo
+            . '</td></tr>'
+            // Pie
+            . '<tr><td style="padding:18px 28px 26px;border-top:1px solid #EEF2F7;">'
+            . '<p style="margin:0;color:#94A3B8;font-size:12px;line-height:1.6;">Este es un mensaje automático de Payops, la plataforma documental de Goleman IPS. Por favor no respondas a este correo.</p>'
+            . '</td></tr>'
+            . '</table>'
+            . '<p style="color:#B6C0CE;font-size:11px;margin:16px 0 0;">© ' . date('Y') . ' Goleman IPS · Servicio Integral SAS</p>'
+            . '</td></tr></table></body></html>';
     }
 }
