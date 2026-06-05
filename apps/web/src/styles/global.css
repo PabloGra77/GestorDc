@@ -6893,6 +6893,18 @@ textarea {
   z-index: 2200;
 }
 
+/* Botón para abrir un adjunto desde la bandeja (se ve como enlace) */
+.bandeja-abrir-adjunto {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--gold-bright, #D4AF37);
+  font: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+}
+.bandeja-abrir-adjunto:hover { color: #b8860b; }
+
 /* Hoja A4 simulada — estilo documento moderno (Word/Canva) */
 .plantilla-page {
   position: relative;

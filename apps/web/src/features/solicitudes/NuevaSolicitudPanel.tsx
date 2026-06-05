@@ -282,6 +282,8 @@ export function NuevaSolicitudPanel({ onCreada }: NuevaSolicitudPanelProps) {
   const [tipoSel, setTipoSel] = useState<TipoSolicitud | null>(null);
   const [datos, setDatos] = useState<Record<string, string>>({});
   const [docs, setDocs] = useState<Record<string, string>>({});
+  const [docArchivos, setDocArchivos] = useState<Record<string, string>>({});
+  const [subiendoDoc, setSubiendoDoc] = useState<string | null>(null);
   const [ocrPorCampo, setOcrPorCampo] = useState<Record<string, { texto: string; confianza: number; alertas: string[] }>>({});
   const [ocrCampoActivo, setOcrCampoActivo] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
@@ -361,6 +363,7 @@ export function NuevaSolicitudPanel({ onCreada }: NuevaSolicitudPanelProps) {
     setTipoSel(null);
     setDatos({});
     setDocs({});
+    setDocArchivos({});
     setMsg('');
     setErr('');
   }
@@ -411,10 +414,24 @@ export function NuevaSolicitudPanel({ onCreada }: NuevaSolicitudPanelProps) {
   async function handleFile(key: string, file: File | null) {
     if (!file) {
       setDocs((p) => { const copy = { ...p }; delete copy[key]; return copy; });
+      setDocArchivos((p) => { const copy = { ...p }; delete copy[key]; return copy; });
       setOcrPorCampo((p) => { const copy = { ...p }; delete copy[key]; return copy; });
       return;
     }
     setDocs((p) => ({ ...p, [key]: file.name }));
+
+    // Subir el archivo al servidor para que el validador pueda abrirlo después
+    setSubiendoDoc(key);
+    try {
+      const fd = new FormData();
+      fd.append('archivo', file);
+      const up = await api.post<{ id: string }>('/archivos', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+      setDocArchivos((p) => ({ ...p, [key]: up.data.id }));
+    } catch {
+      setErr('No se pudo subir “' + file.name + '”. Verifica que sea PDF/JPG/PNG y pese menos de 10 MB.');
+    } finally {
+      setSubiendoDoc(null);
+    }
 
     // OCR si el campo tiene ocr_target
     const campo = tipoSel?.camposPlantilla.find((c) => c.key === key);
@@ -608,14 +625,12 @@ export function NuevaSolicitudPanel({ onCreada }: NuevaSolicitudPanelProps) {
       const documentosFinales: Record<string, unknown> = {};
       Object.entries(docs).forEach(([k, nombre]) => {
         const ocrInfo = ocrPorCampo[k];
-        documentosFinales[k] = ocrInfo
-          ? {
-              nombre,
-              ocrTexto: ocrInfo.texto,
-              ocrConfianza: ocrInfo.confianza,
-              ocrAlertas: ocrInfo.alertas,
-            }
-          : { nombre };
+        const archivoId = docArchivos[k];
+        documentosFinales[k] = {
+          nombre,
+          ...(archivoId ? { archivoId } : {}),
+          ...(ocrInfo ? { ocrTexto: ocrInfo.texto, ocrConfianza: ocrInfo.confianza, ocrAlertas: ocrInfo.alertas } : {}),
+        };
       });
 
       const r = await api.post<{ id: number; numeroRadicado: string; pasoLabel: string | null }>(
@@ -791,6 +806,11 @@ export function NuevaSolicitudPanel({ onCreada }: NuevaSolicitudPanelProps) {
                             onChange={(e) => handleFile(c.key, e.target.files?.[0] ?? null)}
                             required={c.required && !docs[c.key]}
                           />
+                          {subiendoDoc === c.key ? (
+                            <small className="admin-help-text">⏳ Subiendo el archivo…</small>
+                          ) : docArchivos[c.key] ? (
+                            <small className="ocr-ok" style={{ display: 'block' }}>✓ Archivo guardado ({docs[c.key]})</small>
+                          ) : null}
                           {c.ocr_target ? (
                             <small className="admin-help-text">
                               Validación automática con inteligencia artificial · documento esperado: <em>{etiquetaDocumento(c.ocr_target)}</em>

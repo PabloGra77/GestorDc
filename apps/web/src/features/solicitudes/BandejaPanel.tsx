@@ -124,7 +124,7 @@ function formatearValor(c: CampoPlantilla, value: unknown): ValorFormateado {
   return { texto: String(value) };
 }
 
-interface DocFormateado { texto: string; url?: string; confianza?: number }
+interface DocFormateado { texto: string; url?: string; confianza?: number; archivoId?: string }
 function formatearDocumento(v: unknown): DocFormateado | null {
   const o = parseMaybeJson(v);
   if (o == null || o === '') return null;
@@ -134,7 +134,8 @@ function formatearDocumento(v: unknown): DocFormateado | null {
     const nombre = (r.nombre || r.filename || r.name || 'archivo adjunto') as string;
     const url = (r.url || r.src || r.dataUrl) as string | undefined;
     const confianza = typeof r.ocrConfianza === 'number' ? r.ocrConfianza : undefined;
-    return { texto: nombre, url, confianza };
+    const archivoId = typeof r.archivoId === 'string' ? r.archivoId : undefined;
+    return { texto: nombre, url, confianza, archivoId };
   }
   return { texto: String(v) };
 }
@@ -144,6 +145,7 @@ export function BandejaPanel() {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState('');
   const [msg, setMsg] = useState('');
+  const [motivoSel, setMotivoSel] = useState('');
   const [openId, setOpenId] = useState<number | null>(null);
   const [detalle, setDetalle] = useState<Detalle | null>(null);
   const [loadingDetalle, setLoadingDetalle] = useState(false);
@@ -197,6 +199,7 @@ export function BandejaPanel() {
     setDetalle(null);
     setLoadingDetalle(true);
     setComentario('');
+    setMotivoSel('');
     setMsg('');
     setErr('');
     try {
@@ -209,9 +212,23 @@ export function BandejaPanel() {
     }
   }
 
+  async function abrirArchivo(archivoId: string) {
+    try {
+      const r = await api.get(`/archivos/ver?id=${encodeURIComponent(archivoId)}`, { responseType: 'blob' });
+      const url = URL.createObjectURL(r.data as Blob);
+      window.open(url, '_blank', 'noopener');
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch {
+      setErr('No se pudo abrir el adjunto.');
+    }
+  }
+
+  // El comentario final combina el motivo del menú + el detalle escrito
+  const comentarioFinal = [motivoSel, comentario.trim()].filter(Boolean).join(' — ');
+
   async function ejecutar(accion: 'validar' | 'devolver' | 'rechazar' | 'remitir', id: number) {
-    if ((accion === 'devolver' || accion === 'rechazar') && comentario.trim() === '') {
-      setErr('El motivo es obligatorio para devolver o rechazar.');
+    if ((accion === 'devolver' || accion === 'rechazar') && comentarioFinal === '') {
+      setErr('Selecciona un motivo o escríbelo para devolver o rechazar.');
       return;
     }
     if (accion === 'validar' && !firmaValidador) {
@@ -226,7 +243,7 @@ export function BandejaPanel() {
     setErr('');
     setMsg('');
     try {
-      const body: Record<string, unknown> = { comentario: comentario.trim() };
+      const body: Record<string, unknown> = { comentario: comentarioFinal };
       if (accion === 'validar') body.firma = firmaValidador;
       if (accion === 'remitir') body.areaIdDestino = Number(areaRemitir);
       await api.post(`/solicitudes/${id}/${accion}`, body);
@@ -423,10 +440,12 @@ export function BandejaPanel() {
                             <li key={c.key}>
                               <strong>{c.label}:</strong>{' '}
                               {doc ? (
-                                doc.url ? (
+                                doc.archivoId ? (
+                                  <button type="button" className="bandeja-abrir-adjunto" onClick={() => abrirArchivo(doc.archivoId!)}>📎 {doc.texto} · Abrir</button>
+                                ) : doc.url ? (
                                   <a href={doc.url} target="_blank" rel="noopener noreferrer">📎 {doc.texto}</a>
                                 ) : (
-                                  <span>📎 {doc.texto}</span>
+                                  <span title="Adjunto sin archivo (solicitud antigua)">📎 {doc.texto} <em className="admin-help-text">(sin archivo)</em></span>
                                 )
                               ) : (
                                 <em className="admin-help-text">no adjuntado</em>
@@ -459,8 +478,24 @@ export function BandejaPanel() {
                     </ul>
 
                     <div className="bandeja-actions">
+                      <label className="admin-help-text" htmlFor={`motivo-${it.id}`}>Motivo (para devolver o rechazar)</label>
+                      <select
+                        id={`motivo-${it.id}`}
+                        value={motivoSel}
+                        onChange={(e) => setMotivoSel(e.target.value)}
+                      >
+                        <option value="">— Selecciona un motivo —</option>
+                        <option value="Adjunto faltante">Adjunto faltante</option>
+                        <option value="Adjunto ilegible o de baja calidad">Adjunto ilegible o de baja calidad</option>
+                        <option value="Adjunto no corresponde">Adjunto no corresponde al documento pedido</option>
+                        <option value="Valor no coincide con el soporte">Valor no coincide con el soporte</option>
+                        <option value="Datos del formulario incorrectos">Datos del formulario incorrectos</option>
+                        <option value="Falta firma">Falta firma</option>
+                        <option value="Documento vencido">Documento vencido</option>
+                        <option value="Otro">Otro (especificar abajo)</option>
+                      </select>
                       <textarea
-                        placeholder="Motivo o comentario (obligatorio para devolver/rechazar)"
+                        placeholder="Detalle del motivo (opcional si ya elegiste uno arriba)"
                         value={comentario}
                         onChange={(e) => setComentario(e.target.value)}
                         rows={3}

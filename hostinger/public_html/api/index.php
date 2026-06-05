@@ -80,6 +80,10 @@ $routes = [
     ['POST',   '#^/solicitudes/(?P<id>\d+)/rechazar$#',          'solicitudes/rechazar'],
     ['POST',   '#^/solicitudes/(?P<id>\d+)/remitir$#',           'solicitudes/remitir'],
 
+    // Adjuntos (subir / ver con sesión)
+    ['POST',   '#^/archivos$#',                                  'archivos/subir'],
+    ['GET',    '#^/archivos/ver$#',                              'archivos/ver'],
+
     // Verificación forense de documentos
     ['POST',   '#^/forense$#',                                   'forense/analizar'],
 
