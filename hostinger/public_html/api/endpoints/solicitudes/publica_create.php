@@ -197,6 +197,17 @@ try {
             "Guarda tu número de radicado. Puedes consultar el estado en cualquier momento ingresando tu radicado y número de documento en la opción “Consultar estado” del portal.\n\n" .
             "Te avisaremos por este medio cuando haya novedades."
         );
+        FlujoHelpers::notificarValidadores(
+            $pdo,
+            [
+                'numero_radicado'    => $numero,
+                'tipo_nombre'        => $tipo['nombre'] ?? '',
+                'area_nombre'        => $tipo['area_nombre'] ?? '',
+                'solicitante_nombre' => $solNombre,
+            ],
+            $primerPaso['rol'] ?? null,
+            (int)$tipo['area_id']
+        );
     } catch (Throwable $e) {
         error_log('[publica_create email] ' . $e->getMessage());
     }

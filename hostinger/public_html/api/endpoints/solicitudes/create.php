@@ -131,6 +131,27 @@ try {
     Response::error('No se pudo crear la solicitud', 500);
 }
 
+// Notificaciones (no bloquean la respuesta si fallan)
+require_once __DIR__ . '/_flujo.php';
+$solNotif = [
+    'numero_radicado'    => $numero,
+    'tipo_nombre'        => $tipo['nombre'] ?? '',
+    'area_nombre'        => $tipo['area_nombre'] ?? '',
+    'solicitante_nombre' => $usuario['nombre_completo'] ?? '',
+    'solicitante_correo' => $usuario['correo'] ?? '',
+];
+if (!empty($usuario['correo'])) {
+    FlujoHelpers::notificarSolicitante(
+        $solNotif,
+        "Solicitud {$numero} creada",
+        "Tu solicitud fue creada correctamente y entró al flujo de validación.\n\n" .
+        "Tipo: {$tipo['nombre']}\n" .
+        "Área: {$tipo['area_nombre']}\n\n" .
+        "Te avisaremos por este medio cuando avance."
+    );
+}
+FlujoHelpers::notificarValidadores($pdo, $solNotif, $primerPaso['rol'] ?? null, (int)$tipo['area_id']);
+
 Response::json([
     'id'             => $solicitudId,
     'numeroRadicado' => $numero,

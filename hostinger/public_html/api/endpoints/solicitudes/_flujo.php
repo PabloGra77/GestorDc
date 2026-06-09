@@ -105,6 +105,55 @@ final class FlujoHelpers
     }
 
     /**
+     * Avisa por correo a los validadores cuyo turno es el paso indicado.
+     * Contabilidad ve todas las áreas; los demás niveles solo su área.
+     */
+    public static function notificarValidadores(PDO $pdo, array $sol, ?string $paso, int $areaId): void
+    {
+        if (!$paso) return;
+        try {
+            $stmt = $pdo->prepare(
+                "SELECT u.correo, u.nombre_completo
+                 FROM usuarios u
+                 WHERE u.activo = 1 AND u.nivel_aprobacion = :paso
+                   AND (:paso2 = 'contabilidad' OR u.area_id = :area)"
+            );
+            $stmt->execute([':paso' => $paso, ':paso2' => $paso, ':area' => $areaId]);
+            $rows = $stmt->fetchAll();
+        } catch (Throwable $e) {
+            error_log('[notif validadores] ' . $e->getMessage());
+            return;
+        }
+        $radic = (string)($sol['numero_radicado'] ?? '');
+        $tipoNom = (string)($sol['tipo_nombre'] ?? 'una solicitud');
+        $areaNom = (string)($sol['area_nombre'] ?? '');
+        $solic = (string)($sol['solicitante_nombre'] ?? '');
+        foreach ($rows as $r) {
+            $correo = $r['correo'] ?? '';
+            if (!$correo) continue;
+            $texto = "Tienes una solicitud pendiente de validación en Payops.\n\n"
+                . "Radicado: {$radic}\n"
+                . "Tipo: {$tipoNom}\n"
+                . ($areaNom ? "Área: {$areaNom}\n" : '')
+                . ($solic ? "Solicitante: {$solic}\n" : '')
+                . "\nIngresa a Payops → Radicaciones → Bandeja de validación para revisarla.";
+            try {
+                Mailer::send([
+                    'to'      => [$correo],
+                    'subject' => "Solicitud por validar: {$radic}",
+                    'text'    => $texto,
+                    'html'    => self::emailHtml('Tienes una solicitud por validar', $texto, [
+                        'numero_radicado'   => $radic,
+                        'solicitante_nombre' => $r['nombre_completo'] ?? '',
+                    ]),
+                ]);
+            } catch (Throwable $e) {
+                error_log('[notif validador] ' . $e->getMessage());
+            }
+        }
+    }
+
+    /**
      * Envoltorio HTML con identidad Payops · Goleman IPS para los correos.
      * Convierte el texto plano (con saltos de línea) en párrafos seguros.
      */

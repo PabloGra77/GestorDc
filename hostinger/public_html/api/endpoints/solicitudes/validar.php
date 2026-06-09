@@ -90,6 +90,15 @@ try {
     Response::error('No se pudo validar la solicitud', 500);
 }
 
+// Si avanzó, avisar al validador del siguiente paso
+if ($siguiente) {
+    FlujoHelpers::notificarValidadores($pdo, [
+        'numero_radicado'    => $sol['numero_radicado'],
+        'tipo_nombre'        => $sol['tipo_nombre'] ?? '',
+        'solicitante_nombre' => $sol['solicitante_nombre'] ?? '',
+    ], $siguiente['rol'] ?? null, (int)$sol['area_id']);
+}
+
 Response::json([
     'ok' => true,
     'estado' => $nuevoEstado,

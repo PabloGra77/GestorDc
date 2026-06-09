@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api } from '../../services/http/api';
+import { getAuthSession } from '../auth/auth.service';
 import { BandejaPanel } from '../solicitudes/BandejaPanel';
 import { MisSolicitudesPanel } from '../solicitudes/MisSolicitudesPanel';
 import { NuevaSolicitudPanel } from '../solicitudes/NuevaSolicitudPanel';
@@ -29,6 +30,22 @@ export function RadicacionesModule() {
   const [vista, setVista] = useState<Vista>('bandeja');
   const [items, setItems] = useState<SolicitudResumen[]>([]);
   const [loading, setLoading] = useState(false);
+  const [borrando, setBorrando] = useState<number | null>(null);
+  const isAdmin = (getAuthSession()?.usuario?.rol?.nombre || '').toLowerCase() === 'administrador';
+
+  const eliminarSolicitud = useCallback(async (it: SolicitudResumen) => {
+    const ok = window.confirm(`¿Eliminar definitivamente la solicitud ${it.numeroRadicado}? Esta acción no se puede deshacer.`);
+    if (!ok) return;
+    setBorrando(it.id);
+    try {
+      await api.delete(`/solicitudes/${it.id}`);
+      setItems((prev) => prev.filter((x) => x.id !== it.id));
+    } catch {
+      window.alert('No se pudo eliminar la solicitud.');
+    } finally {
+      setBorrando(null);
+    }
+  }, []);
 
   const cargarKpis = useCallback(async () => {
     setLoading(true);
@@ -150,6 +167,7 @@ export function RadicacionesModule() {
                   <th>Paso actual</th>
                   <th>Alertas IA</th>
                   <th>Creado</th>
+                  {isAdmin ? <th>Acciones</th> : null}
                 </tr>
               </thead>
               <tbody>
@@ -165,6 +183,19 @@ export function RadicacionesModule() {
                     <td>{it.pasoActual || '—'}</td>
                     <td>{it.alertasCount > 0 ? <span className="mis-sol-alertas">⚠ {it.alertasCount}</span> : '—'}</td>
                     <td>{it.creadoEn}</td>
+                    {isAdmin ? (
+                      <td>
+                        <button
+                          type="button"
+                          className="admin-ghost-button bandeja-rechazar"
+                          disabled={borrando === it.id}
+                          title="Eliminar solicitud (solo administradores)"
+                          onClick={() => eliminarSolicitud(it)}
+                        >
+                          {borrando === it.id ? '…' : '🗑 Eliminar'}
+                        </button>
+                      </td>
+                    ) : null}
                   </tr>
                 ))}
               </tbody>
