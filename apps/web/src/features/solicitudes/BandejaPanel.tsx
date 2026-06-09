@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '../../services/http/api';
 import { SignaturePad } from '../../components/SignaturePad';
+import { getAuthSession } from '../auth/auth.service';
 import { etiquetaDocumento } from '../../utils/documentoLabels';
 import { generarPdfFormato, generarFormatoBlobUrl } from './generarPdfFormato';
 
@@ -210,6 +211,21 @@ export function BandejaPanel() {
       setErr('No se pudo cargar el detalle.');
     } finally {
       setLoadingDetalle(false);
+    }
+  }
+
+  const isAdmin = (getAuthSession()?.usuario?.rol?.nombre || '').toLowerCase() === 'administrador';
+
+  async function eliminarSolicitud(it: Item) {
+    if (!window.confirm(`¿Eliminar definitivamente la solicitud ${it.numeroRadicado}? Esta acción no se puede deshacer.`)) return;
+    try {
+      await api.delete(`/solicitudes/${it.id}`);
+      setItems((prev) => prev.filter((x) => x.id !== it.id));
+      setOpenId(null);
+      setDetalle(null);
+      setMsg(`Solicitud ${it.numeroRadicado} eliminada.`);
+    } catch {
+      setErr('No se pudo eliminar la solicitud.');
     }
   }
 
@@ -542,6 +558,16 @@ export function BandejaPanel() {
                         >
                           ✗ Rechazar
                         </button>
+                        {isAdmin ? (
+                          <button
+                            type="button"
+                            className="admin-ghost-button bandeja-rechazar"
+                            title="Eliminar definitivamente (solo administradores)"
+                            onClick={() => eliminarSolicitud(it)}
+                          >
+                            🗑 Eliminar
+                          </button>
+                        ) : null}
                       </div>
                       <div className="bandeja-remitir-row">
                         <label htmlFor={`remitir-${it.id}`}>Remitir a otra área:</label>
