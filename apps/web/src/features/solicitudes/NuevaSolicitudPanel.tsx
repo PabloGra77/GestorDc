@@ -45,6 +45,8 @@ interface CampoPlantilla {
   texto?: string;
   operandos?: string[];
   operacion?: 'suma' | 'resta' | 'multiplicacion' | 'division';
+  validar_contra?: string;
+  comparar_contra?: string;
   columnas?: string[];
   opciones?: string[];
   conFactura?: boolean;
@@ -433,9 +435,12 @@ export function NuevaSolicitudPanel({ onCreada }: NuevaSolicitudPanelProps) {
       setSubiendoDoc(null);
     }
 
-    // OCR si el campo tiene ocr_target
-    const campo = tipoSel?.camposPlantilla.find((c) => c.key === key);
-    if (!campo || !campo.ocr_target) return;
+    // Corre la IA si el adjunto tiene un tipo esperado (ocr_target) O si algún dato
+    // del formulario debe compararse contra este soporte (comparar_contra).
+    const todosCampos = camposEnviar();
+    const campo = todosCampos.find((c) => c.key === key);
+    const camposQueComparan = todosCampos.filter((c) => c.comparar_contra === key);
+    if (!campo?.ocr_target && camposQueComparan.length === 0) return;
 
     setOcrCampoActivo(key);
     const ocr = await procesarArchivo(file);
@@ -443,6 +448,36 @@ export function NuevaSolicitudPanel({ onCreada }: NuevaSolicitudPanelProps) {
     if (!ocr) return;
 
     const alertas: string[] = [];
+
+    // Comparación genérica: cada dato marcado "comparar contra este adjunto"
+    for (const cmp of camposQueComparan) {
+      const valor = String(datos[cmp.key] || '').trim();
+      if (!valor) continue;
+      const modo = (cmp.type === 'valor-pesos' || cmp.type === 'number' || cmp.type === 'cc' || cmp.type === 'nit' || cmp.type === 'cuenta-bancaria') ? 'cc' : 'texto';
+      const v = validarOcrContraDato(ocr.text, valor, modo);
+      if (!v.coincide) {
+        alertas.push(`El dato “${cmp.label}” (“${valor}”) no se identificó claramente en este soporte.`);
+      }
+    }
+
+    if (!campo?.ocr_target) {
+      // Sin tipo esperado: solo comparaciones + confianza + forense
+      if (ocr.confidence < 50) {
+        alertas.push(`La inteligencia artificial leyó el documento con baja confiabilidad (${Math.round(ocr.confidence)}%). El archivo puede estar borroso o ser ilegible.`);
+      }
+      try {
+        const dataUrl = await leerComoDataUrl(file);
+        const fr = await api.post<{ hallazgos?: Array<{ severidad: string; texto: string }> }>(
+          '/forense', { archivoBase64: dataUrl, nombre: file.name },
+        );
+        for (const h of fr.data?.hallazgos || []) {
+          if (h.severidad === 'alta' || h.severidad === 'media') alertas.push(`🔎 ${h.texto}`);
+        }
+      } catch { /* complementario */ }
+      setOcrPorCampo((p) => ({ ...p, [key]: { texto: ocr.text, confianza: ocr.confidence, alertas } }));
+      return;
+    }
+
     const target = campo.ocr_target;
     const targetLabel = etiquetaDocumento(target);
 

@@ -25,6 +25,7 @@ interface CampoPlantilla {
   group?: string;
   ocr_target?: string;
   validar_contra?: string;
+  comparar_contra?: string;
   columnas?: string[];
   conFactura?: boolean;
 }
@@ -459,6 +460,17 @@ export function BandejaPanel() {
                                   🔎 La IA debe verificar que <strong>{campoDato.label}</strong> (“{valorEsperado}”) aparezca en este adjunto.
                                 </div>
                               ) : null}
+                              {detalle.camposPlantilla
+                                .filter((d) => d.comparar_contra === c.key)
+                                .map((d) => {
+                                  const val = formatearValor(d, detalle.datosFormulario[d.key]).texto;
+                                  if (!val || val === '—') return null;
+                                  return (
+                                    <div key={d.key} className="bandeja-comparacion">
+                                      🔎 Debe coincidir con <strong>{d.label}</strong>: “{val}”.
+                                    </div>
+                                  );
+                                })}
                             </li>
                           );
                         })}

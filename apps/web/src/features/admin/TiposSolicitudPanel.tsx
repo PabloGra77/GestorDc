@@ -44,6 +44,8 @@ interface CampoPlantilla {
   operacion?: 'suma' | 'resta' | 'multiplicacion' | 'division';
   /** Para campos tipo 'file': key del dato que la IA debe encontrar/validar dentro del adjunto */
   validar_contra?: string;
+  /** Para datos normales: key del adjunto contra el cual la IA debe comparar este valor */
+  comparar_contra?: string;
   /** Para campos tipo 'tabla-items': columnas que llena el solicitante (varias filas) */
   columnas?: string[];
   /** Para campos tipo 'select': opciones de la lista desplegable */
@@ -1857,6 +1859,20 @@ function PlantillaPdfEditor({ plantilla, onChange, campos, onCamposChange, onIns
                   onClick={() => patchCampoIdx(idx, { required: !c.required })}
                 >{c.required ? '● Obligatorio' : '○ Opcional'}</button>
               </div>
+              {campos.some((x) => x.type === 'file') && c.type !== 'file' && c.type !== 'calculado' && c.type !== 'texto-fijo' ? (
+                <>
+                  <label className="plantilla-campo-mini-label">🔍 Comparar contra un adjunto (la IA verifica que este valor aparezca en el soporte)</label>
+                  <select
+                    value={c.comparar_contra ?? ''}
+                    onChange={(e) => patchCampoIdx(idx, { comparar_contra: e.target.value || undefined })}
+                  >
+                    <option value="">— No comparar —</option>
+                    {campos.filter((x) => x.type === 'file').map((x) => (
+                      <option key={x.key} value={x.key}>{x.label || x.key}</option>
+                    ))}
+                  </select>
+                </>
+              ) : null}
               {c.type === 'tabla-items' ? (
                 <>
                   <label className="plantilla-campo-mini-label">Columnas (separadas por coma)</label>
@@ -2326,16 +2342,63 @@ function PlantillaPdfEditor({ plantilla, onChange, campos, onCamposChange, onIns
                   </>
                 ) : null}
 
-                {sel.tipo === 'campo' ? (
+                {sel.tipo === 'campo' ? (() => {
+                  const idxDato = campos.findIndex((c) => c.key === sel.campoKey);
+                  const dato = idxDato >= 0 ? campos[idxDato] : null;
+                  return (
                   <>
                     <label>Campo</label>
-                    <select value={sel.campoKey} onChange={(e) => actualizar(sel.id, { campoKey: e.target.value })}>
+                    <select
+                      value={sel.campoKey}
+                      onChange={(e) => {
+                        if (e.target.value === '__nuevo__') {
+                          const nombre = window.prompt('Nombre del nuevo dato (ej. Concepto del gasto):', '');
+                          if (!nombre || !nombre.trim()) return;
+                          const base = nombre.trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '').slice(0, 28) || 'campo';
+                          let key = base; let n = 1;
+                          while (campos.some((c) => c.key === key)) { key = base + (++n); }
+                          onCamposChange([...campos, { key, label: nombre.trim(), type: 'text', required: true, group: 'Datos del formato' }]);
+                          actualizar(sel.id, { campoKey: key, etiqueta: `${nombre.trim()}:` });
+                        } else {
+                          actualizar(sel.id, { campoKey: e.target.value });
+                        }
+                      }}
+                    >
                       {camposDisponibles.map((c) => (
                         <option key={c.key} value={c.key}>{c.label}</option>
                       ))}
+                      <option value="__nuevo__">➕ Crear dato nuevo…</option>
                     </select>
                     <label>Etiqueta</label>
                     <input type="text" value={sel.etiqueta} onChange={(e) => actualizar(sel.id, { etiqueta: e.target.value })} />
+                    {dato ? (
+                      <>
+                        <label>Tipo del dato (lo que llena la persona)</label>
+                        <select value={dato.type} onChange={(e) => patchCampoIdx(idxDato, { type: e.target.value as CampoPlantilla['type'] })}>
+                          {TIPOS_CAMPO.filter((t) => t.v !== 'file').map((t) => <option key={t.v} value={t.v}>{t.l}</option>)}
+                        </select>
+                        {dato.type === 'select' ? (
+                          <>
+                            <label>Opciones de la lista (separadas por coma)</label>
+                            <input
+                              type="text"
+                              placeholder="Ej. Opción A, Opción B"
+                              value={(dato.opciones || []).join(', ')}
+                              onChange={(e) => patchCampoIdx(idxDato, { opciones: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) })}
+                            />
+                          </>
+                        ) : null}
+                        {campos.some((x) => x.type === 'file') && dato.type !== 'calculado' ? (
+                          <>
+                            <label>🔍 Comparar contra un adjunto</label>
+                            <select value={dato.comparar_contra ?? ''} onChange={(e) => patchCampoIdx(idxDato, { comparar_contra: e.target.value || undefined })}>
+                              <option value="">— No comparar —</option>
+                              {campos.filter((x) => x.type === 'file').map((x) => <option key={x.key} value={x.key}>{x.label || x.key}</option>)}
+                            </select>
+                          </>
+                        ) : null}
+                      </>
+                    ) : null}
                     <label>Alineación</label>
                     <select value={sel.alineacion} onChange={(e) => actualizar(sel.id, { alineacion: e.target.value as PdfAlineacion })}>
                       <option value="izquierda">Izquierda</option>
@@ -2343,7 +2406,8 @@ function PlantillaPdfEditor({ plantilla, onChange, campos, onCamposChange, onIns
                       <option value="derecha">Derecha</option>
                     </select>
                   </>
-                ) : null}
+                  );
+                })() : null}
 
                 {sel.tipo === 'tabla' ? (
                   <>
