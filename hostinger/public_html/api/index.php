@@ -73,6 +73,7 @@ $routes = [
     // Solicitudes (instancias)
     ['POST',   '#^/solicitudes$#',                               'solicitudes/create'],
     ['GET',    '#^/solicitudes$#',                               'solicitudes/find_all'],
+    ['GET',    '#^/solicitudes/reporte$#',                       'solicitudes/reporte'],
     ['GET',    '#^/solicitudes/bandeja$#',                       'solicitudes/bandeja'],
     ['GET',    '#^/solicitudes/(?P<id>\d+)$#',                   'solicitudes/find_one'],
     ['POST',   '#^/solicitudes/(?P<id>\d+)/validar$#',           'solicitudes/validar'],

@@ -6893,6 +6893,26 @@ textarea {
   z-index: 2200;
 }
 
+/* Generador de informe dinámico (Reportes) */
+.reporte-dinamico { display: flex; flex-direction: column; gap: 16px; margin-top: 8px; }
+.reporte-filtros { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+.reporte-filtros label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-weight: 600; color: var(--text, #0F172A); }
+.reporte-filtros select, .reporte-filtros input { padding: 7px 9px; border-radius: 8px; border: 1px solid rgba(15,23,42,0.18); font: inherit; }
+.reporte-columnas { display: flex; flex-direction: column; gap: 12px; }
+.reporte-cols-titulo { font-size: 14px; }
+.reporte-cols-grupo { display: flex; flex-direction: column; gap: 6px; }
+.reporte-cols-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.reporte-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 11px; border-radius: 999px; cursor: pointer;
+  border: 1px solid rgba(99,102,241,0.35); background: rgba(99,102,241,0.06);
+  font-size: 12.5px; user-select: none; transition: background 0.12s, border-color 0.12s;
+}
+.reporte-chip:hover { border-color: #6366F1; }
+.reporte-chip.on { background: #6366F1; color: #fff; border-color: #6366F1; }
+.reporte-chip input { accent-color: #fff; }
+.reporte-dinamico-acciones { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+
 /* Botón para abrir un adjunto desde la bandeja (se ve como enlace) */
 .bandeja-abrir-adjunto {
   background: none;
