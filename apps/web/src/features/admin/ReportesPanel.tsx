@@ -8,7 +8,44 @@ interface Props {
 }
 
 interface CampoMin { key: string; label: string; type?: string }
-interface TipoMin { id: number; nombre: string; camposPlantilla: CampoMin[] }
+interface BloqueMin { tipo: string; campoKey?: string; etiqueta?: string; texto?: string }
+interface TipoMin { id: number; nombre: string; camposPlantilla: CampoMin[]; plantillaPdf?: { bloques?: BloqueMin[] } | null }
+
+const TOKEN_COLS: Record<string, { key: string; label: string }> = {
+  valor: { key: 'valorPesos', label: 'Valor a cobrar' },
+  concepto: { key: 'observaciones', label: 'Concepto / observaciones' },
+  ciudad: { key: 'ciudad', label: 'Ciudad' },
+};
+
+// Une los datos definidos del tipo con los colocados en la hoja (bloques "campo" y
+// tokens), igual que el formulario, para ofrecer TODAS las columnas posibles.
+function derivarColumnas(tipo: TipoMin): { datos: CampoMin[]; docs: CampoMin[] } {
+  const datos: CampoMin[] = [];
+  const docs: CampoMin[] = [];
+  const vistos = new Set<string>();
+  for (const c of tipo.camposPlantilla || []) {
+    if (!c.key || vistos.has(c.key)) continue;
+    vistos.add(c.key);
+    if (c.type === 'file') docs.push(c);
+    else if (c.type !== 'texto-fijo') datos.push(c);
+  }
+  for (const b of tipo.plantillaPdf?.bloques || []) {
+    if (b.tipo === 'campo' && b.campoKey && !b.campoKey.startsWith('__') && !vistos.has(b.campoKey)) {
+      vistos.add(b.campoKey);
+      const label = (b.etiqueta || b.campoKey).replace(/[:]\s*$/, '').replace(/^[•☐]\s*/, '').trim() || b.campoKey;
+      datos.push({ key: b.campoKey, label });
+    }
+    if ((b.tipo === 'texto' || b.tipo === 'titulo') && b.texto) {
+      const re = /\{\{(\w+)\}\}/g;
+      let m: RegExpExecArray | null;
+      while ((m = re.exec(b.texto)) !== null) {
+        const def = TOKEN_COLS[m[1]];
+        if (def && !vistos.has(def.key)) { vistos.add(def.key); datos.push(def); }
+      }
+    }
+  }
+  return { datos, docs };
+}
 
 const REPORTES = [
   { tipo: 'nuevos', titulo: 'Usuarios nuevos (últimos 30 días)', desc: 'Usuarios creados en los últimos 30 días con su estado.' },
@@ -19,7 +56,9 @@ const REPORTES = [
 // Columnas fijas disponibles para el informe dinámico
 const COLS_FIJAS: Array<{ key: string; label: string }> = [
   { key: 'radicado', label: 'Radicado' },
-  { key: 'fecha', label: 'Fecha' },
+  { key: 'fecha', label: 'Fecha de creación' },
+  { key: 'aprobado', label: 'Fecha de aprobación' },
+  { key: 'actualizado', label: 'Última actualización' },
   { key: 'tipo', label: 'Tipo de solicitud' },
   { key: 'area', label: 'Área' },
   { key: 'estado', label: 'Estado' },
@@ -27,6 +66,9 @@ const COLS_FIJAS: Array<{ key: string; label: string }> = [
   { key: 'solicitante', label: 'Nombre del profesional' },
   { key: 'documento', label: 'Documento' },
   { key: 'correo', label: 'Correo' },
+  { key: 'firmado', label: 'Firmado' },
+  { key: 'alertas', label: 'Alertas IA' },
+  { key: 'adjuntos', label: 'Adjuntos cargados' },
 ];
 
 const ESTADOS = [
@@ -54,15 +96,21 @@ export function ReportesPanel({ onMsg, onErr }: Props) {
   }, []);
 
   const tipoActual = useMemo(() => tipos.find((t) => t.id === tipoSel) || null, [tipos, tipoSel]);
-  const colsDato = useMemo(() => {
-    if (!tipoActual) return [];
-    return (tipoActual.camposPlantilla || [])
-      .filter((c) => c.key && c.type !== 'texto-fijo')
-      .map((c) => ({ key: `dato:${c.key}`, label: c.label || c.key }));
-  }, [tipoActual]);
+  const derivadas = useMemo(() => tipoActual ? derivarColumnas(tipoActual) : { datos: [], docs: [] }, [tipoActual]);
+  const colsDato = useMemo(() => derivadas.datos.map((c) => ({ key: `dato:${c.key}`, label: c.label || c.key })), [derivadas]);
+  const colsDoc = useMemo(() => derivadas.docs.map((c) => ({ key: `doc:${c.key}`, label: `¿Adjuntó ${c.label || c.key}?` })), [derivadas]);
 
   function toggleCol(key: string) {
     setCols((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
+  }
+
+  function seleccionarTodo() {
+    const todas = [
+      ...COLS_FIJAS.map((c) => c.key),
+      ...colsDato.map((c) => c.key),
+      ...colsDoc.map((c) => c.key),
+    ];
+    setCols(todas);
   }
 
   async function descargarUrl(path: string, nombreDefecto: string, idCarga: string) {
@@ -163,7 +211,11 @@ export function ReportesPanel({ onMsg, onErr }: Props) {
         </div>
 
         <div className="reporte-columnas">
-          <strong className="reporte-cols-titulo">Columnas del informe</strong>
+          <div className="reporte-dinamico-acciones" style={{ justifyContent: 'flex-start' }}>
+            <strong className="reporte-cols-titulo">Columnas del informe</strong>
+            <button type="button" className="admin-ghost-button" onClick={seleccionarTodo}>✓ Seleccionar todo</button>
+            <button type="button" className="admin-ghost-button" onClick={() => setCols([])}>Limpiar</button>
+          </div>
           <div className="reporte-cols-grupo">
             <span className="admin-help-text">Generales</span>
             <div className="reporte-cols-chips">
@@ -190,6 +242,19 @@ export function ReportesPanel({ onMsg, onErr }: Props) {
                   ))}
                 </div>
               )}
+              {colsDoc.length > 0 ? (
+                <>
+                  <span className="admin-help-text" style={{ marginTop: 6 }}>Adjuntos / soportes (Sí / No)</span>
+                  <div className="reporte-cols-chips">
+                    {colsDoc.map((c) => (
+                      <label key={c.key} className={`reporte-chip${cols.includes(c.key) ? ' on' : ''}`}>
+                        <input type="checkbox" checked={cols.includes(c.key)} onChange={() => toggleCol(c.key)} />
+                        {c.label}
+                      </label>
+                    ))}
+                  </div>
+                </>
+              ) : null}
             </div>
           ) : (
             <span className="admin-help-text">Elige un tipo de solicitud específico para incluir los datos del formulario como columnas.</span>

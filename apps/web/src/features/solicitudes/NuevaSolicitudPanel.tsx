@@ -397,6 +397,9 @@ export function NuevaSolicitudPanel({ onCreada }: NuevaSolicitudPanelProps) {
         return !datos[c.key] || (datos[c.key] || '').trim() === '';
       });
       if (faltan.length > 0) return `Faltan: ${faltan.map((f) => f.label).join(', ')}`;
+      // Campos "persona": el valor debe coincidir con un usuario activo del sistema
+      const personaInvalida = campos.filter((c) => c.type === 'persona' && (datos[c.key] || '').trim() !== '' && !personas.includes((datos[c.key] || '').trim()));
+      if (personaInvalida.length > 0) return `Elige un usuario válido de la lista en: ${personaInvalida.map((f) => f.label).join(', ')}`;
     }
     return '';
   }
@@ -647,6 +650,12 @@ export function NuevaSolicitudPanel({ onCreada }: NuevaSolicitudPanelProps) {
     });
     if (faltantes.length > 0) {
       setErr(`Faltan campos obligatorios: ${faltantes.map((f) => f.label).join(', ')}`);
+      return;
+    }
+    // Campos "persona": deben coincidir con un usuario activo del sistema
+    const personaInvalida = camposEnviar().filter((c) => c.type === 'persona' && (datos[c.key] || '').trim() !== '' && !personas.includes((datos[c.key] || '').trim()));
+    if (personaInvalida.length > 0) {
+      setErr(`Elige un usuario válido de la lista en: ${personaInvalida.map((f) => f.label).join(', ')}`);
       return;
     }
     if (!firmaSolicitante) {
@@ -1012,21 +1021,38 @@ export function NuevaSolicitudPanel({ onCreada }: NuevaSolicitudPanelProps) {
                           </div>
                         </div>
                       ) : c.type === 'persona' ? (
-                        <>
-                          <input
-                            id={`f-${c.key}`}
-                            type="text"
-                            list={`dl-${c.key}`}
-                            autoComplete="off"
-                            value={datos[c.key] || ''}
-                            onChange={(e) => setDatos((p) => ({ ...p, [c.key]: e.target.value }))}
-                            required={c.required}
-                            placeholder="Escribe y elige de la lista…"
-                          />
-                          <datalist id={`dl-${c.key}`}>
-                            {personas.map((n, i) => <option key={i} value={n} />)}
-                          </datalist>
-                        </>
+                        (() => {
+                          const val = (datos[c.key] || '').trim();
+                          const esValido = val !== '' && personas.includes(val);
+                          const escribiendo = val.length > 0 && val.length < 3;
+                          return (
+                            <>
+                              <input
+                                id={`f-${c.key}`}
+                                type="text"
+                                list={`dl-${c.key}`}
+                                autoComplete="off"
+                                value={datos[c.key] || ''}
+                                onChange={(e) => setDatos((p) => ({ ...p, [c.key]: e.target.value }))}
+                                required={c.required}
+                                placeholder="Escribe al menos 3 letras y elige de la lista…"
+                                style={val !== '' ? { borderColor: esValido ? '#16a34a' : '#dc2626' } : undefined}
+                              />
+                              <datalist id={`dl-${c.key}`}>
+                                {personas.map((n, i) => <option key={i} value={n} />)}
+                              </datalist>
+                              {val === '' ? (
+                                <small className="admin-help-text">Solo se permiten usuarios activos del sistema.</small>
+                              ) : esValido ? (
+                                <small className="ocr-ok" style={{ display: 'block' }}>✓ Usuario válido</small>
+                              ) : (
+                                <small style={{ display: 'block', color: '#dc2626' }}>
+                                  {escribiendo ? 'Sigue escribiendo y elige una opción de la lista.' : 'Debes elegir un usuario de la lista (no es un usuario válido).'}
+                                </small>
+                              )}
+                            </>
+                          );
+                        })()
                       ) : (
                         <input
                           id={`f-${c.key}`}
