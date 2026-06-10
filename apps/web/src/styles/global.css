@@ -6857,11 +6857,27 @@ textarea {
   position: fixed;
   inset: 0;
   z-index: 2000;
-  background: #F1F3F6;
+  background: #F1F3F6 !important;
   padding: 0;
   overflow-y: auto;
   gap: 0;
   border-radius: 0;
+  color: #0F172A !important;
+}
+/* Todos los textos dentro del editor siempre oscuros */
+.plantilla-editor-fullscreen *:not(.plantilla-fullscreen-bar):not(.plantilla-fullscreen-bar *):not(.admin-primary-button):not(.admin-primary-button *):not(.bloque-rapido-btn):not(.bloque-rapido-btn *) {
+  color: inherit;
+}
+.plantilla-editor-fullscreen label {
+  color: #4A5573 !important;
+}
+/* Inputs/selects dentro del editor siempre en modo claro */
+.plantilla-editor-fullscreen input,
+.plantilla-editor-fullscreen select,
+.plantilla-editor-fullscreen textarea {
+  background: rgba(0, 0, 0, 0.05) !important;
+  color: #0F172A !important;
+  border-color: rgba(0, 0, 0, 0.18) !important;
 }
 .plantilla-editor-fullscreen .plantilla-paleta,
 .plantilla-editor-fullscreen .plantilla-tip,
@@ -6869,13 +6885,13 @@ textarea {
 .plantilla-editor-fullscreen .plantilla-placeholders-bar {
   border-radius: 0;
   margin: 0;
-  background: #FFFFFF;
+  background: #FFFFFF !important;
   border-left: none;
   border-right: none;
   border-top: none;
   border-bottom: 1px solid rgba(212, 175, 55, 0.4);
   padding: 8px 18px;
-  color: #0F172A;
+  color: #0F172A !important;
 }
 .plantilla-editor-fullscreen .plantilla-paleta {
   position: sticky;
@@ -6897,8 +6913,8 @@ textarea {
   position: sticky;
   top: 110px;
   max-height: calc(100vh - 130px);
-  background: #FFFFFF;
-  color: #0F172A;
+  background: #FFFFFF !important;
+  color: #0F172A !important;
 }
 .plantilla-editor-fullscreen .plantilla-edit-panel label { color: #4A5573 !important; }
 
@@ -7127,8 +7143,8 @@ textarea {
 }
 .plantilla-editor-fullscreen .plantilla-col-datos,
 .plantilla-editor-fullscreen .plantilla-col-docs {
-  background: #FFFFFF;
-  color: #0F172A;
+  background: #FFFFFF !important;
+  color: #0F172A !important;
 }
 .plantilla-editor-fullscreen .plantilla-col-datos label,
 .plantilla-editor-fullscreen .plantilla-col-docs label,
