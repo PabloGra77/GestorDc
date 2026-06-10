@@ -6030,6 +6030,129 @@ textarea {
 }
 .inicio-seguimiento-input .radicado-action-button { padding: 8px 18px; }
 
+/* ── Widget seguimiento principal ─────────────────────────────────────── */
+.inicio-seguimiento-principal {
+  padding: 20px 24px;
+  margin-bottom: 16px;
+}
+.inicio-seguimiento-header { margin-bottom: 14px; }
+.inicio-seguimiento-header h3 { margin: 0 0 4px; }
+.inicio-seguimiento-principal .inicio-seguimiento-input { margin-top: 0; }
+.inicio-seguimiento-principal .inicio-seguimiento-input input {
+  flex: 1;
+  padding: 10px 14px;
+  font-size: 15px;
+  border-radius: 8px;
+}
+.seguimiento-resultado { display: grid; gap: 14px; }
+.seguimiento-result-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.seguimiento-numero { font-size: 18px; display: block; }
+.seguimiento-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  font-size: 13px;
+  margin-bottom: 14px;
+  color: var(--text-secondary, #C8CEE0);
+}
+.seguimiento-meta strong { color: var(--text-primary, #EEF1F9); }
+
+/* Trazado de pasos */
+.seguimiento-trazado {
+  display: flex;
+  align-items: flex-start;
+  gap: 0;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.trazado-paso {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  flex: 1;
+  min-width: 80px;
+}
+.trazado-paso:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  width: 100%;
+  height: 2px;
+  background: var(--gold-line, rgba(212,175,55,0.3));
+}
+.trazado-icono {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 700;
+  border: 2px solid var(--gold-line, rgba(212,175,55,0.4));
+  background: var(--surface, #1E2235);
+  position: relative;
+  z-index: 1;
+  margin-bottom: 6px;
+}
+.trazado-completado .trazado-icono {
+  background: #2e7d32;
+  border-color: #4caf50;
+  color: #fff;
+}
+.trazado-en_curso .trazado-icono {
+  background: var(--gold, #D4AF37);
+  border-color: var(--gold, #D4AF37);
+  color: #1a1a1a;
+}
+.trazado-pendiente .trazado-icono {
+  color: var(--text-secondary, #C8CEE0);
+}
+.trazado-label {
+  font-size: 11px;
+  text-align: center;
+  color: var(--text-secondary, #C8CEE0);
+  line-height: 1.3;
+  max-width: 90px;
+}
+.trazado-completado .trazado-label { color: #81c784; }
+.trazado-en_curso .trazado-label { color: var(--gold, #D4AF37); font-weight: 600; }
+
+/* Historial de movimientos */
+.seguimiento-movimientos { margin-bottom: 14px; }
+.seguimiento-movimientos h5 { margin: 0 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-secondary, #C8CEE0); }
+.seguimiento-movimientos ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+.seguimiento-mov-item {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 12px;
+  font-size: 13px;
+  padding: 8px 12px;
+  border-left: 3px solid var(--gold-line, rgba(212,175,55,0.35));
+  background: rgba(0,0,0,0.15);
+  border-radius: 0 6px 6px 0;
+}
+.seguimiento-mov-fecha {
+  color: var(--text-secondary, #C8CEE0);
+  font-size: 11px;
+  grid-column: 1 / -1;
+}
+.seguimiento-mov-accion { font-weight: 600; }
+.seguimiento-mov-comentario {
+  grid-column: 1 / -1;
+  font-style: italic;
+  color: var(--text-secondary, #C8CEE0);
+}
+.seguimiento-actions { margin-top: 12px; }
+
 .inicio-recientes-head {
   display: flex;
   justify-content: space-between;

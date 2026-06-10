@@ -65,6 +65,7 @@ if ($numeroN !== '') {
             'existe' => true,
             'tipo' => 'solicitud',
             'solicitud' => [
+                'id'             => (int)$sol['id'],
                 'numeroRadicado' => $sol['numero_radicado'],
                 'tipoNombre'     => $sol['tipo_nombre'],
                 'areaNombre'     => $sol['area_nombre'],

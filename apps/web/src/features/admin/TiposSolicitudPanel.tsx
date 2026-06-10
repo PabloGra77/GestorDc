@@ -1497,11 +1497,56 @@ function PlantillaPdfEditor({ plantilla, onChange, campos, onCamposChange, onIns
     return set;
   }, [bloques]);
 
+  // Detecta los campos/adjuntos que la hoja referencia pero que aún no existen
+  // como "Dato" o "Documento", para crearlos y dejar todo conectado.
+  function camposFaltantesDeHoja(bloquesActuales: PdfBloque[]): CampoPlantilla[] {
+    const existentes = new Set(campos.map((c) => c.key));
+    const nuevos: CampoPlantilla[] = [];
+    const limpiar = (s: string) => s.replace(/[:•☐]/g, '').trim();
+    const agregar = (key: string, etiqueta: string, tipo?: CampoPlantilla['type']) => {
+      if (!key || key.startsWith('__') || existentes.has(key)) return;
+      existentes.add(key);
+      const pre = DOCUMENTOS_PREDEFINIDOS.find((d) => d.key === key);
+      if (pre) {
+        nuevos.push({ key, label: pre.label, type: 'file', required: true, group: 'Documentos a adjuntar', ocr_target: pre.ocr_target });
+      } else if (key.toLowerCase().startsWith('doc')) {
+        nuevos.push({ key, label: limpiar(etiqueta) || key, type: 'file', required: false, group: 'Documentos a adjuntar' });
+      } else {
+        nuevos.push({ key, label: limpiar(etiqueta) || key, type: tipo || adivinarTipoCampo(key), required: true, group: 'Datos del formato' });
+      }
+    };
+    for (const b of bloquesActuales) {
+      if (b.tipo === 'campo' && b.campoKey) agregar(b.campoKey, b.etiqueta || b.campoKey);
+      if ((b.tipo === 'texto' || b.tipo === 'titulo') && b.texto) {
+        const re = /\{\{(\w+)\}\}/g;
+        let m: RegExpExecArray | null;
+        while ((m = re.exec(b.texto)) !== null) {
+          const def = TOKEN_CAMPOS[m[1]];
+          if (def) agregar(def.key, def.label, def.type);
+        }
+      }
+    }
+    return nuevos;
+  }
+
+  function conectarCamposDeHoja() {
+    const faltan = camposFaltantesDeHoja(bloques);
+    if (faltan.length === 0) {
+      window.alert('Todos los campos de la hoja ya están conectados.');
+      return;
+    }
+    onCamposChange([...campos, ...faltan]);
+    window.alert(`Se conectaron ${faltan.length} campo(s)/adjunto(s) que estaban en la hoja. Revisa la columna de datos y adjuntos.`);
+  }
+
   function cargarEjemplo(id: string) {
     const ej = PLANTILLAS_EJEMPLO.find((p) => p.id === id);
     if (!ej) return;
     if (bloques.length > 0 && !window.confirm('Esto reemplaza la plantilla actual con un ejemplo. ¿Continuar?')) return;
-    setBloques(ej.build());
+    const nuevosBloques = ej.build();
+    setBloques(nuevosBloques);
+    const faltan = camposFaltantesDeHoja(nuevosBloques);
+    if (faltan.length > 0) onCamposChange([...campos, ...faltan]);
     setSeleccionadoId(null);
   }
 
@@ -1683,6 +1728,14 @@ function PlantillaPdfEditor({ plantilla, onChange, campos, onCamposChange, onIns
             <option key={p.id} value={p.id}>{p.nombre}</option>
           ))}
         </select>
+        <button
+          type="button"
+          className="bloque-rapido-btn"
+          title="Crea automáticamente los datos y adjuntos que están en la hoja pero aún no aparecen en las columnas (conecta todo)."
+          onClick={conectarCamposDeHoja}
+        >
+          🔗 Conectar campos de la hoja
+        </button>
         <span className="plantilla-preview-sep" />
         <button
           type="button"

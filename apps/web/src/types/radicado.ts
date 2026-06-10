@@ -8,8 +8,38 @@ export interface Radicado {
 	actualizadoEn: string;
 }
 
+export interface TrazadoPaso {
+	rol: string;
+	label: string;
+	orden: number;
+	estado: 'pendiente' | 'en_curso' | 'completado';
+}
+
+export interface MovimientoPublico {
+	accion: string;
+	paso: string | null;
+	estadoResultado: string | null;
+	comentario: string | null;
+	creadoEn: string;
+}
+
+export interface SolicitudVerificada {
+	id: number;
+	numeroRadicado: string;
+	tipoNombre: string;
+	areaNombre: string;
+	estado: string;
+	pasoActual: string | null;
+	creadoEn: string;
+	aprobadoEn: string | null;
+	trazado: TrazadoPaso[];
+	movimientosPublicos: MovimientoPublico[];
+}
+
 export interface VerificarRadicadoResponse {
 	existe: boolean;
+	tipo?: 'solicitud' | 'radicado';
+	solicitud?: SolicitudVerificada;
 	radicado?: Radicado;
 }
 

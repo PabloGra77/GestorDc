@@ -10,7 +10,7 @@ import { TiposSolicitudPanel } from '../admin/TiposSolicitudPanel';
 import { ReportesPanel } from '../admin/ReportesPanel';
 import { BulkCreatePanel } from '../admin/BulkCreatePanel';
 import { ConfiguracionSmtpPanel } from '../admin/ConfiguracionSmtpPanel';
-import { InicioStats, InicioRecientes } from './InicioStats';
+import { InicioStats, InicioRecientes, SeguimientoRadicado } from './InicioStats';
 import type { Role } from '../../types/role';
 import type { Radicado, VerificarRadicadoResponse } from '../../types/radicado';
 import type { Usuario } from '../../types/usuario';
@@ -828,58 +828,12 @@ export function DashboardPage() {
 		>
 			{activeSection === 'Inicio' ? (
 				<section className="inicio-layout">
-					{radicadoMessage ? <div className="admin-success">{radicadoMessage}</div> : null}
-					{radicadoError ? <div className="admin-error">{radicadoError}</div> : null}
-
-					<InicioStats />
+					<SeguimientoRadicado />
 
 					<div className="inicio-grid">
 						<div className="inicio-grid-main">
 							<InicioRecientes />
 						</div>
-						<aside className="inicio-grid-side">
-							<form className="admin-form card-surface inicio-seguimiento-card" onSubmit={handleVerifyRadicado}>
-								<h4>Seguimiento de radicado</h4>
-								<p className="admin-help-text">Consulta el estado de cualquier radicado. Solo lectura.</p>
-								{canVerificarRadicados ? (
-									<div className="inicio-seguimiento-input">
-										<input
-											type="text"
-											placeholder="Ej. M2604-ES0001"
-											value={verificarBusqueda}
-											onChange={(event) => setVerificarBusqueda(event.target.value)}
-										/>
-										<button type="submit" className="radicado-action-button">Buscar</button>
-									</div>
-								) : (
-									<p className="admin-help-text">No tienes permiso para verificar.</p>
-								)}
-
-								{verificacionRadicado ? (
-									<div className="radicado-result card-surface">
-										<strong>{verificacionRadicado.numero}</strong>
-										{verificacionRadicado.referencia ? <span>Referencia: {verificacionRadicado.referencia}</span> : null}
-										<span>Estado: <strong>{verificacionRadicado.estado}</strong></span>
-										{(verificacionRadicado as { areaNombre?: string }).areaNombre ? (
-											<span>Área: {(verificacionRadicado as { areaNombre?: string }).areaNombre}</span>
-										) : null}
-										{(verificacionRadicado as { tipoNombre?: string }).tipoNombre ? (
-											<span>Tipo: {(verificacionRadicado as { tipoNombre?: string }).tipoNombre}</span>
-										) : null}
-										{(verificacionRadicado as { pasoActual?: string | null }).pasoActual ? (
-											<span>Paso: {(verificacionRadicado as { pasoActual?: string }).pasoActual}</span>
-										) : null}
-									</div>
-								) : null}
-
-								{isVerificadoSinResultado ? (
-									<div className="radicado-result card-surface">
-										<strong>Sin coincidencias</strong>
-										<span>No existe ese número.</span>
-									</div>
-								) : null}
-							</form>
-						</aside>
 					</div>
 
 					{isComposeRadicadoOpen ? (
