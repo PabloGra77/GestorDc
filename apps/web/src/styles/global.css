@@ -725,8 +725,6 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 20px;
-  max-width: 1280px;
-  margin: 0 auto;
   width: 100%;
 }
 
@@ -3815,18 +3813,12 @@ body { background: #000000; }
   font-size: 12px;
 }
 
-/* Cards / Panels / superficies */
-.admin-card, .admin-panel,
-.dashboard-card, .panel, .surface-card,
-.mail-compose-launcher,
-.admin-form, .admin-side-list {
+/* Cards / Panels / superficies — sin estilo de caja */
+.mail-compose-launcher {
   background: rgba(0, 0, 0, 0.65) !important;
   border: 1px solid var(--gold-line) !important;
   border-radius: 16px !important;
-  -webkit-backdrop-filter: blur(8px);
-          backdrop-filter: blur(8px);
   color: #FFFFFF;
-  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.5);
 }
 
 /* Inputs en admin */
@@ -4274,10 +4266,7 @@ button.admin-primary-button {
   mix-blend-mode: multiply !important;
 }
 [data-theme="light"] .payops-login-card,
-[data-theme="light"] .admin-card, [data-theme="light"] .admin-panel,
-[data-theme="light"] .dashboard-card,
-[data-theme="light"] .admin-form, [data-theme="light"] .admin-side-list,
-[data-theme="light"] .admin-kpi-card, [data-theme="light"] .mail-compose-launcher {
+[data-theme="light"] .mail-compose-launcher {
   background: #FFFFFF !important;
   color: #0F172A !important;
   border-color: rgba(212, 175, 55, 0.55) !important;
