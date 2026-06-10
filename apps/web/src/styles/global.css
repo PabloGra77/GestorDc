@@ -85,7 +85,7 @@ body {
 h1, h2, h3, h4 { color: var(--text-primary); letter-spacing: -0.01em; }
 a { color: var(--sky-blue); text-decoration: none; }
 a:hover { color: var(--gold-bright); }
-label { color: var(--text-secondary); font-size: 13px; font-weight: 500; letter-spacing: 0.02em; }
+label { color: var(--text-secondary); font-size: 14px; font-weight: 500; letter-spacing: 0.02em; }
 
 button,
 input,
@@ -570,9 +570,8 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
 
 .admin-shell {
   min-height: 100vh;
-  display: grid;
-  grid-template-columns: 1fr;
-  grid-template-rows: auto 1fr;
+  display: flex;
+  flex-direction: column;
   background: linear-gradient(120deg, rgba(15, 23, 42, 0.04), rgba(61, 90, 254, 0.08));
 }
 
@@ -722,11 +721,11 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
 }
 
 .admin-workspace {
-  padding: 28px 36px;
+  padding: 24px 32px;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 20px;
-  max-width: 1400px;
+  max-width: 1280px;
   margin: 0 auto;
   width: 100%;
 }
@@ -743,8 +742,8 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
 }
 
 .admin-main {
-  display: grid;
-  grid-template-rows: auto 1fr;
+  display: flex;
+  flex-direction: column;
   gap: 16px;
 }
 
@@ -1447,12 +1446,6 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
   align-content: start;
   align-items: start;
   grid-auto-rows: max-content;
-  border: 1px solid var(--border);
-  background:
-    radial-gradient(circle at 95% -10%, rgba(59, 130, 246, 0.08), transparent 40%),
-    radial-gradient(circle at -5% 5%, rgba(14, 116, 144, 0.06), transparent 32%),
-    linear-gradient(180deg, var(--bg-card) 0%, var(--bg-elevated) 100%);
-  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.07);
 }
 
 .admin-panel-head {
@@ -1666,7 +1659,7 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
 .admin-help-text {
   margin: 0 0 10px;
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .admin-user-meta {
@@ -1893,16 +1886,10 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
 
 .radicaciones-module {
   display: grid;
-  gap: 14px;
+  gap: 16px;
   align-content: start;
   align-items: start;
   grid-auto-rows: max-content;
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  background:
-    linear-gradient(125deg, rgba(3, 105, 161, 0.04), rgba(148, 163, 184, 0.03) 42%, transparent 42%),
-    var(--bg-card);
-  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
 }
 
 .radicaciones-head h3 {
@@ -6389,10 +6376,13 @@ textarea {
   gap: 12px;
 }
 .tipo-card {
-  padding: 14px 16px;
+  padding: 16px 18px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
+  background: rgba(0,0,0,0.04);
+  border: 1px solid var(--border);
+  border-radius: 12px;
 }
 .tipo-card-head {
   display: flex;
@@ -6425,6 +6415,7 @@ textarea {
 }
 .tipo-card-actions button { padding: 6px 10px; font-size: 12px; }
 [data-theme="light"] .tipo-card-meta li { color: #4A5573 !important; }
+[data-theme="light"] .tipo-card { background: #F8F9FB !important; border-color: rgba(212,175,55,0.4) !important; }
 
 /* Modal del editor de tipo */
 .tipos-editor-overlay {
