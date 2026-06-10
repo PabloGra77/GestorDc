@@ -3785,8 +3785,10 @@ body { background: #000000; }
 }
 .admin-shell > *, .dashboard-shell > * { position: relative; z-index: 1; }
 
-/* Topbar/Sidebar header */
-.admin-topbar, .dashboard-topbar, .admin-header-bar {
+/* Topbar/Sidebar header — solo tema oscuro */
+[data-theme="dark"] .admin-topbar,
+[data-theme="dark"] .dashboard-topbar,
+[data-theme="dark"] .admin-header-bar {
   background: rgba(0, 0, 0, 0.7) !important;
   border-bottom: 1px solid var(--gold-line) !important;
   -webkit-backdrop-filter: blur(8px);
@@ -3930,8 +3932,9 @@ button.admin-realizar-solicitud:hover,
   color: var(--gold-bright) !important;
 }
 
-/* Cards interiores */
-.admin-card .card-surface, .admin-panel .card-surface {
+/* Cards interiores — solo tema oscuro */
+[data-theme="dark"] .admin-card .card-surface,
+[data-theme="dark"] .admin-panel .card-surface {
   background: rgba(0, 0, 0, 0.4) !important;
   border-color: rgba(212, 175, 55, 0.18) !important;
 }
@@ -4112,11 +4115,11 @@ button.secondary-link:hover {
   border-radius: 8px !important;
 }
 
-/* Cards interiores del start-radicado (Nueva solicitud, Seguimiento) */
-.start-radicado-panel .card-surface,
-.mail-tracking-panel,
-.mail-tracking-compact,
-.compose-trigger-wrap {
+/* Cards interiores del start-radicado (Nueva solicitud, Seguimiento) — solo oscuro */
+[data-theme="dark"] .start-radicado-panel .card-surface,
+[data-theme="dark"] .mail-tracking-panel,
+[data-theme="dark"] .mail-tracking-compact,
+[data-theme="dark"] .compose-trigger-wrap {
   background: rgba(0, 0, 0, 0.4) !important;
   border-color: var(--gold-line) !important;
 }
@@ -4202,9 +4205,11 @@ button.admin-primary-button {
   box-shadow: 0 12px 28px rgba(212, 175, 55, 0.45) !important;
 }
 
-/* Card "Nueva solicitud" dentro de Radicaciones */
-.start-radicado-panel, .radicaciones-content,
-.radicado-section, .radicaciones-card {
+/* Card "Nueva solicitud" dentro de Radicaciones — solo tema oscuro */
+[data-theme="dark"] .start-radicado-panel,
+[data-theme="dark"] .radicaciones-content,
+[data-theme="dark"] .radicado-section,
+[data-theme="dark"] .radicaciones-card {
   background: rgba(0, 0, 0, 0.55) !important;
   border: 1px solid var(--gold-line) !important;
 }
