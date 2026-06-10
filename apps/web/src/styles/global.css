@@ -722,14 +722,24 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
 }
 
 .admin-workspace {
-  padding: 24px;
+  padding: 28px 36px;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 16px;
+  gap: 20px;
+  max-width: 1400px;
+  margin: 0 auto;
+  width: 100%;
 }
 
 .admin-workspace.chat-collapsed {
   grid-template-columns: minmax(0, 1fr);
+}
+
+@media (max-width: 1100px) {
+  .admin-workspace { padding: 20px 24px; }
+}
+@media (max-width: 700px) {
+  .admin-workspace { padding: 14px 16px; }
 }
 
 .admin-main {
@@ -916,15 +926,15 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
 
 .admin-content {
   display: grid;
-  gap: 14px;
+  gap: 20px;
 }
 
 .card-surface {
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: 16px;
   background: var(--bg-card);
   box-shadow: 0 9px 26px rgba(15, 23, 42, 0.06);
-  padding: 16px;
+  padding: 24px;
 }
 
 .dashboard-intro h2,
@@ -1440,7 +1450,7 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
 
 .admin-forms-panel {
   display: grid;
-  gap: 14px;
+  gap: 20px;
   align-content: start;
   align-items: start;
   grid-auto-rows: max-content;
@@ -1618,13 +1628,13 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
 .admin-form-grid {
   display: grid;
   grid-template-columns: 1.45fr 1fr;
-  gap: 10px;
+  gap: 16px;
   align-items: start;
 }
 
 .admin-form {
   display: grid;
-  gap: 8px;
+  gap: 14px;
 }
 
 .admin-user-form-grid {
@@ -1694,22 +1704,22 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
   margin: 0;
   padding: 0;
   display: grid;
-  gap: 8px;
+  gap: 10px;
 }
 
 .admin-side-list li {
   border: 1px solid var(--border);
   border-radius: 10px;
-  padding: 9px;
+  padding: 12px 14px;
   display: flex;
   justify-content: space-between;
-  gap: 10px;
+  gap: 12px;
   align-items: center;
 }
 
 .admin-side-list li div {
   display: grid;
-  gap: 2px;
+  gap: 3px;
 }
 
 .admin-side-list li span {
@@ -4922,14 +4932,14 @@ button.mail-tracking-search-button,
 /* ============================================================
    MIS SOLICITUDES — lista
    ============================================================ */
-.mis-solicitudes-panel { display: flex; flex-direction: column; gap: 14px; }
-.mis-solicitudes-list { display: flex; flex-direction: column; gap: 10px; }
+.mis-solicitudes-panel { display: flex; flex-direction: column; gap: 20px; }
+.mis-solicitudes-list { display: flex; flex-direction: column; gap: 12px; }
 .mis-sol-item {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
   gap: 16px;
-  padding: 14px 16px !important;
+  padding: 18px 20px !important;
   border-radius: 12px !important;
 }
 .mis-sol-meta {
@@ -4960,8 +4970,8 @@ button.mail-tracking-search-button,
 /* ============================================================
    BANDEJA — listado con detalle expandible
    ============================================================ */
-.bandeja-panel { display: flex; flex-direction: column; gap: 14px; }
-.bandeja-list { display: flex; flex-direction: column; gap: 12px; }
+.bandeja-panel { display: flex; flex-direction: column; gap: 20px; }
+.bandeja-list { display: flex; flex-direction: column; gap: 14px; }
 .bandeja-item {
   padding: 0 !important;
   overflow: hidden;
@@ -4972,7 +4982,7 @@ button.mail-tracking-search-button,
   justify-content: space-between;
   align-items: flex-start;
   gap: 16px;
-  padding: 14px 16px;
+  padding: 18px 20px;
   cursor: pointer;
 }
 .bandeja-item-head:hover { background: var(--gold-soft); }
@@ -4983,7 +4993,7 @@ button.mail-tracking-search-button,
   gap: 4px;
 }
 .bandeja-item-body {
-  padding: 16px;
+  padding: 20px;
   border-top: 1px solid var(--gold-line);
   background: rgba(0, 0, 0, 0.35);
 }
@@ -5012,15 +5022,15 @@ button.mail-tracking-search-button,
 .bandeja-datos {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 8px 16px;
+  gap: 10px 18px;
 }
 .bandeja-dato {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: 8px 10px;
+  gap: 3px;
+  padding: 12px 14px;
   border: 1px solid var(--gold-line);
-  border-radius: 8px;
+  border-radius: 10px;
   background: rgba(0, 0, 0, 0.25);
 }
 .bandeja-dato strong {
@@ -5083,7 +5093,7 @@ button.mail-tracking-search-button,
 .preview-form-tabla th,
 .preview-form-tabla td {
   border: 1px solid var(--gold-line, rgba(212, 175, 55, 0.4));
-  padding: 4px 6px;
+  padding: 9px 12px;
   text-align: left;
 }
 .tabla-items th,
@@ -6032,18 +6042,19 @@ textarea {
 
 /* ── Widget seguimiento principal ─────────────────────────────────────── */
 .inicio-seguimiento-principal {
-  padding: 22px 26px;
-  margin-bottom: 16px;
+  padding: 28px 32px;
+  margin-bottom: 0;
 }
-.inicio-seguimiento-header { margin-bottom: 16px; }
-.inicio-seguimiento-header h3 { margin: 0 0 4px; font-size: 18px; }
-.inicio-seguimiento-principal .inicio-seguimiento-input { margin-top: 0; }
+.inicio-seguimiento-header { margin-bottom: 20px; }
+.inicio-seguimiento-header h3 { margin: 0 0 6px; font-size: 20px; }
+.inicio-seguimiento-principal .inicio-seguimiento-input { margin-top: 0; gap: 10px; }
 .inicio-seguimiento-principal .inicio-seguimiento-input input {
   flex: 1;
-  padding: 11px 16px;
-  font-size: 15px;
-  border-radius: 8px;
-  letter-spacing: 0.04em;
+  padding: 13px 18px;
+  font-size: 16px;
+  border-radius: 10px;
+  letter-spacing: 0.05em;
+  max-width: 480px;
 }
 
 /* Sin resultado */
@@ -6051,34 +6062,34 @@ textarea {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
-  padding: 28px 16px;
-  margin-top: 16px;
+  gap: 8px;
+  padding: 36px 16px;
+  margin-top: 20px;
   border: 1px dashed var(--gold-line, rgba(212,175,55,0.3));
-  border-radius: 10px;
+  border-radius: 12px;
   text-align: center;
   color: var(--text-secondary, #C8CEE0);
 }
-.seg-sin-icono { font-size: 28px; }
-.seg-sin-resultado strong { font-size: 15px; color: var(--text-primary, #EEF1F9); }
+.seg-sin-icono { font-size: 32px; }
+.seg-sin-resultado strong { font-size: 16px; color: var(--text-primary, #EEF1F9); }
 
 /* Resultado contenedor */
-.seg-resultado { margin-top: 18px; display: grid; gap: 16px; }
+.seg-resultado { margin-top: 24px; display: grid; gap: 20px; }
 
 /* Encabezado del resultado */
 .seg-head {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  gap: 16px;
-  padding: 16px 20px;
-  background: rgba(0,0,0,0.2);
-  border-radius: 10px;
-  border-left: 4px solid var(--gold, #D4AF37);
+  gap: 20px;
+  padding: 22px 26px;
+  background: rgba(0,0,0,0.25);
+  border-radius: 12px;
+  border-left: 5px solid var(--gold, #D4AF37);
 }
 .seg-head-left { display: flex; flex-direction: column; gap: 5px; }
-.seg-numero { font-size: 22px; font-weight: 700; letter-spacing: 0.03em; color: var(--text-primary, #EEF1F9); }
-.seg-subtitulo { font-size: 14px; color: var(--gold, #D4AF37); font-weight: 500; }
+.seg-numero { font-size: 24px; font-weight: 800; letter-spacing: 0.03em; color: var(--text-primary, #EEF1F9); }
+.seg-subtitulo { font-size: 15px; color: var(--gold, #D4AF37); font-weight: 600; }
 .seg-area { font-size: 13px; color: var(--text-secondary, #C8CEE0); }
 .seg-area strong { color: var(--text-primary, #EEF1F9); }
 .seg-paso-actual {
@@ -6088,19 +6099,20 @@ textarea {
 }
 .seg-paso-actual strong {
   color: #fff;
-  background: rgba(212,175,55,0.2);
-  padding: 1px 8px;
-  border-radius: 4px;
-  border: 1px solid rgba(212,175,55,0.4);
+  background: rgba(212,175,55,0.18);
+  padding: 3px 10px;
+  border-radius: 20px;
+  border: 1px solid rgba(212,175,55,0.45);
+  font-size: 13px;
 }
 .seg-head-right { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; flex-shrink: 0; }
 .seg-estado-badge {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 14px;
-  border-radius: 20px;
-  font-size: 13px;
+  gap: 8px;
+  padding: 9px 20px;
+  border-radius: 24px;
+  font-size: 14px;
   font-weight: 700;
   border: 1.5px solid;
   letter-spacing: 0.02em;
@@ -6110,19 +6122,19 @@ textarea {
 
 /* Titulo de sección */
 .seg-section-title {
-  margin: 0 0 12px;
+  margin: 0 0 16px;
   font-size: 11px;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.09em;
   color: var(--text-secondary, #C8CEE0);
-  font-weight: 600;
+  font-weight: 700;
 }
 
 /* Trazado de pasos */
 .seg-trazado-wrap {
-  padding: 16px 20px;
-  background: rgba(0,0,0,0.15);
-  border-radius: 10px;
+  padding: 20px 24px;
+  background: rgba(0,0,0,0.2);
+  border-radius: 12px;
   border: 1px solid var(--gold-line, rgba(212,175,55,0.2));
 }
 .seg-trazado {
@@ -6137,33 +6149,35 @@ textarea {
   align-items: center;
   position: relative;
   flex: 1;
-  min-width: 90px;
+  min-width: 110px;
   text-align: center;
+  padding: 0 8px;
 }
 .seg-paso-circulo {
-  width: 36px;
-  height: 36px;
+  width: 42px;
+  height: 42px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 700;
-  border: 2px solid rgba(120,120,120,0.4);
-  background: rgba(30,34,53,0.8);
-  color: #888;
+  border: 2px solid rgba(120,120,120,0.35);
+  background: rgba(10,12,25,0.9);
+  color: #666;
   position: relative;
   z-index: 1;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
   transition: all 0.2s;
+  flex-shrink: 0;
 }
 .seg-paso-linea {
   position: absolute;
-  top: 17px;
+  top: 20px;
   left: 50%;
   width: 100%;
   height: 2px;
-  background: rgba(120,120,120,0.25);
+  background: rgba(120,120,120,0.2);
   z-index: 0;
 }
 .seg-paso--completado .seg-paso-circulo {
@@ -6204,22 +6218,22 @@ textarea {
 
 /* Historial */
 .seg-historial {
-  padding: 16px 20px;
-  background: rgba(0,0,0,0.15);
-  border-radius: 10px;
+  padding: 20px 24px;
+  background: rgba(0,0,0,0.2);
+  border-radius: 12px;
   border: 1px solid var(--gold-line, rgba(212,175,55,0.2));
 }
-.seg-mov-lista { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+.seg-mov-lista { list-style: none; padding: 0; margin: 0; display: grid; gap: 12px; }
 .seg-mov {
   display: flex;
-  gap: 12px;
+  gap: 14px;
   align-items: flex-start;
-  padding: 10px 14px;
-  border-radius: 8px;
-  background: rgba(255,255,255,0.03);
-  border: 1px solid rgba(255,255,255,0.06);
+  padding: 14px 16px;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.025);
+  border: 1px solid rgba(255,255,255,0.07);
 }
-.seg-mov-icon { font-size: 18px; flex-shrink: 0; line-height: 1.4; }
+.seg-mov-icon { font-size: 20px; flex-shrink: 0; line-height: 1.5; }
 .seg-mov-body { flex: 1; display: grid; gap: 4px; }
 .seg-mov-top {
   display: flex;
@@ -6232,21 +6246,22 @@ textarea {
 .seg-mov-paso { font-weight: 400; font-size: 13px; color: var(--text-secondary, #C8CEE0); }
 .seg-mov-fecha { font-size: 11px; color: var(--text-secondary, #C8CEE0); white-space: nowrap; }
 .seg-mov-comentario {
-  margin: 0;
+  margin: 4px 0 0;
   font-size: 13px;
   font-style: italic;
   color: var(--text-secondary, #C8CEE0);
-  padding: 6px 10px;
-  background: rgba(0,0,0,0.2);
-  border-radius: 6px;
+  padding: 8px 12px;
+  background: rgba(0,0,0,0.25);
+  border-radius: 8px;
   border-left: 3px solid var(--gold-line, rgba(212,175,55,0.4));
 }
 
 /* Acciones */
 .seg-acciones {
   display: flex;
-  gap: 10px;
+  gap: 12px;
   flex-wrap: wrap;
+  padding-top: 4px;
 }
 
 /* Modal PDF */
@@ -6261,15 +6276,16 @@ textarea {
   padding: 20px;
 }
 .seg-pdf-modal {
-  background: var(--surface, #1E2235);
-  border-radius: 12px;
+  background: var(--bg-card, #000);
+  border-radius: 14px;
   border: 1px solid var(--gold-line, rgba(212,175,55,0.3));
   width: 100%;
-  max-width: 900px;
+  max-width: 980px;
   height: 90vh;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  box-shadow: 0 40px 80px rgba(0,0,0,0.7);
 }
 .seg-pdf-modal-head {
   display: flex;
@@ -6290,6 +6306,8 @@ textarea {
   height: 100%;
   color: #ccc;
   font-size: 14px;
+  padding: 24px;
+  text-align: center;
 }
 
 .inicio-recientes-head {
