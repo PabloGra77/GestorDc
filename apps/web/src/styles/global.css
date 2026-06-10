@@ -1490,16 +1490,14 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
 }
 
 .admin-kpi-card {
-  border: 1px solid var(--gold-line, rgba(212, 175, 55, 0.45));
+  border: 1px solid var(--border);
   border-radius: 12px;
-  background: linear-gradient(180deg, var(--bg-card), var(--bg-elevated));
-  padding: 14px 16px;
+  padding: 16px 18px;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: 6px;
   min-height: 78px;
-  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.05);
 }
 
 .admin-kpi-card span {
@@ -1635,7 +1633,7 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
 
 .admin-ghost-button {
   border: 1px solid var(--border);
-  background: var(--bg-elevated);
+  background: transparent;
   color: var(--text-secondary);
   border-radius: 9px;
   padding: 6px 10px;
@@ -1646,7 +1644,7 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
 
 .admin-ghost-button:hover {
   border-color: var(--text-muted);
-  background: var(--bg-elevated);
+  background: var(--gold-soft);
 }
 
 .admin-ghost-button:disabled {
@@ -1712,7 +1710,7 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
 }
 
 .admin-side-list li strong {
-  color: #070B1D;
+  color: var(--text-primary);
 }
 
 .online-users-panel ul {
@@ -1723,7 +1721,7 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
 .admin-role-form,
 .admin-role-catalog {
   border: 1px solid var(--border);
-  background: linear-gradient(180deg, var(--bg-card), var(--bg-elevated));
+  border-radius: 12px;
 }
 
 .admin-role-head {
@@ -1748,7 +1746,6 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
 .role-permissions-builder {
   border: 1px solid var(--border);
   border-radius: 10px;
-  background: var(--bg-elevated);
   padding: 10px;
   display: grid;
   gap: 8px;
@@ -1757,7 +1754,7 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
 .role-permissions-builder h5 {
   margin: 0;
   font-size: 14px;
-  color: #070B1D;
+  color: var(--text-primary);
 }
 
 .role-permissions-module {
@@ -3825,12 +3822,12 @@ body { background: #000000; }
 .admin-shell input, .dashboard-shell input,
 .admin-shell select, .dashboard-shell select,
 .admin-shell textarea, .dashboard-shell textarea {
-  background: rgba(0, 0, 0, 0.55) !important;
-  border: 1px solid var(--gold-line) !important;
-  color: #FFFFFF !important;
+  background: var(--bg-input) !important;
+  border: 1px solid var(--border) !important;
+  color: var(--text-primary) !important;
   border-radius: 10px !important;
 }
-.admin-shell input::placeholder, .dashboard-shell input::placeholder { color: #6B7280; }
+.admin-shell input::placeholder, .dashboard-shell input::placeholder { color: var(--text-muted); }
 .admin-shell input:focus, .dashboard-shell input:focus,
 .admin-shell select:focus, .dashboard-shell select:focus,
 .admin-shell textarea:focus, .dashboard-shell textarea:focus {
@@ -3920,16 +3917,10 @@ button.admin-realizar-solicitud:hover,
 }
 
 /* KPI cards */
-.admin-kpi-card {
-  background: rgba(0, 0, 0, 0.65) !important;
-  border: 1px solid var(--gold-line) !important;
-  border-radius: 16px !important;
-  color: #FFFFFF;
-}
 .admin-kpi-card .kpi-value { color: var(--gold-bright); font-weight: 800; }
 
-/* Labels en blanco */
-.admin-shell label, .dashboard-shell label { color: #FFFFFF; }
+/* Labels en blanco (solo dark) */
+[data-theme='dark'] .admin-shell label, [data-theme='dark'] .dashboard-shell label { color: #FFFFFF; }
 
 /* Help text */
 .admin-help-text, .help-text { color: #B8BCC8 !important; }
@@ -7810,13 +7801,12 @@ textarea {
   gap: 10px;
 }
 .admin-area-card {
-  border: 1px solid var(--gold-line, rgba(212, 175, 55, 0.45));
+  border: 1px solid var(--border);
   border-radius: 10px;
-  padding: 10px 12px;
-  background: rgba(0,0,0,0.2);
+  padding: 12px 14px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
 }
 .admin-area-card .admin-area-card-head {
   display: flex;
