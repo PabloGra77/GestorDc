@@ -927,6 +927,7 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
 .admin-content {
   display: grid;
   gap: 20px;
+  align-content: start;
 }
 
 .card-surface {
@@ -1634,7 +1635,7 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
 
 .admin-form {
   display: grid;
-  gap: 14px;
+  gap: 12px;
 }
 
 .admin-user-form-grid {
@@ -5093,7 +5094,7 @@ button.mail-tracking-search-button,
 .preview-form-tabla th,
 .preview-form-tabla td {
   border: 1px solid var(--gold-line, rgba(212, 175, 55, 0.4));
-  padding: 9px 12px;
+  padding: 7px 10px;
   text-align: left;
 }
 .tabla-items th,
@@ -5961,7 +5962,8 @@ textarea {
    ============================================================ */
 .inicio-layout {
   display: grid;
-  gap: 14px;
+  gap: 16px;
+  align-content: start;
 }
 .inicio-stats-grid {
   display: grid;
