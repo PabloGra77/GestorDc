@@ -1,23 +1,29 @@
 <?php
 declare(strict_types=1);
 
-Throttle::hit('reset-conf:' . Throttle::clientIp(), 5, 60);
+require_once __DIR__ . '/../../bootstrap.php';
 
-$body = Request::body();
-$token = trim((string)($body['token'] ?? ''));
-$newPassword = (string)($body['newPassword'] ?? '');
+$data = Request::body();
+$token = trim((string)($data['token'] ?? ''));
+// El frontend envia 'newPassword'; se aceptan ambos nombres por compatibilidad.
+$newPassword = (string)($data['newPassword'] ?? ($data['nueva_password'] ?? ''));
 
-if ($token === '' || strlen($newPassword) < 8) {
-    Response::error('Token o nueva contrasena invalida', 400);
+if ($token === '' || strlen($token) !== 64) {
+    Response::error('Token de restablecimiento invalido', 400);
+}
+
+if (strlen($newPassword) < 8) {
+    Response::error('La contrasena debe tener minimo 8 caracteres', 400);
 }
 
 $tokenHash = hash('sha256', $token);
 $pdo = Db::pdo();
+
 $stmt = $pdo->prepare(
     "SELECT id, activo FROM usuarios
      WHERE password_reset_token_hash = :h
-       AND password_reset_expires_at IS NOT NULL
-       AND password_reset_expires_at > UTC_TIMESTAMP()
+     AND password_reset_expires_at IS NOT NULL
+     AND password_reset_expires_at > UTC_TIMESTAMP()
      LIMIT 1"
 );
 $stmt->execute([':h' => $tokenHash]);

@@ -126,7 +126,7 @@ header('Cache-Control: no-store, no-cache, must-revalidate');
 
 $out = fopen('php://output', 'w');
 fwrite($out, "\xEF\xBB\xBF"); // BOM UTF-8 para Excel
-fputcsv($out, array_map($etiquetaCol, $cols), ';');
+fputcsv($out, array_map($etiquetaCol, $cols), ';', '"', '\\');
 foreach ($rows as $r) {
     $datos = json_decode((string)($r['datos_formulario'] ?? ''), true) ?: [];
     $documentos = json_decode((string)($r['documentos'] ?? ''), true);
@@ -137,7 +137,7 @@ foreach ($rows as $r) {
     if (!is_array($firmas)) $firmas = [];
     $linea = [];
     foreach ($cols as $c) { $linea[] = $valorCol($c, $r, $datos, $documentos, $alertas, $firmas); }
-    fputcsv($out, $linea, ';');
+    fputcsv($out, $linea, ';', '"', '\\');
 }
 fclose($out);
 exit;
