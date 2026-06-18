@@ -72,3 +72,4 @@ deploy-fase1.sh
 deploy-fase1b.sh
 _deploytmp/
 *.tgz
+deploy-fase2.sh

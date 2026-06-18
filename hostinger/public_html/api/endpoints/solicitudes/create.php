@@ -66,9 +66,29 @@ foreach ($documentos as $key => $info) {
 
 // Tomar usuario del JWT
 $usuarioId = (int)($jwt['sub'] ?? 0);
-$u = $pdo->prepare("SELECT id, nombre_completo, correo, numero_documento FROM usuarios WHERE id = :id LIMIT 1");
+$u = $pdo->prepare("SELECT id, nombre_completo, correo, numero_documento, area_id FROM usuarios WHERE id = :id LIMIT 1");
 $u->execute([':id' => $usuarioId]);
 $usuario = $u->fetch();
+
+// Reglas especiales del tipo "anticipo"
+$esAnticipo = (($tipo['slug'] ?? '') === 'anticipo');
+// El area de la solicitud es la del solicitante (para que validen analista/director de SU area)
+$areaSolicitud = (int)$tipo['area_id'];
+if ($esAnticipo && !empty($usuario['area_id'])) {
+    $areaSolicitud = (int)$usuario['area_id'];
+}
+// Limite: maximo 2 anticipos abiertos (sin legalizar / no rechazados)
+if ($esAnticipo) {
+    $lim = $pdo->prepare(
+        "SELECT COUNT(*) FROM solicitudes
+         WHERE solicitante_usuario_id = :u AND tipo_solicitud_id = :t
+           AND estado NOT IN ('legalizado','rechazado')"
+    );
+    $lim->execute([':u' => $usuarioId, ':t' => $tipoId]);
+    if ((int)$lim->fetchColumn() >= 2) {
+        Response::error('No puedes tener más de 2 anticipos abiertos a la vez. Legaliza (paga con facturas) uno antes de crear otro.', 409);
+    }
+}
 
 // Determinar primer paso del flujo
 $flujo = json_decode($tipo['flujo_aprobacion'] ?? '[]', true) ?: [];
@@ -96,7 +116,7 @@ try {
     $ins->execute([
         ':num'  => $numero,
         ':tid'  => $tipoId,
-        ':aid'  => (int)$tipo['area_id'],
+        ':aid'  => $areaSolicitud,
         ':uid'  => $usuario ? (int)$usuario['id'] : null,
         ':unom' => $usuario['nombre_completo'] ?? null,
         ':ucor' => $usuario['correo'] ?? null,
@@ -150,7 +170,7 @@ if (!empty($usuario['correo'])) {
         "Te avisaremos por este medio cuando avance."
     );
 }
-FlujoHelpers::notificarValidadores($pdo, $solNotif, $primerPaso['rol'] ?? null, (int)$tipo['area_id']);
+FlujoHelpers::notificarValidadores($pdo, $solNotif, $primerPaso['rol'] ?? null, $areaSolicitud);
 
 Response::json([
     'id'             => $solicitudId,

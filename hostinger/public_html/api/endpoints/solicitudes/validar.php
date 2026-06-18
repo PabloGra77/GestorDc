@@ -60,26 +60,39 @@ try {
         $nuevoPaso = $siguiente['rol'];
         $nuevoPasoLabel = $siguiente['label'] ?? $siguiente['rol'];
     } else {
-        // No hay siguiente paso = aprobada. Guard contra race.
+        // No hay siguiente paso = aprobada. Para anticipo, pasa a "por_legalizar".
+        $esAnticipo = (($sol['tipo_slug'] ?? '') === 'anticipo');
+        $estadoFinal = $esAnticipo ? 'por_legalizar' : 'aprobado';
         $upd = $pdo->prepare(
             "UPDATE solicitudes
-             SET estado = 'aprobado', paso_actual = NULL, aprobado_en = UTC_TIMESTAMP(), firmas = :firmas
+             SET estado = :ef, paso_actual = NULL, aprobado_en = UTC_TIMESTAMP(), firmas = :firmas
              WHERE id = :id AND estado = 'en_validacion' AND paso_actual = :pa_prev"
         );
-        $upd->execute([':id' => $id, ':pa_prev' => $sol['paso_actual'], ':firmas' => $firmasJson]);
+        $upd->execute([':ef' => $estadoFinal, ':id' => $id, ':pa_prev' => $sol['paso_actual'], ':firmas' => $firmasJson]);
         if ($upd->rowCount() === 0) {
             $pdo->rollBack();
             Response::error('La solicitud ya fue actualizada por otro validador', 409);
         }
         FlujoHelpers::registrarMovimiento(
             $pdo, $id, 'aprobada', $sol['paso_actual'],
-            'aprobado', $user, $comentario, 'publico'
+            $estadoFinal, $user, $comentario, 'publico'
         );
-        FlujoHelpers::notificarSolicitante($sol,
-            "Solicitud {$sol['numero_radicado']} aprobada",
-            "Su solicitud {$sol['numero_radicado']} fue aprobada definitivamente. Comentario: {$comentario}"
-        );
-        $nuevoEstado = 'aprobado';
+        if ($esAnticipo) {
+            $datosSol = json_decode($sol['datos_formulario'] ?? '{}', true) ?: [];
+            $fechaLeg = (string)($datosSol['fechaLegalizacion'] ?? '');
+            FlujoHelpers::notificarSolicitante($sol,
+                "Anticipo {$sol['numero_radicado']} aprobado - debes legalizar",
+                "Tu anticipo {$sol['numero_radicado']} fue APROBADO." .
+                ($fechaLeg ? " Recuerda que te comprometiste a legalizarlo (subir facturas/soportes) a mas tardar el {$fechaLeg}." : " Recuerda legalizarlo subiendo las facturas/soportes del gasto.") .
+                "\n\nIngresa a Payops -> Mis solicitudes -> Legalizar y adjunta las evidencias del gasto. La inteligencia artificial validara los soportes."
+            );
+        } else {
+            FlujoHelpers::notificarSolicitante($sol,
+                "Solicitud {$sol['numero_radicado']} aprobada",
+                "Su solicitud {$sol['numero_radicado']} fue aprobada definitivamente. Comentario: {$comentario}"
+            );
+        }
+        $nuevoEstado = $estadoFinal;
         $nuevoPaso = null;
         $nuevoPasoLabel = null;
     }

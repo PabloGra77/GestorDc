@@ -81,6 +81,9 @@ $routes = [
     ['POST',   '#^/solicitudes/(?P<id>\d+)/devolver$#',          'solicitudes/devolver'],
     ['POST',   '#^/solicitudes/(?P<id>\d+)/rechazar$#',          'solicitudes/rechazar'],
     ['POST',   '#^/solicitudes/(?P<id>\d+)/remitir$#',           'solicitudes/remitir'],
+    ['POST',   '#^/solicitudes/(?P<id>\d+)/legalizar$#',         'solicitudes/legalizar'],
+    ['POST',   '#^/solicitudes/(?P<id>\d+)/legalizacion/confirmar$#', 'solicitudes/legalizacion_confirmar'],
+    ['POST',   '#^/solicitudes/(?P<id>\d+)/recordar-legalizar$#', 'solicitudes/recordar_legalizar'],
     ['DELETE', '#^/solicitudes/(?P<id>\d+)$#',                    'solicitudes/delete'],
 
     // Adjuntos (subir / ver con sesión)
