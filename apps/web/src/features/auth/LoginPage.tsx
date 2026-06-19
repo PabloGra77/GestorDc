@@ -157,16 +157,6 @@ export function LoginPage() {
 
             {error ? <div className="payops-error">{error}</div> : null}
 
-            <div className="payops-divider"><span>o continúa con</span></div>
-
-            <Link to="/radicacion-cuenta-cobro-ops" className="payops-btn-secondary">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 2 4 5v6c0 5 3.5 9.5 8 11 4.5-1.5 8-6 8-11V5l-8-3Z" />
-                <path d="m9 12 2 2 4-4" />
-              </svg>
-              <span>Verificar radicado</span>
-            </Link>
-
             <Link to="/instalar" className="payops-install-link">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />

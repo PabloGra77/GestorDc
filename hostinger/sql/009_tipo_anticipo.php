@@ -16,12 +16,18 @@ foreach ($areas as $a) {
 }
 if ($contaId === null) $contaId = $areaBase;
 
+$soloViaje = ['campo'=>'categoria','en'=>['Viaje']];
 $campos = [
   ['key'=>'categoria','label'=>'¿Para qué necesitas el anticipo?','type'=>'select','required'=>true,'group'=>'Solicitud de anticipo','opciones'=>['Viaje','Hospedaje','Alimentación','Transporte','Otro']],
-  ['key'=>'valorPesos','label'=>'Valor solicitado','type'=>'valor-pesos','required'=>true,'group'=>'Solicitud de anticipo'],
+  ['key'=>'valorPesos','label'=>'Valor total solicitado','type'=>'valor-pesos','required'=>true,'group'=>'Solicitud de anticipo'],
   ['key'=>'justificacion','label'=>'Justificación / explicación','type'=>'textarea','required'=>true,'group'=>'Solicitud de anticipo'],
-  ['key'=>'destino','label'=>'Destino (si es viaje)','type'=>'text','required'=>false,'group'=>'Solicitud de anticipo'],
-  ['key'=>'motivo','label'=>'Motivo del viaje (si aplica)','type'=>'text','required'=>false,'group'=>'Solicitud de anticipo'],
+  // --- Solo cuando es Viaje ---
+  ['key'=>'destino','label'=>'Destino del viaje (con mapa)','type'=>'direccion','required'=>true,'group'=>'Solicitud de anticipo','mostrarSi'=>$soloViaje],
+  ['key'=>'motivo','label'=>'Motivo del viaje','type'=>'text','required'=>false,'group'=>'Solicitud de anticipo','mostrarSi'=>$soloViaje],
+  ['key'=>'tipoTransporte','label'=>'Medio de transporte','type'=>'select','required'=>true,'group'=>'Solicitud de anticipo','mostrarSi'=>$soloViaje],
+  ['key'=>'soporteCosto','label'=>'Soporte/cotización del costo (avión, bus, taxi…)','type'=>'file','required'=>false,'group'=>'Solicitud de anticipo','mostrarSi'=>$soloViaje],
+  // --- Detalle de gastos (hospedaje, comida, etc.) con soporte por fila validado por IA ---
+  ['key'=>'detalleGastos','label'=>'Detalle de gastos (agrega hospedaje, comida, transporte… con su soporte)','type'=>'tabla-items','required'=>false,'group'=>'Solicitud de anticipo','columnas'=>['Concepto','Valor'],'conFactura'=>true,'verificaciones'=>['total','establecimiento','fecha','alteracion']],
   ['key'=>'autorizadoPor','label'=>'Autorizado por (director de tu área o un usuario)','type'=>'persona','required'=>true,'group'=>'Solicitud de anticipo'],
   ['key'=>'fechaLegalizacion','label'=>'¿Cuándo legalizarás con facturas?','type'=>'date','required'=>true,'group'=>'Compromiso de legalización'],
 ];
