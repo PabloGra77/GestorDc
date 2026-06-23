@@ -82,6 +82,18 @@ const ESTADO_LABEL: Record<string, string> = {
   devuelto: 'Devuelto',
 };
 
+const PASO_LABEL: Record<string, string> = {
+  analista: 'Analista',
+  coordinador: 'Coordinador',
+  director: 'Director',
+  contabilidad: 'Área final (Contabilidad)',
+};
+
+function labelPaso(paso: string | null): string {
+  if (!paso) return '';
+  return PASO_LABEL[paso] || paso;
+}
+
 // --- Formateo legible de valores diligenciados (evita mostrar JSON crudo) ---
 function parseMaybeJson(v: unknown): unknown {
   if (v && typeof v === 'object') return v;
@@ -343,7 +355,7 @@ export function BandejaPanel() {
               </div>
               <div className="bandeja-item-meta">
                 <span className={`mis-sol-estado mis-sol-${it.estado}`}>
-                  {it.estado === 'en_validacion' ? it.pasoActual : (ESTADO_LABEL[it.estado] || it.estado)}
+                  {it.estado === 'en_validacion' ? `Validando por ${labelPaso(it.pasoActual)}` : (ESTADO_LABEL[it.estado] || it.estado)}
                 </span>
                 {it.alertasCount > 0 ? (
                   <span className="mis-sol-alertas">⚠ {it.alertasCount}</span>
@@ -389,6 +401,30 @@ export function BandejaPanel() {
                         </ul>
                       </div>
                     ) : null}
+
+                    {(() => {
+                      const leg = (detalle.documentos as Record<string, unknown>)?.['__legalizacion'] as Record<string, unknown> | undefined;
+                      const resumen = leg?.['_resumen'] as { valorSolicitado?: number; montoLegalizado?: number; saldoPendiente?: number } | undefined;
+                      if (!resumen) return null;
+                      const fmt = (n?: number) => `$ ${Number(n || 0).toLocaleString('es-CO')}`;
+                      const saldo = resumen.saldoPendiente ?? 0;
+                      return (
+                        <div className="bandeja-alertas" style={{ background: saldo > 0 ? '#FEF3C7' : undefined }}>
+                          <strong>Comparación de montos</strong>
+                          <ul>
+                            <li>Monto del anticipo: {fmt(resumen.valorSolicitado)}</li>
+                            <li>Monto legalizado (factura): {fmt(resumen.montoLegalizado)}</li>
+                            <li>
+                              {saldo > 0
+                                ? <>Saldo a devolver por el solicitante: <strong>{fmt(saldo)}</strong></>
+                                : saldo < 0
+                                  ? <>El gasto superó el anticipo por {fmt(Math.abs(saldo))} (revisar manualmente).</>
+                                  : 'Legalización completa, sin saldo pendiente.'}
+                            </li>
+                          </ul>
+                        </div>
+                      );
+                    })()}
 
                     <div className="bandeja-formato-head">
                       <h4>Formato diligenciado</h4>

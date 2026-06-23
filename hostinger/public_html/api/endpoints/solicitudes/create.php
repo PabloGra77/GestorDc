@@ -166,7 +166,8 @@ if (!empty($usuario['correo'])) {
         "Solicitud {$numero} creada",
         "Tu solicitud fue creada correctamente y entró al flujo de validación.\n\n" .
         "Tipo: {$tipo['nombre']}\n" .
-        "Área: {$tipo['area_nombre']}\n\n" .
+        "Área: {$tipo['area_nombre']}\n" .
+        "En revisión por: " . ($primerPaso['label'] ?? 'el primer paso del flujo') . "\n\n" .
         "Te avisaremos por este medio cuando avance."
     );
 }

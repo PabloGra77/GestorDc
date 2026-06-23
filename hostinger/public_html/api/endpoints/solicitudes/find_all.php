@@ -33,7 +33,9 @@ if (!$esAdmin) {
     }
 }
 
-$sql = "SELECT s.*, t.nombre AS tipo_nombre, t.slug AS tipo_slug, a.nombre AS area_nombre
+$sql = "SELECT s.*, t.nombre AS tipo_nombre, t.slug AS tipo_slug, a.nombre AS area_nombre,
+               (SELECT m.comentario FROM solicitud_movimientos m
+                WHERE m.solicitud_id = s.id ORDER BY m.creado_en DESC LIMIT 1) AS ultimo_comentario
         FROM solicitudes s
         INNER JOIN tipos_solicitud t ON t.id = s.tipo_solicitud_id
         INNER JOIN areas a ON a.id = s.area_id
@@ -62,5 +64,6 @@ Response::json(array_map(function ($r) {
         'actualizadoEn'       => $r['actualizado_en'],
         'aprobadoEn'          => $r['aprobado_en'],
         'alertasCount'        => count(json_decode($r['alertas'] ?? '[]', true) ?: []),
+        'ultimoComentario'    => $r['ultimo_comentario'],
     ];
 }, $rows));

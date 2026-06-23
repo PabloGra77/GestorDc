@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { api } from '../../services/http/api';
 import { generarPdfFormato } from './generarPdfFormato';
 import { useOcrDocument } from '../../hooks/useOcrDocument';
+import { numeroAPesosEnLetras, formatearMiles } from '../../utils/numeroALetras';
 
 interface SolicitudResumen {
   id: number;
@@ -17,6 +18,32 @@ interface SolicitudResumen {
   creadoEn: string;
   actualizadoEn: string;
   alertasCount: number;
+  ultimoComentario: string | null;
+}
+
+const PASO_LABEL: Record<string, string> = {
+  analista: 'Analista',
+  coordinador: 'Coordinador',
+  director: 'Director',
+  contabilidad: 'Área final (Contabilidad)',
+};
+
+function labelPaso(paso: string | null): string {
+  if (!paso) return '';
+  return PASO_LABEL[paso] || paso;
+}
+
+function labelEstado(s: Pick<SolicitudResumen, 'estado' | 'pasoActual' | 'ultimoComentario'>): string {
+  if (s.estado === 'en_validacion') {
+    return `En revisión · validando por ${labelPaso(s.pasoActual)}`;
+  }
+  if (s.estado === 'devuelto') {
+    return s.ultimoComentario ? `Devuelto: ${s.ultimoComentario}` : 'Devuelto';
+  }
+  if (s.estado === 'rechazado') {
+    return s.ultimoComentario ? `Solicitud denegada: ${s.ultimoComentario}` : 'Solicitud denegada';
+  }
+  return ESTADO_LABEL[s.estado] || s.estado;
 }
 
 const ESTADO_LABEL: Record<string, string> = {
@@ -54,6 +81,7 @@ function LegalizarModal({ solicitud, onClose, onDone }: {
   onDone: () => void;
 }) {
   const [evidencias, setEvidencias] = useState<Record<string, Evidencia>>({});
+  const [montoLegalizado, setMontoLegalizado] = useState('');
   const [enviando, setEnviando] = useState(false);
   const [err, setErr] = useState('');
   const { procesarArchivo } = useOcrDocument();
@@ -98,13 +126,14 @@ function LegalizarModal({ solicitud, onClose, onDone }: {
   async function enviar() {
     const listas = Object.entries(evidencias).filter(([, e]) => e.estado === 'listo');
     if (listas.length === 0) { setErr('Adjunta al menos un soporte válido (factura/recibo).'); return; }
+    if (!montoLegalizado) { setErr('Indica el monto total de la factura/compra legalizada.'); return; }
     setEnviando(true); setErr('');
     try {
       const documentos: Record<string, unknown> = {};
       for (const [k, e] of listas) {
         documentos[k] = { nombre: e.nombre, archivoId: e.archivoId, ocrTexto: e.ocrTexto, ocrConfianza: e.ocrConfianza, ocrAlertas: e.ocrAlertas };
       }
-      await api.post(`/solicitudes/${solicitud.id}/legalizar`, { documentos });
+      await api.post(`/solicitudes/${solicitud.id}/legalizar`, { documentos, montoLegalizado });
       onDone();
     } catch (e) {
       const r = (e as { response?: { data?: { message?: string } } })?.response?.data?.message;
@@ -140,6 +169,25 @@ function LegalizarModal({ solicitud, onClose, onDone }: {
             </li>
           ))}
         </ul>
+        <label htmlFor="monto-legalizado" style={{ display: 'block', marginTop: 14, fontWeight: 600 }}>
+          Monto total de la factura/compra legalizada
+        </label>
+        <div className="valor-pesos-wrap">
+          <input
+            id="monto-legalizado"
+            type="text"
+            inputMode="numeric"
+            placeholder="Ej: 150000"
+            value={montoLegalizado}
+            onChange={(e) => setMontoLegalizado(e.target.value.replace(/\D/g, ''))}
+          />
+          {montoLegalizado ? (
+            <div className="valor-pesos-preview">
+              <span>$ {formatearMiles(montoLegalizado)}</span>
+              <strong>{numeroAPesosEnLetras(montoLegalizado)}</strong>
+            </div>
+          ) : null}
+        </div>
         {err ? <div className="admin-error" style={{ marginTop: 8 }}>{err}</div> : null}
         <div className="admin-permissions-actions">
           <button type="button" className="admin-ghost-button" onClick={onClose} disabled={enviando}>Cancelar</button>
@@ -232,13 +280,8 @@ export function MisSolicitudesPanel({ refresco }: { refresco?: number }) {
             </div>
             <div className="mis-sol-meta">
               <span className={`mis-sol-estado mis-sol-${s.estado}`}>
-                {ESTADO_LABEL[s.estado] || s.estado}
+                {labelEstado(s)}
               </span>
-              {s.pasoActual ? (
-                <span className="admin-help-text">
-                  Paso: <strong>{s.pasoActual}</strong>
-                </span>
-              ) : null}
               {s.alertasCount > 0 ? (
                 <span className="mis-sol-alertas">⚠ {s.alertasCount} alerta(s)</span>
               ) : null}

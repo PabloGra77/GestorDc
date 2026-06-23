@@ -11,6 +11,7 @@ $id = (int)($params['id'] ?? 0);
 $body = Request::body();
 $docs = is_array($body['documentos'] ?? null) ? $body['documentos'] : [];
 $comentario = trim((string)($body['comentario'] ?? ''));
+$montoLegalizado = (float)($body['montoLegalizado'] ?? 0);
 
 $pdo = Db::pdo();
 $st = $pdo->prepare(
@@ -31,10 +32,22 @@ if (!in_array($sol['estado'], ['por_legalizar', 'en_legalizacion'], true)) {
     Response::error('El anticipo no esta en una etapa que permita legalizar', 400);
 }
 if (count($docs) === 0) Response::error('Adjunta al menos un soporte (factura/recibo)', 400);
+if ($montoLegalizado <= 0) Response::error('Indica el monto total de la factura/compra legalizada', 400);
+
+$datosFormulario = json_decode($sol['datos_formulario'] ?? '{}', true) ?: [];
+$valorSolicitado = (float)($datosFormulario['valorPesos'] ?? 0);
+$saldoPendiente = round($valorSolicitado - $montoLegalizado, 2);
 
 // Limpiar documentos de evidencia + recolectar alertas de la IA
 $evid = [];
 $alertasNuevas = [];
+if ($saldoPendiente < 0) {
+    $alertasNuevas[] = [
+        'tipo' => 'legalizacion_excede_anticipo',
+        'descripcion' => 'El monto legalizado ($' . number_format($montoLegalizado, 0, ',', '.') . ') supera el valor del anticipo ($' . number_format($valorSolicitado, 0, ',', '.') . '). Revisar manualmente.',
+        'severidad' => 'media',
+    ];
+}
 foreach ($docs as $k => $info) {
     if (!is_array($info)) continue;
     $entry = [];
@@ -53,6 +66,12 @@ foreach ($docs as $k => $info) {
     }
     $evid[(string)$k] = $entry;
 }
+
+$evid['_resumen'] = [
+    'valorSolicitado'  => $valorSolicitado,
+    'montoLegalizado'  => $montoLegalizado,
+    'saldoPendiente'   => $saldoPendiente,
+];
 
 $documentos = json_decode($sol['documentos'] ?? '{}', true) ?: [];
 $documentos['__legalizacion'] = $evid;

@@ -246,8 +246,11 @@ function plantillaAnticipoGastos(): PdfBloque[] {
     { id: nuevoId(), pagina: 1, x: 18, y: 10, w: 174, tipo: 'encabezado', titulo: 'ANTICIPO DE GASTOS DE VIAJE O TRAMITES CORRESPONDIENTES', subtitulo: 'DIRECCION FINANCIERA', area: 'CONTABILIDAD', codigo: 'DF-CON-FR-004', fecha: '16/01/2026', version: '2', paginaTexto: '1 de 1', src: '/logo-payops-dark.png' },
     { id: nuevoId(), pagina: 1, x: 18, y: 48, w: 174, tipo: 'titulo', texto: 'REFERENCIA: ANTICIPO DE GASTOS DE VIAJE O TRAMITES CORRESPONDIENTE', alineacion: 'centro', tamano: 11, negrita: true },
     { id: nuevoId(), pagina: 1, x: 18, y: 64, w: 174, tipo: 'campo', campoKey: 'dirigidoA', etiqueta: 'A:', alineacion: 'izquierda' },
-    { id: nuevoId(), pagina: 1, x: 18, y: 80, w: 174, tipo: 'texto', texto: 'FECHA: {{fecha}}. Yo, {{nombre}} identificado con CC {{cedula}}, autorizo de manera expresa a IPS GOLEMAN SERVICIOS INTEGRALES SAS, para que en el evento que no se realice la legalización en un término máximo de cinco (5) días hábiles siguientes a la finalización del viaje del colaborador o terminación de los tramites solicitados por la empresa, sea descontado el valor de $ {{valor}}, correspondiente al Anticipo de gastos de viaje y entrega de anticipo para tramites de la empresa, correspondiente a: {{concepto}}', alineacion: 'izquierda', tamano: 11 },
+    { id: nuevoId(), pagina: 1, x: 18, y: 80, w: 174, tipo: 'texto', texto: 'FECHA: {{fecha}}. Yo, {{nombre}} identificado con CC {{cedula}}, autorizo de manera expresa a IPS GOLEMAN SERVICIOS INTEGRALES SAS, para que en el evento que no se realice la legalización en un término máximo de cinco (5) días hábiles siguientes a la finalización del viaje del colaborador o terminación de los tramites solicitados por la empresa, sea descontado el valor de $ {{valor}} ({{valorLetras}}), correspondiente al Anticipo de gastos de viaje y entrega de anticipo para tramites de la empresa, correspondiente a: {{concepto}}', alineacion: 'izquierda', tamano: 11 },
     { id: nuevoId(), pagina: 1, x: 18, y: 132, w: 174, tipo: 'texto', texto: 'Este descuento será aplicable a conceptos de pago de salarios, primas extralegales, primas legales. Igualmente, que en caso de retiro o desvinculación de la empresa autorizo a que el saldo que en cualquier momento se encuentre en mi contra, sea descontado de mi liquidación de salarios y prestaciones sociales finales, vacaciones, auxilios y en general cualquier concepto que deba cancelarme la Empresa.', alineacion: 'izquierda', tamano: 11 },
+    { id: nuevoId(), pagina: 1, x: 18, y: 158, w: 174, tipo: 'campo', campoKey: 'banco', etiqueta: 'Banco:', alineacion: 'izquierda' },
+    { id: nuevoId(), pagina: 1, x: 18, y: 168, w: 174, tipo: 'campo', campoKey: 'tipoCuenta', etiqueta: 'Tipo de cuenta:', alineacion: 'izquierda' },
+    { id: nuevoId(), pagina: 1, x: 18, y: 178, w: 174, tipo: 'campo', campoKey: 'numeroCuenta', etiqueta: 'Número de cuenta:', alineacion: 'izquierda' },
     { id: nuevoId(), pagina: 1, x: 18, y: 210, w: 90, tipo: 'firma', etiqueta: 'Firma', campoFirma: 'profesional' },
     { id: nuevoId(), pagina: 1, x: 18, y: 240, w: 174, tipo: 'campo', campoKey: '__nombre', etiqueta: 'Nombre completo:', alineacion: 'izquierda' },
     { id: nuevoId(), pagina: 1, x: 18, y: 250, w: 174, tipo: 'campo', campoKey: 'cargo', etiqueta: 'Cargo:', alineacion: 'izquierda' },
@@ -356,8 +359,8 @@ function sugerirDesdeTitulo(nombre: string): SugerenciaTipo | null {
   }
   if (l.includes('anticipo')) {
     return {
-      descripcion: 'Solicitud de anticipo de gastos: indica el valor del anticipo y el concepto. Se legaliza con facturas dentro del plazo establecido.',
-      conjuntos: ['cuenta-cobro'],
+      descripcion: 'Solicitud de anticipo de gastos: indica el valor del anticipo, el concepto y la cuenta bancaria donde se consignará. Se legaliza con facturas dentro del plazo establecido.',
+      conjuntos: ['cuenta-cobro', 'cuenta-bancaria'],
     };
   }
   if (l.includes('viatic') || l.includes('viaje')) {
