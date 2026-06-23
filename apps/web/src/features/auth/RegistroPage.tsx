@@ -1,11 +1,8 @@
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { usePayopsLogo } from '../../hooks/usePayopsLogo';
 
 const API_PUBLICO = '/api/index.php/publico';
-
-interface Area { id: number; nombre: string; descripcion: string | null }
-interface Rol { id: number; nombre: string; descripcion: string | null }
 
 const TIPOS_DOCUMENTO = [
   { v: 'CC', l: 'Cédula de ciudadanía' },
@@ -32,24 +29,9 @@ export function RegistroPage() {
   const [tipoDocumento, setTipoDocumento] = useState('CC');
   const [numeroDocumento, setNumeroDocumento] = useState('');
   const [correo, setCorreo] = useState('');
-  const [areaId, setAreaId] = useState<number | ''>('');
-  const [rolId, setRolId] = useState<number | ''>('');
-
-  const [areas, setAreas] = useState<Area[]>([]);
-  const [roles, setRoles] = useState<Rol[]>([]);
   const [enviando, setEnviando] = useState(false);
   const [err, setErr] = useState('');
   const [ok, setOk] = useState(false);
-
-  useEffect(() => {
-    Promise.all([
-      fetch(`${API_PUBLICO}/areas`).then((r) => r.json()),
-      fetch(`${API_PUBLICO}/roles`).then((r) => r.json()),
-    ]).then(([a, r]) => {
-      setAreas(Array.isArray(a) ? a : []);
-      setRoles(Array.isArray(r) ? r : []);
-    }).catch(() => setErr('No se pudo cargar el catalogo. Intenta de nuevo.'));
-  }, []);
 
   async function enviar(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -60,10 +42,6 @@ export function RegistroPage() {
     }
     if (!numeroDocumento.trim()) {
       setErr('Ingresa tu número de documento');
-      return;
-    }
-    if (!areaId || !rolId) {
-      setErr('Selecciona area y rol');
       return;
     }
     setEnviando(true);
@@ -79,8 +57,6 @@ export function RegistroPage() {
           tipoDocumento,
           numeroDocumento: numeroDocumento.trim(),
           correo: correo.trim().toLowerCase(),
-          areaId: Number(areaId),
-          rolId: Number(rolId),
         }),
       });
       const data = await r.json();
@@ -117,15 +93,14 @@ export function RegistroPage() {
         <section className="payops-login-form-col">
           <div className="payops-login-card">
             <div className="payops-card-header">
-              <h2>Solicitud enviada</h2>
-              <p>Tu solicitud de registro fue recibida correctamente.</p>
+              <h2>Cuenta creada</h2>
+              <p>Tu cuenta fue creada correctamente.</p>
             </div>
             <div className="payops-registro-confirmacion">
               <div className="payops-registro-checkmark">✓</div>
-              <p>Te enviamos un correo a <strong>{correo}</strong>.</p>
+              <p>Te enviamos la contraseña temporal a <strong>{correo}</strong>.</p>
               <p className="payops-registro-help">
-                Tu cuenta estara disponible una vez sea verificada por un administrador.
-                Recibiras un nuevo correo con tu contrasena temporal cuando sea aprobada.
+                Ingresa con esa contraseña y cámbiala en el primer inicio de sesión.
               </p>
               <button type="button" className="payops-btn-primary" onClick={() => navigate('/login')}>
                 Volver al inicio de sesion
@@ -170,7 +145,7 @@ export function RegistroPage() {
         <div className="payops-login-card payops-registro-card">
           <div className="payops-card-header">
             <h2>Crear cuenta en Payops</h2>
-            <p>Solo correos del dominio @ipsgoleman.com.co. Tu cuenta sera verificada por un administrador antes de activarse.</p>
+            <p>Solo correos @ipsgoleman.com.co y documentos autorizados por el administrador. Tu rol y área ya están asignados.</p>
           </div>
 
           <form className="payops-form payops-registro-form" onSubmit={enviar}>
@@ -250,31 +225,15 @@ export function RegistroPage() {
               </div>
             </div>
 
-            <div className="payops-registro-row">
-              <div className="payops-field">
-                <label htmlFor="reg-area">Area *</label>
-                <div className="payops-input-wrap">
-                  <select id="reg-area" value={areaId} onChange={(e) => setAreaId(e.target.value === '' ? '' : Number(e.target.value))} required>
-                    <option value="">— selecciona —</option>
-                    {areas.map((a) => <option key={a.id} value={a.id}>{a.nombre}</option>)}
-                  </select>
-                </div>
-              </div>
-              <div className="payops-field">
-                <label htmlFor="reg-rol">Rol *</label>
-                <div className="payops-input-wrap">
-                  <select id="reg-rol" value={rolId} onChange={(e) => setRolId(e.target.value === '' ? '' : Number(e.target.value))} required>
-                    <option value="">— selecciona —</option>
-                    {roles.map((r) => <option key={r.id} value={r.id}>{r.nombre}</option>)}
-                  </select>
-                </div>
-              </div>
-            </div>
+            <p className="payops-registro-help" style={{ marginTop: 4 }}>
+              Tu rol y tu área los asigna el administrador. Solo puedes crear cuenta si tu
+              documento fue autorizado previamente.
+            </p>
 
             <div className="payops-registro-actions">
               <Link to="/login" className="payops-forgot-link">← Cancelar</Link>
               <button type="submit" className="payops-btn-primary" disabled={enviando}>
-                {enviando ? 'Enviando…' : 'Solicitar registro'}
+                {enviando ? 'Enviando…' : 'Crear cuenta'}
               </button>
             </div>
 

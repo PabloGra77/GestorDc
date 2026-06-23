@@ -7,7 +7,6 @@ import { LoginPage } from '../../features/auth/LoginPage';
 import { RegistroPage } from '../../features/auth/RegistroPage';
 import { ResetPasswordPage } from '../../features/auth/ResetPasswordPage';
 import { DashboardPage } from '../../features/dashboard/DashboardPage';
-import { OpsCuentaCobroUploadPage } from '../../features/radicaciones/OpsCuentaCobroUploadPage';
 import { InstallPage } from '../../features/install/InstallPage';
 
 function RequireAuth() {
@@ -41,7 +40,6 @@ export const router = createBrowserRouter([
       { path: 'registro', element: <RegistroPage /> },
       { path: 'forgot-password', element: <ForgotPasswordPage /> },
       { path: 'reset-password', element: <ResetPasswordPage /> },
-      { path: 'radicacion-cuenta-cobro-ops', element: <OpsCuentaCobroUploadPage /> },
       { path: 'instalar', element: <InstallPage /> },
       {
         element: <RequireAuth />,

@@ -65,3 +65,12 @@ deploy-key.pub
 *.bak
 *.tmp
 .cache/
+deploy-front.sh
+deploy-when-ready.sh
+deploy-final.sh
+deploy-fase1.sh
+deploy-fase1b.sh
+_deploytmp/
+*.tgz
+deploy-fase2.sh
+deploy-fase2b.sh

@@ -52,6 +52,7 @@ interface CampoPlantilla {
   conFactura?: boolean;
   verificaciones?: string[];
   establecimientoEsperado?: string;
+  mostrarSi?: { campo: string; en: string[] };
 }
 
 // Texto numérico/monetario → número (formato colombiano: punto = miles, coma = decimal)
@@ -387,10 +388,18 @@ export function NuevaSolicitudPanel({ onCreada }: NuevaSolicitudPanelProps) {
   const gruposArr = useMemo(() => Array.from(camposPorGrupo.entries()), [camposPorGrupo]);
   const totalSubPasos = gruposArr.length + 1; // grupos + firma
 
+  // Mostrar/ocultar campos segun el valor de otro campo (ej. destino solo si "Viaje")
+  function esVisible(c: CampoPlantilla): boolean {
+    const ms = c.mostrarSi;
+    if (!ms || !ms.campo || !Array.isArray(ms.en)) return true;
+    return ms.en.includes((datos[ms.campo] || '').trim());
+  }
+
   function validarGrupoActual(): string {
     if (subPaso < gruposArr.length) {
       const [, campos] = gruposArr[subPaso];
       const faltan = campos.filter((c) => {
+        if (!esVisible(c)) return false;
         if (!c.required) return false;
         if (c.type === 'texto-fijo') return false;
         if (c.type === 'file') return !docs[c.key];
@@ -644,6 +653,7 @@ export function NuevaSolicitudPanel({ onCreada }: NuevaSolicitudPanelProps) {
 
     // Validacion cliente: campos requeridos
     const faltantes = camposEnviar().filter((c) => {
+      if (!esVisible(c)) return false;
       if (!c.required) return false;
       if (c.type === 'file') return !docs[c.key];
       return !datos[c.key] || datos[c.key].trim() === '';
@@ -829,7 +839,7 @@ export function NuevaSolicitudPanel({ onCreada }: NuevaSolicitudPanelProps) {
               <div key={grupo} className="nueva-sol-grupo">
                 <h4 className="nueva-sol-grupo-titulo">{grupo}</h4>
                 <div className="nueva-sol-grupo-grid">
-                  {campos.map((c) => (
+                  {campos.filter((c) => esVisible(c)).map((c) => (
                     <div key={c.key} className="form-group">
                       <label htmlFor={`f-${c.key}`}>
                         {c.label} {c.required ? <span className="req">*</span> : null}

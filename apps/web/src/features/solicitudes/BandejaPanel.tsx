@@ -72,6 +72,16 @@ interface Detalle {
 
 interface AreaMini { id: number; nombre: string; activo: boolean }
 
+const ESTADO_LABEL: Record<string, string> = {
+  en_validacion: 'En validación',
+  por_legalizar: 'Por legalizar',
+  en_legalizacion: 'Legalización por revisar',
+  aprobado: 'Aprobado',
+  legalizado: 'Legalizado',
+  rechazado: 'Rechazado',
+  devuelto: 'Devuelto',
+};
+
 // --- Formateo legible de valores diligenciados (evita mostrar JSON crudo) ---
 function parseMaybeJson(v: unknown): unknown {
   if (v && typeof v === 'object') return v;
@@ -240,6 +250,25 @@ export function BandejaPanel() {
     }
   }
 
+  async function accionLeg(id: number, ruta: string, okMsg: string, confirmTxt?: string) {
+    if (confirmTxt && !window.confirm(confirmTxt)) return;
+    setAccionando(ruta);
+    setErr('');
+    setMsg('');
+    try {
+      await api.post(`/solicitudes/${id}/${ruta}`, {});
+      setMsg(okMsg);
+      setOpenId(null);
+      setDetalle(null);
+      cargar();
+    } catch (e) {
+      const r = (e as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      setErr(r || 'No se pudo ejecutar la acción.');
+    } finally {
+      setAccionando(null);
+    }
+  }
+
   // El comentario final combina el motivo del menú + el detalle escrito
   const comentarioFinal = [motivoSel, comentario.trim()].filter(Boolean).join(' — ');
 
@@ -313,9 +342,33 @@ export function BandejaPanel() {
                 <p className="admin-help-text">Solicitante: {it.solicitanteNombre || it.solicitanteCorreo || '—'}</p>
               </div>
               <div className="bandeja-item-meta">
-                <span className="mis-sol-estado mis-sol-en_validacion">{it.pasoActual}</span>
+                <span className={`mis-sol-estado mis-sol-${it.estado}`}>
+                  {it.estado === 'en_validacion' ? it.pasoActual : (ESTADO_LABEL[it.estado] || it.estado)}
+                </span>
                 {it.alertasCount > 0 ? (
                   <span className="mis-sol-alertas">⚠ {it.alertasCount}</span>
+                ) : null}
+                {(it.estado === 'por_legalizar' || it.estado === 'en_legalizacion') ? (
+                  <span className="bandeja-leg-actions" onClick={(e) => e.stopPropagation()}>
+                    <button
+                      type="button"
+                      className="admin-ghost-button"
+                      disabled={accionando !== null}
+                      onClick={() => accionLeg(it.id, 'recordar-legalizar', `Recordatorio enviado para ${it.numeroRadicado}.`)}
+                    >
+                      🔔 Recordar legalizar
+                    </button>
+                    {it.estado === 'en_legalizacion' ? (
+                      <button
+                        type="button"
+                        className="admin-primary-button"
+                        disabled={accionando !== null}
+                        onClick={() => accionLeg(it.id, 'legalizacion/confirmar', `Anticipo ${it.numeroRadicado} legalizado.`, `¿Confirmar que ${it.numeroRadicado} quedó legalizado (facturas correctas)?`)}
+                      >
+                        ✓ Confirmar legalización
+                      </button>
+                    ) : null}
+                  </span>
                 ) : null}
                 <span className="admin-help-text">{openId === it.id ? '▲' : '▼'}</span>
               </div>
@@ -505,6 +558,7 @@ export function BandejaPanel() {
                       ))}
                     </ul>
 
+                    {detalle.estado === 'en_validacion' ? (
                     <div className="bandeja-actions">
                       <label className="admin-help-text" htmlFor={`motivo-${it.id}`}>Motivo (para devolver o rechazar)</label>
                       <select
@@ -591,6 +645,11 @@ export function BandejaPanel() {
                         </button>
                       </div>
                     </div>
+                    ) : (
+                      <p className="admin-help-text" style={{ marginTop: 10 }}>
+                        Este anticipo está en etapa de legalización. Usa “🔔 Recordar legalizar” o “✓ Confirmar legalización” en la parte superior de la tarjeta.
+                      </p>
+                    )}
                   </>
                 ) : null}
               </div>
