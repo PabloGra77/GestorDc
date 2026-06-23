@@ -336,6 +336,73 @@ function inferirPlantillaPorNombre(nombre: string): PdfBloque[] {
   return plantillaGenerica();
 }
 
+// ── Sugerencias inteligentes (catálogo offline) ───────────────────────────
+// Según el título del tipo (ej. "cuenta de cobro") propone una descripción y
+// los conjuntos de campos (de BLOQUES_PREDEFINIDOS) que normalmente se requieren.
+// La plantilla del PDF se infiere con inferirPlantillaPorNombre().
+interface SugerenciaTipo {
+  descripcion: string;
+  conjuntos: string[]; // ids de BLOQUES_PREDEFINIDOS
+}
+
+function sugerirDesdeTitulo(nombre: string): SugerenciaTipo | null {
+  const l = nombre.trim().toLowerCase();
+  if (l.length < 3) return null;
+  if (l.includes('cuenta') && l.includes('cobro')) {
+    return {
+      descripcion: 'Radicación de cuenta de cobro: indica el periodo, el valor a cobrar (con su valor en letras) y el concepto, y adjunta la cuenta de cobro firmada junto con la certificación bancaria.',
+      conjuntos: ['cuenta-cobro', 'cuenta-bancaria'],
+    };
+  }
+  if (l.includes('anticipo')) {
+    return {
+      descripcion: 'Solicitud de anticipo de gastos: indica el valor del anticipo y el concepto. Se legaliza con facturas dentro del plazo establecido.',
+      conjuntos: ['cuenta-cobro'],
+    };
+  }
+  if (l.includes('viatic') || l.includes('viaje')) {
+    return {
+      descripcion: 'Solicitud de viáticos / viaje: indica el destino, el medio de transporte y el valor, y adjunta las facturas o recibos del viaje.',
+      conjuntos: ['destino-viaje-soporte'],
+    };
+  }
+  if (l.includes('rut')) {
+    return {
+      descripcion: 'Registro / actualización de RUT: el solicitante adjunta el RUT para su validación automática.',
+      conjuntos: ['datos-personales', 'rut'],
+    };
+  }
+  if (l.includes('eps')) {
+    return {
+      descripcion: 'Certificado de EPS: indica la EPS de afiliación y adjunta el certificado vigente.',
+      conjuntos: ['certificado-eps'],
+    };
+  }
+  if (l.includes('adres')) {
+    return {
+      descripcion: 'Certificado ADRES: el solicitante adjunta el certificado ADRES para su validación.',
+      conjuntos: ['adres'],
+    };
+  }
+  if (l.includes('seguridad') || l.includes('planilla') || l.includes('aporte')) {
+    return {
+      descripcion: 'Soporte de seguridad social: el solicitante adjunta la planilla de aportes del periodo.',
+      conjuntos: ['planilla-seguridad'],
+    };
+  }
+  if (l.includes('banc') || l.includes('cuenta')) {
+    return {
+      descripcion: 'Certificación bancaria: indica banco, tipo y número de cuenta, y adjunta la certificación bancaria.',
+      conjuntos: ['cuenta-bancaria'],
+    };
+  }
+  // Genérico: al menos pide identificación del solicitante.
+  return {
+    descripcion: 'Solicitud con los datos básicos de identificación del solicitante.',
+    conjuntos: ['datos-personales'],
+  };
+}
+
 // Plantilla inicial para un tipo NUEVO: genérica y neutral (no cuenta de cobro),
 // para no confundir. El admin elige el formato real con "escoge un ejemplo".
 const PLANTILLA_PDF_DEFAULT: PlantillaPdf = {
@@ -618,6 +685,45 @@ export function TiposSolicitudPanel() {
     });
     return ids.map((id) => byId.get(id) || `Área #${id}`);
   }, [areas, areasParticipantes, areaInicialId, areaFinalId]);
+
+  // Sugerencias inteligentes según el título escrito en "Nombre del tipo".
+  const sugerencia = useMemo(() => sugerirDesdeTitulo(nombre), [nombre]);
+  const requisitosSugeridos = useMemo(() => {
+    if (!sugerencia) return [] as string[];
+    const labels: string[] = [];
+    const vistos = new Set<string>();
+    for (const id of sugerencia.conjuntos) {
+      const conj = BLOQUES_PREDEFINIDOS.find((b) => b.id === id);
+      if (!conj) continue;
+      for (const c of conj.campos) {
+        if (!vistos.has(c.key)) { vistos.add(c.key); labels.push(c.label); }
+      }
+    }
+    return labels;
+  }, [sugerencia]);
+
+  function aplicarSugerencia(incluirPlantilla: boolean) {
+    if (!sugerencia) return;
+    if (!descripcion.trim()) setDescripcion(sugerencia.descripcion);
+    setCampos((prev) => {
+      const keys = new Set(prev.map((c) => c.key));
+      const add: CampoPlantilla[] = [];
+      for (const id of sugerencia.conjuntos) {
+        const conj = BLOQUES_PREDEFINIDOS.find((b) => b.id === id);
+        if (!conj) continue;
+        for (const c of conj.campos) {
+          if (!keys.has(c.key)) { keys.add(c.key); add.push(c); }
+        }
+      }
+      return [...prev, ...add];
+    });
+    if (incluirPlantilla) {
+      setPlantillaPdf({ bloques: inferirPlantillaPorNombre(nombre) });
+      setUsaPlantillaPdf(true);
+    }
+    setErr('');
+    setMsg('Sugerencia aplicada. Revisa los campos y la plantilla; puedes seguir editándolos manualmente abajo.');
+  }
 
   function abrirEditor(t: TipoSolicitud | null) {
     setMsg('');
@@ -923,6 +1029,33 @@ export function TiposSolicitudPanel() {
                     <label htmlFor="t-desc">Descripción</label>
                     <input id="t-desc" type="text" value={descripcion} onChange={(e) => setDescripcion(e.target.value)} placeholder="Descripción visible al solicitante" />
                   </div>
+                  {sugerencia && requisitosSugeridos.length > 0 ? (
+                    <div className="form-group sugerencia-tipo" style={{ gridColumn: '1 / -1' }}>
+                      <strong>💡 Sugerencia para «{nombre.trim()}»</strong>
+                      <p className="admin-help-text" style={{ margin: '4px 0' }}>Normalmente este trámite requiere:</p>
+                      <div className="sugerencia-chips">
+                        {requisitosSugeridos.map((r) => (
+                          <span key={r} className="sugerencia-chip">{r}</span>
+                        ))}
+                      </div>
+                      <div className="admin-inline-actions" style={{ marginTop: 8 }}>
+                        <button type="button" className="admin-primary-button" onClick={() => aplicarSugerencia(true)}>
+                          ✨ Aplicar campos + plantilla
+                        </button>
+                        <button type="button" className="admin-ghost-button" onClick={() => aplicarSugerencia(false)}>
+                          Solo agregar campos
+                        </button>
+                        {!descripcion.trim() ? (
+                          <button type="button" className="admin-ghost-button" onClick={() => setDescripcion(sugerencia.descripcion)}>
+                            Usar descripción sugerida
+                          </button>
+                        ) : null}
+                      </div>
+                      <small className="admin-help-text" style={{ display: 'block', marginTop: 6 }}>
+                        Son sugerencias automáticas según el título. Puedes editarlas, quitarlas o seguir agregando datos manualmente.
+                      </small>
+                    </div>
+                  ) : null}
                   <label className="ops-checkbox" style={{ alignSelf: 'end' }}>
                     <input type="checkbox" checked={activo} onChange={(e) => setActivo(e.target.checked)} /> Activo
                   </label>

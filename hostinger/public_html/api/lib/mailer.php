@@ -13,7 +13,7 @@ final class Mailer
         // se usa el .env como fallback.
         $host = Settings::get('smtp_host', Config::get('SMTP_HOST'));
         $user = Settings::get('smtp_user', Config::get('SMTP_USER'));
-        $pass = Settings::get('smtp_pass', Config::get('SMTP_PASS'));
+        $pass = Settings::decryptSecret(Settings::get('smtp_pass', Config::get('SMTP_PASS')));
         $from = Settings::get('smtp_from', Config::get('SMTP_FROM')) ?: $user;
         $port = (int)(Settings::get('smtp_port', (string)Config::getInt('SMTP_PORT', 587)));
         $secureRaw = Settings::get('smtp_secure');
@@ -114,14 +114,15 @@ final class Mailer
     private static function buildHeaders(string $from, array $to, array $cc, string $subject, bool $isHtml): string
     {
         $boundary = 'b_' . bin2hex(random_bytes(8));
+        $clean = fn(string $s): string => str_replace(["\r", "\n", "\0"], '', $s);
         $headers = [
-            'From: ' . $from,
-            'To: ' . implode(', ', $to),
+            'From: ' . $clean($from),
+            'To: ' . implode(', ', array_map($clean, $to)),
         ];
         if (!empty($cc)) {
-            $headers[] = 'Cc: ' . implode(', ', $cc);
+            $headers[] = 'Cc: ' . implode(', ', array_map($clean, $cc));
         }
-        $headers[] = 'Subject: =?UTF-8?B?' . base64_encode($subject) . '?=';
+        $headers[] = 'Subject: =?UTF-8?B?' . base64_encode($clean($subject)) . '?=';
         $headers[] = 'MIME-Version: 1.0';
         $headers[] = 'Date: ' . date('r');
         if ($isHtml) {
@@ -139,16 +140,28 @@ final class Mailer
     private static function buildBody(string $text, ?string $html): string
     {
         if ($html === null) {
-            return $text;
+            return self::dotStuff($text);
         }
         $b = self::$boundary;
-        return "--{$b}\r\n"
+        return self::dotStuff(
+            "--{$b}\r\n"
             . "Content-Type: text/plain; charset=UTF-8\r\n\r\n"
             . $text . "\r\n"
             . "--{$b}\r\n"
             . "Content-Type: text/html; charset=UTF-8\r\n\r\n"
             . $html . "\r\n"
-            . "--{$b}--";
+            . "--{$b}--"
+        );
+    }
+
+    /**
+     * RFC 5321 4.5.2: duplicar cualquier linea que empiece con "."
+     * para que el contenido del mensaje no pueda terminar prematuramente
+     * la secuencia DATA ni inyectar comandos SMTP en la misma sesion.
+     */
+    private static function dotStuff(string $body): string
+    {
+        return preg_replace('/(^|\r\n)\./', '$1..', $body);
     }
 
     private static function extractAddress(string $s): string

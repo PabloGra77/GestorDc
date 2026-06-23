@@ -50,4 +50,38 @@ final class Settings
             self::$cache[$clave] = $valor;
         }
     }
+
+    /**
+     * Cifra un secreto (ej. password SMTP) antes de persistirlo en BD.
+     * Clave derivada de JWT_ACCESS_SECRET, que ya esta validado al boot
+     * (config.php rechaza secretos cortos o por defecto).
+     */
+    public static function encryptSecret(string $plain): string
+    {
+        $key = hash('sha256', Config::get('JWT_ACCESS_SECRET') . '|settings-secret', true);
+        $iv = random_bytes(16);
+        $cipher = openssl_encrypt($plain, 'aes-256-cbc', $key, OPENSSL_RAW_DATA, $iv);
+        return 'enc:' . base64_encode($iv . $cipher);
+    }
+
+    /**
+     * Descifra un valor guardado con encryptSecret(). Si el valor no tiene
+     * el prefijo 'enc:' (texto plano historico o fallback de .env), se
+     * devuelve sin cambios para no romper configuraciones existentes.
+     */
+    public static function decryptSecret(?string $stored): ?string
+    {
+        if ($stored === null || $stored === '' || !str_starts_with($stored, 'enc:')) {
+            return $stored;
+        }
+        $raw = base64_decode(substr($stored, 4));
+        if ($raw === false || strlen($raw) < 17) {
+            return null;
+        }
+        $key = hash('sha256', Config::get('JWT_ACCESS_SECRET') . '|settings-secret', true);
+        $iv = substr($raw, 0, 16);
+        $cipher = substr($raw, 16);
+        $plain = openssl_decrypt($cipher, 'aes-256-cbc', $key, OPENSSL_RAW_DATA, $iv);
+        return $plain === false ? null : $plain;
+    }
 }

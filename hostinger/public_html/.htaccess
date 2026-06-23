@@ -2,6 +2,15 @@
 
 RewriteEngine On
 
+# Pasar el header Authorization a PHP (Hostinger/LiteSpeed lo elimina por defecto).
+# Sin esto, los endpoints autenticados no reciben el token Bearer y devuelven 401.
+<IfModule lsapi_module>
+    CGIPassAuth On
+</IfModule>
+SetEnvIf Authorization "(.*)" HTTP_AUTHORIZATION=$1
+RewriteCond %{HTTP:Authorization} ^(.+)$
+RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
 # Forzar HTTPS
 RewriteCond %{HTTPS} !=on
 RewriteCond %{HTTP:X-Forwarded-Proto} !https

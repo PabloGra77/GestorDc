@@ -6,18 +6,24 @@ final class Jwt
     public static function sign(array $payload): string
     {
         $secret = Config::get('JWT_ACCESS_SECRET');
-        if (!$secret || strlen($secret) < 32) {
-            throw new RuntimeException('JWT_ACCESS_SECRET no configurado o muy corto');
+        if (!$secret) {
+            throw new RuntimeException('JWT_ACCESS_SECRET no configurado');
         }
-        $ttl = Config::getInt('JWT_TTL_MINUTES', 480) * 60;
-        $now = time();
-        $payload['iat'] = $now;
-        $payload['exp'] = $now + $ttl;
-
-        $header  = self::b64(json_encode(['alg' => 'HS256', 'typ' => 'JWT']));
-        $body    = self::b64(json_encode($payload, JSON_UNESCAPED_UNICODE));
+        
+        // Agregar expiración por defecto (1 hora) si no existe
+        if (!isset($payload['exp'])) {
+            $payload['exp'] = time() + 3600;
+        }
+        
+        // Agregar timestamp de emisión
+        if (!isset($payload['iat'])) {
+            $payload['iat'] = time();
+        }
+        
+        $header = self::b64(json_encode(['alg' => 'HS256', 'typ' => 'JWT']));
+        $body = self::b64(json_encode($payload, JSON_UNESCAPED_UNICODE));
         $signing = $header . '.' . $body;
-        $sig     = self::b64(hash_hmac('sha256', $signing, $secret, true));
+        $sig = self::b64(hash_hmac('sha256', $signing, $secret, true));
         return $signing . '.' . $sig;
     }
 
@@ -25,6 +31,7 @@ final class Jwt
     {
         $secret = Config::get('JWT_ACCESS_SECRET');
         if (!$secret) return null;
+        
         $parts = explode('.', $token);
         if (count($parts) !== 3) return null;
         [$h, $p, $s] = $parts;
@@ -37,25 +44,40 @@ final class Jwt
 
         $expected = self::b64(hash_hmac('sha256', $h . '.' . $p, $secret, true));
         if (!hash_equals($expected, $s)) return null;
+        
         $payload = json_decode(self::b64dec($p), true);
         if (!is_array($payload)) return null;
-        if (isset($payload['exp']) && $payload['exp'] < time()) return null;
+        
+        // Verificar expiración
+        if (isset($payload['exp']) && $payload['exp'] < time()) {
+            return null;
+        }
+        
         return $payload;
     }
 
     public static function bearer(): ?string
     {
         $header = null;
-        if (isset($_SERVER['HTTP_AUTHORIZATION'])) {
+        if (!empty($_SERVER['HTTP_AUTHORIZATION'])) {
             $header = $_SERVER['HTTP_AUTHORIZATION'];
+        } elseif (!empty($_SERVER['REDIRECT_HTTP_AUTHORIZATION'])) {
+            // Algunos servidores (LiteSpeed/Hostinger) lo exponen con prefijo REDIRECT_
+            $header = $_SERVER['REDIRECT_HTTP_AUTHORIZATION'];
         } elseif (function_exists('apache_request_headers')) {
             $h = apache_request_headers();
             $header = $h['Authorization'] ?? ($h['authorization'] ?? null);
         }
+        if (!$header && function_exists('getallheaders')) {
+            $h = getallheaders();
+            foreach ($h as $k => $v) {
+                if (strcasecmp($k, 'Authorization') === 0) { $header = $v; break; }
+            }
+        }
         if (!$header || !preg_match('/^Bearer\s+(.+)$/i', $header, $m)) {
             return null;
         }
-        return $m[1];
+        return trim($m[1]);
     }
 
     private static function b64(string $bin): string
@@ -86,10 +108,6 @@ final class Auth
         return $payload;
     }
 
-    /**
-     * Requiere que el usuario tenga rol 'Administrador'.
-     * Devuelve el payload JWT + datos del usuario.
-     */
     public static function requireAdmin(): array
     {
         $payload = self::requireUser();

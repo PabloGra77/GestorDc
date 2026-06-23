@@ -13,7 +13,7 @@ final class FlujoHelpers
     public static function cargarYAutorizar(PDO $pdo, int $solicitudId, int $usuarioId): array
     {
         $sStmt = $pdo->prepare(
-            "SELECT s.*, t.flujo_aprobacion, t.nombre AS tipo_nombre
+            "SELECT s.*, t.flujo_aprobacion, t.nombre AS tipo_nombre, t.slug AS tipo_slug
              FROM solicitudes s
              INNER JOIN tipos_solicitud t ON t.id = s.tipo_solicitud_id
              WHERE s.id = :id LIMIT 1"

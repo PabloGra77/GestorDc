@@ -14,20 +14,23 @@ $user = $uStmt->fetch();
 if (!$user) Response::error('Usuario no encontrado', 404);
 
 $nivel = $user['nivel_aprobacion'] ?? '';
-$esAdmin = strtolower(trim($user['rol'] ?? '')) === 'administrador';
+$rol = strtolower(trim($user['rol'] ?? ''));
+$esAdmin = $rol === 'administrador';
+$esGerente = $rol === 'gerente';
 
-if (!$nivel && !$esAdmin) {
-    Response::json([]); // sin nivel y no admin, sin bandeja
+if (!$nivel && !$esAdmin && !$esGerente) {
+    Response::json([]); // sin nivel, no admin y no gerente: sin bandeja
 }
 
-$where = "s.estado = 'en_validacion'";
 $params = [];
-if ($esAdmin) {
-    // admin ve todo
+if ($esAdmin || $esGerente) {
+    // admin/gerente ven todo lo accionable (validacion + legalizacion) en todas las areas
+    $where = "(s.estado = 'en_validacion' OR s.estado IN ('por_legalizar','en_legalizacion'))";
 } elseif ($nivel === 'contabilidad') {
-    $where .= " AND s.paso_actual = 'contabilidad'";
+    // area final: su paso de validacion + las legalizaciones de anticipos (todas las areas)
+    $where = "((s.estado = 'en_validacion' AND s.paso_actual = 'contabilidad') OR s.estado IN ('por_legalizar','en_legalizacion'))";
 } else {
-    $where .= " AND s.paso_actual = :nivel AND s.area_id = :aid";
+    $where = "s.estado = 'en_validacion' AND s.paso_actual = :nivel AND s.area_id = :aid";
     $params[':nivel'] = $nivel;
     $params[':aid']   = (int)($user['area_id'] ?? 0);
 }

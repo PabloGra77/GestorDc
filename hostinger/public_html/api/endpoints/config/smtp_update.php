@@ -34,9 +34,9 @@ Settings::set('smtp_port', (string)$port);
 Settings::set('smtp_secure', $secure ? 'true' : 'false');
 Settings::set('smtp_user', $user);
 Settings::set('smtp_from', $from !== '' ? $from : $user);
-// Solo tocar la contraseña si llega una nueva no vacia.
+// Solo tocar la contraseña si llega una nueva no vacia. Se cifra antes de persistir.
 if ($pass !== null && $pass !== '') {
-    Settings::set('smtp_pass', $pass);
+    Settings::set('smtp_pass', Settings::encryptSecret($pass));
 }
 
 Response::json(['ok' => true]);

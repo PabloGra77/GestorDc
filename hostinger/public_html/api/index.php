@@ -62,13 +62,14 @@ $routes = [
     ['PATCH',  '#^/tipos/(?P<id>\d+)$#',                         'tipos/update'],
     ['DELETE', '#^/tipos/(?P<id>\d+)$#',                         'tipos/delete'],
 
-    // Endpoints publicos (sin auth) para formulario externo
-    ['GET',    '#^/publico/areas$#',                             'areas/publica_find_all'],
-    ['GET',    '#^/publico/roles$#',                             'roles/publica_find_all'],
-    ['GET',    '#^/publico/tipos$#',                             'tipos/publica_find_all'],
-    ['POST',   '#^/publico/solicitudes$#',                       'solicitudes/publica_create'],
-    ['GET',    '#^/publico/solicitudes/estado$#',                'solicitudes/estado_publico'],
+    // Unico endpoint publico restante: auto-registro pre-autorizado (whitelist)
     ['POST',   '#^/publico/usuarios/registro$#',                 'usuarios/registro_publico'],
+
+    // Personal autorizado (whitelist) - solo admin
+    ['POST',   '#^/personal/bulk$#',                             'personal/bulk'],
+    ['POST',   '#^/personal$#',                                  'personal/create'],
+    ['GET',    '#^/personal$#',                                  'personal/find_all'],
+    ['DELETE', '#^/personal/(?P<id>\d+)$#',                      'personal/delete'],
 
     // Solicitudes (instancias)
     ['POST',   '#^/solicitudes$#',                               'solicitudes/create'],
@@ -80,6 +81,9 @@ $routes = [
     ['POST',   '#^/solicitudes/(?P<id>\d+)/devolver$#',          'solicitudes/devolver'],
     ['POST',   '#^/solicitudes/(?P<id>\d+)/rechazar$#',          'solicitudes/rechazar'],
     ['POST',   '#^/solicitudes/(?P<id>\d+)/remitir$#',           'solicitudes/remitir'],
+    ['POST',   '#^/solicitudes/(?P<id>\d+)/legalizar$#',         'solicitudes/legalizar'],
+    ['POST',   '#^/solicitudes/(?P<id>\d+)/legalizacion/confirmar$#', 'solicitudes/legalizacion_confirmar'],
+    ['POST',   '#^/solicitudes/(?P<id>\d+)/recordar-legalizar$#', 'solicitudes/recordar_legalizar'],
     ['DELETE', '#^/solicitudes/(?P<id>\d+)$#',                    'solicitudes/delete'],
 
     // Adjuntos (subir / ver con sesión)
