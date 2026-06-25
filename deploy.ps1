@@ -9,7 +9,7 @@ $RepoRoot    = $PSScriptRoot
 $SSH_HOST    = "187.124.72.3"
 $SSH_PORT    = "65002"
 $SSH_USER    = "u315763484_LqhlHlMdz"
-$SSH_KEY     = "$RepoRoot\deploy-key"
+$SSH_KEY     = "$RepoRoot\deploy-key2"
 $REMOTE_ROOT = "/home/u315763484/websites/LqhlHlMdz/public_html"
 
 if (-not (Test-Path $SSH_KEY)) { Write-Error "Clave SSH no encontrada. Ejecuta setup-ssh.ps1 primero."; exit 1 }
