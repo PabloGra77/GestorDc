@@ -37,8 +37,8 @@ export function Sidebar({ esAdmin, activeSection, onSelectSection }: SidebarProp
 	const [seenIds, setSeenIdsState] = useState<Set<number>>(() => getSeenIds());
 
 	const menuItems = esAdmin
-		? ['Inicio', 'Radicaciones', 'Panel administrador']
-		: ['Inicio', 'Radicaciones'];
+		? ['Inicio', 'Radicaciones', 'Legalizaciones', 'Panel administrador']
+		: ['Inicio', 'Radicaciones', 'Legalizaciones'];
 
 	const unread = items.filter((n) => !seenIds.has(n.id));
 

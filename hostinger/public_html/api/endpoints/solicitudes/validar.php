@@ -60,9 +60,10 @@ try {
         $nuevoPaso = $siguiente['rol'];
         $nuevoPasoLabel = $siguiente['label'] ?? $siguiente['rol'];
     } else {
-        // No hay siguiente paso = aprobada. Para anticipo, pasa a "por_legalizar".
-        $esAnticipo = (($sol['tipo_slug'] ?? '') === 'anticipo');
-        $estadoFinal = $esAnticipo ? 'por_legalizar' : 'aprobado';
+        // No hay siguiente paso = aprobada definitivamente.
+        $esAnticipo     = (($sol['tipo_slug'] ?? '') === 'anticipo');
+        $esLegalizacion = (($sol['tipo_slug'] ?? '') === 'legalizacion');
+        $estadoFinal    = $esAnticipo ? 'por_legalizar' : 'aprobado';
         $upd = $pdo->prepare(
             "UPDATE solicitudes
              SET estado = :ef, paso_actual = NULL, aprobado_en = UTC_TIMESTAMP(), firmas = :firmas
@@ -77,14 +78,61 @@ try {
             $pdo, $id, 'aprobada', $sol['paso_actual'],
             $estadoFinal, $user, $comentario, 'publico'
         );
-        if ($esAnticipo) {
+
+        if ($esLegalizacion) {
+            // Registrar facturas para detección de duplicados futuros
+            $datosSol = json_decode($sol['datos_formulario'] ?? '{}', true) ?: [];
+            $gastos   = [];
+            if (isset($datosSol['gastos']) && is_string($datosSol['gastos'])) {
+                $gastos = json_decode($datosSol['gastos'], true) ?: [];
+            } elseif (is_array($datosSol['gastos'] ?? null)) {
+                $gastos = $datosSol['gastos'];
+            }
+            $insF = $pdo->prepare(
+                "INSERT INTO facturas_legalizadas
+                 (solicitud_id, numero_factura, nit_proveedor, nombre_proveedor, fecha_factura, valor_factura, archivo_hash, categoria)
+                 VALUES (:sid, :nf, :nit, :np, :fd, :vf, :ha, :cat)"
+            );
+            foreach ($gastos as $gasto) {
+                $fechaFact = null;
+                if (!empty($gasto['fechaFactura'])) {
+                    $parsed = strtotime((string)$gasto['fechaFactura']);
+                    $fechaFact = $parsed ? date('Y-m-d', $parsed) : null;
+                }
+                $insF->execute([
+                    ':sid' => $id,
+                    ':nf'  => mb_substr(trim((string)($gasto['numeroFactura'] ?? '')), 0, 120) ?: null,
+                    ':nit' => preg_replace('/\D/', '', (string)($gasto['nitProveedor'] ?? '')) ?: null,
+                    ':np'  => mb_substr(trim((string)($gasto['nombreProveedor'] ?? '')), 0, 200) ?: null,
+                    ':fd'  => $fechaFact,
+                    ':vf'  => (float)str_replace(['.', ','], ['', '.'], (string)($gasto['valor'] ?? '0')),
+                    ':ha'  => mb_substr(trim((string)($gasto['_facturaHash'] ?? '')), 0, 64) ?: null,
+                    ':cat' => mb_substr(trim((string)($gasto['categoria'] ?? '')), 0, 80) ?: null,
+                ]);
+            }
+            // Mensaje de pago personalizable
+            $mensajePlantilla = Settings::get(
+                'legalizacion.mensaje_pago',
+                'Tu solicitud de legalización con número de radicado {radicado} fue aprobada. El pago será realizado en el transcurso de los días hábiles.'
+            ) ?? '';
+            $mensajeFinal = str_replace('{radicado}', $sol['numero_radicado'], $mensajePlantilla);
+            FlujoHelpers::registrarMovimiento(
+                $pdo, $id, 'mensaje_pago', null, 'aprobado',
+                ['id' => 0, 'nombre_completo' => 'Sistema Payops', 'nivel_aprobacion' => 'sistema'],
+                $mensajeFinal, 'publico'
+            );
+            FlujoHelpers::notificarSolicitante($sol,
+                "Legalización {$sol['numero_radicado']} aprobada — pago en proceso",
+                $mensajeFinal
+            );
+        } elseif ($esAnticipo) {
             $datosSol = json_decode($sol['datos_formulario'] ?? '{}', true) ?: [];
             $fechaLeg = (string)($datosSol['fechaLegalizacion'] ?? '');
             FlujoHelpers::notificarSolicitante($sol,
                 "Anticipo {$sol['numero_radicado']} aprobado - debes legalizar",
                 "Tu anticipo {$sol['numero_radicado']} fue APROBADO." .
-                ($fechaLeg ? " Recuerda que te comprometiste a legalizarlo (subir facturas/soportes) a mas tardar el {$fechaLeg}." : " Recuerda legalizarlo subiendo las facturas/soportes del gasto.") .
-                "\n\nIngresa a Payops -> Mis solicitudes -> Legalizar y adjunta las evidencias del gasto. La inteligencia artificial validara los soportes."
+                ($fechaLeg ? " Recuerda que te comprometiste a legalizarlo a mas tardar el {$fechaLeg}." : " Recuerda legalizarlo subiendo las facturas/soportes del gasto.") .
+                "\n\nIngresa a Payops -> Mis solicitudes -> Legalizar y adjunta las evidencias del gasto."
             );
         } else {
             FlujoHelpers::notificarSolicitante($sol,
@@ -92,8 +140,8 @@ try {
                 "Su solicitud {$sol['numero_radicado']} fue aprobada definitivamente. Comentario: {$comentario}"
             );
         }
-        $nuevoEstado = $estadoFinal;
-        $nuevoPaso = null;
+        $nuevoEstado    = $estadoFinal;
+        $nuevoPaso      = null;
         $nuevoPasoLabel = null;
     }
     $pdo->commit();

@@ -81,10 +81,11 @@ $routes = [
     ['POST',   '#^/solicitudes/(?P<id>\d+)/devolver$#',          'solicitudes/devolver'],
     ['POST',   '#^/solicitudes/(?P<id>\d+)/rechazar$#',          'solicitudes/rechazar'],
     ['POST',   '#^/solicitudes/(?P<id>\d+)/remitir$#',           'solicitudes/remitir'],
-    ['POST',   '#^/solicitudes/(?P<id>\d+)/legalizar$#',         'solicitudes/legalizar'],
+    ['POST',   '#^/solicitudes/(?P<id>\d+)/legalizar$#',              'solicitudes/legalizar'],
     ['POST',   '#^/solicitudes/(?P<id>\d+)/legalizacion/confirmar$#', 'solicitudes/legalizacion_confirmar'],
-    ['POST',   '#^/solicitudes/(?P<id>\d+)/recordar-legalizar$#', 'solicitudes/recordar_legalizar'],
-    ['DELETE', '#^/solicitudes/(?P<id>\d+)$#',                    'solicitudes/delete'],
+    ['POST',   '#^/solicitudes/(?P<id>\d+)/recordar-legalizar$#',     'solicitudes/recordar_legalizar'],
+    ['POST',   '#^/solicitudes/(?P<id>\d+)/autorizar-legalizacion$#', 'solicitudes/autorizar_legalizacion'],
+    ['DELETE', '#^/solicitudes/(?P<id>\d+)$#',                        'solicitudes/delete'],
 
     // Adjuntos (subir / ver con sesión)
     ['POST',   '#^/archivos$#',                                  'archivos/subir'],
@@ -97,6 +98,8 @@ $routes = [
     ['GET',    '#^/config/smtp$#',                               'config/smtp_get'],
     ['PUT',    '#^/config/smtp$#',                               'config/smtp_update'],
     ['POST',   '#^/config/smtp/test$#',                          'config/smtp_test'],
+    ['GET',    '#^/config/legalizacion$#',                       'config/legalizacion_get'],
+    ['PUT',    '#^/config/legalizacion$#',                       'config/legalizacion_update'],
 
     // Radicados
     ['POST',   '#^/radicados$#',                                 'radicados/create'],

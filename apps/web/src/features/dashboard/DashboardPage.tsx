@@ -11,12 +11,14 @@ import { ReportesPanel } from '../admin/ReportesPanel';
 import { BulkCreatePanel } from '../admin/BulkCreatePanel';
 import { PersonalAutorizadoPanel } from '../admin/PersonalAutorizadoPanel';
 import { ConfiguracionSmtpPanel } from '../admin/ConfiguracionSmtpPanel';
+import { LegalizacionConfigPanel } from '../admin/LegalizacionConfigPanel';
+import { LegalizacionPanel } from '../solicitudes/LegalizacionPanel';
 import { InicioStats, InicioRecientes, SeguimientoRadicado } from './InicioStats';
 import type { Role } from '../../types/role';
 import type { Radicado, VerificarRadicadoResponse } from '../../types/radicado';
 import type { Usuario } from '../../types/usuario';
 
-type AdminModule = 'Usuarios' | 'Personal autorizado' | 'Roles' | 'Areas' | 'Tipos de solicitud' | 'Usuarios en linea' | 'Reportes' | 'Configuracion';
+type AdminModule = 'Usuarios' | 'Personal autorizado' | 'Roles' | 'Areas' | 'Tipos de solicitud' | 'Usuarios en linea' | 'Reportes' | 'Configuracion' | 'Configuracion Legalizaciones';
 
 const ROLE_PERMISSIONS_CATALOG = {
 	inicio: {
@@ -1107,7 +1109,7 @@ export function DashboardPage() {
 					</div>
 
 					<div className="admin-module-nav" role="tablist" aria-label="Módulos administrativos">
-						{(['Usuarios', 'Personal autorizado', 'Roles', 'Areas', 'Tipos de solicitud', 'Usuarios en linea', 'Reportes', 'Configuracion'] as AdminModule[]).map((module) => (
+						{(['Usuarios', 'Personal autorizado', 'Roles', 'Areas', 'Tipos de solicitud', 'Usuarios en linea', 'Reportes', 'Configuracion', 'Configuracion Legalizaciones'] as AdminModule[]).map((module) => (
 							<button
 								key={module}
 								type="button"
@@ -1465,6 +1467,10 @@ export function DashboardPage() {
 							<ConfiguracionSmtpPanel />
 						) : null}
 
+						{activeAdminModule === 'Configuracion Legalizaciones' ? (
+							<LegalizacionConfigPanel />
+						) : null}
+
 						{activeAdminModule === 'Usuarios' && canCrearUsuarios ? (
 							<BulkCreatePanel
 								roles={roles}
@@ -1515,6 +1521,13 @@ export function DashboardPage() {
 
 			{activeSection === 'Radicaciones' ? <RadicacionesModule /> : null}
 
+			{activeSection === 'Legalizaciones' ? (
+				<section className="card-surface module-card">
+					<h3>Nueva legalización de gastos</h3>
+					<LegalizacionPanel onCreada={() => {}} />
+				</section>
+			) : null}
+
 			{isUserPermisosOpen && usuarioPermisosObjetivo ? (
 				<div className="admin-permissions-overlay" role="dialog" aria-modal="true" aria-label="Permisos de usuario">
 					<div className="admin-permissions-modal card-surface">
@@ -1563,7 +1576,7 @@ export function DashboardPage() {
 				</div>
 			) : null}
 
-			{activeSection !== 'Inicio' && activeSection !== 'Panel administrador' && activeSection !== 'Radicaciones' ? (
+			{activeSection !== 'Inicio' && activeSection !== 'Panel administrador' && activeSection !== 'Radicaciones' && activeSection !== 'Legalizaciones' ? (
 				<section className="card-surface module-card">
 					<h3>{activeSection}</h3>
 					<p>Vista en construcción. Este módulo se conectará en el siguiente paso.</p>

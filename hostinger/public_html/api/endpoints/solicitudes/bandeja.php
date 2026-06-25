@@ -24,15 +24,21 @@ if (!$nivel && !$esAdmin && !$esGerente) {
 
 $params = [];
 if ($esAdmin || $esGerente) {
-    // admin/gerente ven todo lo accionable (validacion + legalizacion) en todas las areas
     $where = "(s.estado = 'en_validacion' OR s.estado IN ('por_legalizar','en_legalizacion'))";
 } elseif ($nivel === 'contabilidad') {
-    // area final: su paso de validacion + las legalizaciones de anticipos (todas las areas)
     $where = "((s.estado = 'en_validacion' AND s.paso_actual = 'contabilidad') OR s.estado IN ('por_legalizar','en_legalizacion'))";
 } else {
-    $where = "s.estado = 'en_validacion' AND s.paso_actual = :nivel AND s.area_id = :aid";
-    $params[':nivel'] = $nivel;
-    $params[':aid']   = (int)($user['area_id'] ?? 0);
+    // Solicitudes normales según nivel + área
+    // PLUS: legalizaciones donde este usuario es el autorizador designado
+    $where = "(
+      (s.estado = 'en_validacion' AND s.paso_actual = :nivel AND s.area_id = :aid)
+      OR
+      (s.estado = 'en_validacion' AND s.paso_actual = 'autorizador_visto_bueno'
+       AND JSON_UNQUOTE(JSON_EXTRACT(s.datos_formulario, '$.autorizadorId')) = :uid_str)
+    )";
+    $params[':nivel']   = $nivel;
+    $params[':aid']     = (int)($user['area_id'] ?? 0);
+    $params[':uid_str'] = (string)$usuarioId;
 }
 
 $sql = "SELECT s.*, t.nombre AS tipo_nombre, t.slug AS tipo_slug, a.nombre AS area_nombre

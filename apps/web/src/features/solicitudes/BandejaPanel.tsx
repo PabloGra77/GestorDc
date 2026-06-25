@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+﻿import { useCallback, useEffect, useState } from 'react';
 import { api } from '../../services/http/api';
 import { SignaturePad } from '../../components/SignaturePad';
 import { getAuthSession } from '../auth/auth.service';
@@ -87,6 +87,7 @@ const PASO_LABEL: Record<string, string> = {
   coordinador: 'Coordinador',
   director: 'Director',
   contabilidad: 'Área final (Contabilidad)',
+  autorizador_visto_bueno: 'Visto bueno del autorizador',
 };
 
 function labelPaso(paso: string | null): string {
@@ -281,6 +282,25 @@ export function BandejaPanel() {
     }
   }
 
+  async function darVistoBueno(id: number) {
+    setAccionando('visto_bueno');
+    setErr('');
+    setMsg('');
+    try {
+      await api.post(`/solicitudes/${id}/autorizar-legalizacion`, { comentario: comentario.trim() || 'Visto bueno otorgado' });
+      setMsg('Visto bueno otorgado. La solicitud avanzó al siguiente paso.');
+      setOpenId(null);
+      setDetalle(null);
+      setComentario('');
+      cargar();
+    } catch (e) {
+      const r = (e as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      setErr(r || 'No se pudo dar el visto bueno.');
+    } finally {
+      setAccionando(null);
+    }
+  }
+
   // El comentario final combina el motivo del menú + el detalle escrito
   const comentarioFinal = [motivoSel, comentario.trim()].filter(Boolean).join(' — ');
 
@@ -442,11 +462,11 @@ export function BandejaPanel() {
                       ) : pdfUrl ? (
                         <iframe className="bandeja-pdf-preview" src={pdfUrl} title="Formato diligenciado" />
                       ) : (
-                        <p className="admin-help-text">No se pudo generar la vista del PDF. Usa “Descargar PDF”.</p>
+                        <p className="admin-help-text">No se pudo generar la vista del PDF. Usa "Descargar PDF".</p>
                       )
                     ) : (
                       <p className="admin-help-text">
-                        Este tipo de solicitud no tiene plantilla PDF personalizada. Con “Descargar PDF” obtienes el formato estándar con los datos.
+                        Este tipo de solicitud no tiene plantilla PDF personalizada. Con "Descargar PDF" obtienes el formato estándar con los datos.
                       </p>
                     )}
 
@@ -562,7 +582,7 @@ export function BandejaPanel() {
                               {c.ocr_target ? <span className="admin-help-text"> · esperado: {etiquetaDocumento(c.ocr_target)}</span> : null}
                               {campoDato && valorEsperado && valorEsperado !== '—' ? (
                                 <div className="bandeja-comparacion">
-                                  🔎 La IA debe verificar que <strong>{campoDato.label}</strong> (“{valorEsperado}”) aparezca en este adjunto.
+                                  🔎 La IA debe verificar que <strong>{campoDato.label}</strong> ("{valorEsperado}") aparezca en este adjunto.
                                 </div>
                               ) : null}
                               {detalle.camposPlantilla
@@ -572,7 +592,7 @@ export function BandejaPanel() {
                                   if (!val || val === '—') return null;
                                   return (
                                     <div key={d.key} className="bandeja-comparacion">
-                                      🔎 Debe coincidir con <strong>{d.label}</strong>: “{val}”.
+                                      🔎 Debe coincidir con <strong>{d.label}</strong>: "{val}".
                                     </div>
                                   );
                                 })}
@@ -594,7 +614,41 @@ export function BandejaPanel() {
                       ))}
                     </ul>
 
-                    {detalle.estado === 'en_validacion' ? (
+                    {detalle.estado === 'en_validacion' && detalle.pasoActual === 'autorizador_visto_bueno' && (
+                      <div className="bandeja-actions">
+                        <div className="bandeja-visto-bueno-info">
+                          <p>
+                            <strong>Se requiere tu visto bueno</strong> — El solicitante indica que tu autorizaste este gasto verbalmente.
+                            Al confirmar, la solicitud avanza al siguiente paso del flujo.
+                          </p>
+                        </div>
+                        <textarea
+                          placeholder="Observacion (opcional)"
+                          value={comentario}
+                          onChange={(e) => setComentario(e.target.value)}
+                          rows={2}
+                        />
+                        <div className="bandeja-actions-row">
+                          <button
+                            type="button"
+                            className="admin-primary-button"
+                            disabled={accionando !== null}
+                            onClick={() => darVistoBueno(it.id)}
+                          >
+                            Confirmar visto bueno
+                          </button>
+                          <button
+                            type="button"
+                            className="admin-ghost-button bandeja-rechazar"
+                            disabled={accionando !== null}
+                            onClick={() => ejecutar('rechazar', it.id)}
+                          >
+                            No autorizo este gasto
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                    {detalle.estado === 'en_validacion' && detalle.pasoActual !== 'autorizador_visto_bueno' && (
                     <div className="bandeja-actions">
                       <label className="admin-help-text" htmlFor={`motivo-${it.id}`}>Motivo (para devolver o rechazar)</label>
                       <select
@@ -602,7 +656,7 @@ export function BandejaPanel() {
                         value={motivoSel}
                         onChange={(e) => setMotivoSel(e.target.value)}
                       >
-                        <option value="">— Selecciona un motivo —</option>
+                        <option value="">selecciona un motivo</option>
                         <option value="Adjunto faltante">Adjunto faltante</option>
                         <option value="Adjunto ilegible o de baja calidad">Adjunto ilegible o de baja calidad</option>
                         <option value="Adjunto no corresponde">Adjunto no corresponde al documento pedido</option>
@@ -630,7 +684,7 @@ export function BandejaPanel() {
                           disabled={accionando !== null}
                           onClick={() => ejecutar('validar', it.id)}
                         >
-                          ✓ Validar y avanzar
+                          Validar y avanzar
                         </button>
                         <button
                           type="button"
@@ -638,7 +692,7 @@ export function BandejaPanel() {
                           disabled={accionando !== null}
                           onClick={() => ejecutar('devolver', it.id)}
                         >
-                          ↩ Devolver al solicitante
+                          Devolver al solicitante
                         </button>
                         <button
                           type="button"
@@ -646,7 +700,7 @@ export function BandejaPanel() {
                           disabled={accionando !== null}
                           onClick={() => ejecutar('rechazar', it.id)}
                         >
-                          ✗ Rechazar
+                          Rechazar
                         </button>
                         {isAdmin ? (
                           <button
@@ -655,18 +709,18 @@ export function BandejaPanel() {
                             title="Eliminar definitivamente (solo administradores)"
                             onClick={() => eliminarSolicitud(it)}
                           >
-                            🗑 Eliminar
+                            Eliminar
                           </button>
                         ) : null}
                       </div>
                       <div className="bandeja-remitir-row">
-                        <label htmlFor={`remitir-${it.id}`}>Remitir a otra área:</label>
+                        <label htmlFor={`remitir-${it.id}`}>Remitir a otra area:</label>
                         <select
                           id={`remitir-${it.id}`}
                           value={areaRemitir}
                           onChange={(e) => setAreaRemitir(e.target.value === '' ? '' : Number(e.target.value))}
                         >
-                          <option value="">— selecciona área destino —</option>
+                          <option value="">selecciona area destino</option>
                           {areas.filter((a) => a.id !== (detalle ? (detalle as unknown as { areaId?: number }).areaId : 0)).map((a) => (
                             <option key={a.id} value={a.id}>{a.nombre}</option>
                           ))}
@@ -677,13 +731,14 @@ export function BandejaPanel() {
                           disabled={accionando !== null || !areaRemitir}
                           onClick={() => ejecutar('remitir', it.id)}
                         >
-                          → Remitir
+                          Remitir
                         </button>
                       </div>
                     </div>
-                    ) : (
+                    )}
+                    {detalle.estado !== 'en_validacion' && (
                       <p className="admin-help-text" style={{ marginTop: 10 }}>
-                        Este anticipo está en etapa de legalización. Usa “🔔 Recordar legalizar” o “✓ Confirmar legalización” en la parte superior de la tarjeta.
+                        Este anticipo esta en etapa de legalizacion. Usa Recordar legalizar o Confirmar legalizacion en la parte superior de la tarjeta.
                       </p>
                     )}
                   </>

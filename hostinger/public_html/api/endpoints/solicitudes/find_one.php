@@ -30,17 +30,22 @@ $user = $uStmt->fetch();
 $esAdmin = strtolower(trim($user['rol'] ?? '')) === 'administrador';
 
 $esSolicitante = (int)$r['solicitante_usuario_id'] === $usuarioId;
-// Validador autorizado: su nivel coincide con el paso_actual (o la solicitud ya esta cerrada =
-// historico) Y el area coincide. Excepcion: contabilidad ve todas las areas (igual que en _flujo.php).
-$nivelUser = (string)($user['nivel_aprobacion'] ?? '');
-$mismaArea = (int)($user['area_id'] ?? 0) === (int)$r['area_id'];
+$nivelUser     = (string)($user['nivel_aprobacion'] ?? '');
+$mismaArea     = (int)($user['area_id'] ?? 0) === (int)$r['area_id'];
 $esContabilidad = $nivelUser === 'contabilidad';
-$pasoActual = (string)($r['paso_actual'] ?? '');
+$pasoActual    = (string)($r['paso_actual'] ?? '');
 $estadoCerrado = in_array((string)$r['estado'], ['aprobado', 'rechazado'], true);
 $nivelHabilitado = $nivelUser !== '' && ($nivelUser === $pasoActual || $estadoCerrado);
 $esValidadorEnTurno = $nivelHabilitado && ($esContabilidad || $mismaArea);
 
-if (!$esAdmin && !$esSolicitante && !$esValidadorEnTurno) {
+// Autorizador de visto bueno: puede ver si paso_actual = 'autorizador_visto_bueno' y su ID coincide
+$esAutorizador = false;
+if ($pasoActual === 'autorizador_visto_bueno') {
+    $datos = json_decode($r['datos_formulario'] ?? '{}', true) ?: [];
+    $esAutorizador = (int)($datos['autorizadorId'] ?? 0) === $usuarioId;
+}
+
+if (!$esAdmin && !$esSolicitante && !$esValidadorEnTurno && !$esAutorizador) {
     Response::error('No tienes permiso para ver esta solicitud', 403);
 }
 
