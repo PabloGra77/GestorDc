@@ -2485,7 +2485,7 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
   }
 
   /* Botones que deben ocupar ancho completo en formularios */
-  button:not(.admin-ghost-button):not(.admin-primary-button):not(.admin-bell-button):not(.admin-nav-item):not(.admin-module-item):not(.radicaciones-nav-item):not(.bandeja-item-head):not(.admin-refresh-button):not(.leg-cat-btn):not(.leg-sugerido-item):not(.leg-gasto-del):not(.payops-theme-toggle):not(.secondary-link):not(.secondary-button):not(.radicado-action-button):not([class*="icon"]) {
+  button:not(.admin-ghost-button):not(.admin-primary-button):not(.admin-bell-button):not(.admin-nav-item):not(.admin-module-item):not(.radicaciones-nav-item):not(.bandeja-item-head):not(.admin-refresh-button):not(.leg-cat-btn):not(.leg-sugerido-item):not(.leg-gasto-del):not(.payops-theme-toggle):not(.secondary-link):not(.secondary-button):not(.radicado-action-button):not(.payops-input-eye):not([class*="icon"]) {
     width: 100%;
   }
 
@@ -2505,9 +2505,18 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
   .secondary-link,
   .secondary-button,
   .payops-theme-toggle,
-  .radicado-action-button {
+  .radicado-action-button,
+  .payops-input-eye,
+  .leg-sugerido-item {
     width: auto !important;
     min-height: auto;
+  }
+
+  /* Ojo de contraseña: tamaño fijo, no expandir */
+  .payops-input-eye {
+    width: 40px !important;
+    height: 40px !important;
+    min-height: 40px !important;
   }
 
   /* Tema toggle: mantener circular */

@@ -77,6 +77,37 @@ async function hashFile(file: File): Promise<string> {
   }
 }
 
+/** Convierte cualquier imagen a JPEG comprimida (<1.5 MB, max 1600px) para upload seguro */
+async function prepararImagen(file: File): Promise<File> {
+  if (file.type === 'application/pdf') return file;
+  return new Promise((resolve) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const MAX = 1600;
+      let w = img.naturalWidth;
+      let h = img.naturalHeight;
+      if (w > MAX || h > MAX) {
+        if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
+        else { w = Math.round(w * MAX / h); h = MAX; }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) { resolve(file); return; }
+      ctx.drawImage(img, 0, 0, w, h);
+      canvas.toBlob((blob) => {
+        if (!blob) { resolve(file); return; }
+        const nombre = file.name.replace(/\.[^.]+$/, '.jpg');
+        resolve(new File([blob], nombre, { type: 'image/jpeg' }));
+      }, 'image/jpeg', 0.82);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
+    img.src = url;
+  });
+}
+
 /* ─── Componente fila de gasto ─────────────────────────────── */
 function FilaGasto({
   gasto, idx, categorias, onChange, onRemove, onAdjuntarFactura, canRemove,
@@ -212,6 +243,14 @@ function FilaGasto({
           />
         </div>
 
+        {/* Error de upload (sin archivo cargado) */}
+        {!tieneFactura && gasto._facturaAlertas.length > 0 && (
+          <div className="admin-error" style={{ marginTop: 8, fontSize: 13 }}>
+            {gasto._facturaAlertas[0]}
+          </div>
+        )}
+
+        {/* Alertas OCR (archivo cargado con advertencias) */}
         {tieneFactura && hayAlertas && (
           <ul className="leg-alertas-list">
             {gasto._facturaAlertas.map((a, i) => <li key={i}>{a}</li>)}
@@ -257,6 +296,8 @@ export function LegalizacionPanel({ onCreada }: LegalizacionPanelProps) {
   const [enviando, setEnviando] = useState(false);
 
   const { procesarArchivo } = useOcrDocument();
+  const gastosRef = useRef(gastos);
+  useEffect(() => { gastosRef.current = gastos; });
 
   useEffect(() => {
     api.get<LegalizacionConfig>('/config/legalizacion').then((r) => setConfig(r.data)).catch(() => {});
@@ -300,67 +341,78 @@ export function LegalizacionPanel({ onCreada }: LegalizacionPanelProps) {
   }
 
   const adjuntarFactura = useCallback(async (idx: number, file: File) => {
-    setGastos((prev) => prev.map((g, i) => i === idx ? { ...g, _validando: true } : g));
+    setGastos((prev) => prev.map((g, i) =>
+      i === idx ? { ...g, _validando: true, _facturaAlertas: [] } : g
+    ));
+
+    // 1. Subir archivo — error visible si falla
+    let archivoId = '';
     try {
-      // Subir archivo
+      const archivoParaSubir = await prepararImagen(file);
       const fd = new FormData();
-      fd.append('archivo', file);
-      const up = await api.post<{ id: string }>('/archivos', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
-      const archivoId = up.data.id;
+      fd.append('archivo', archivoParaSubir);
+      const up = await api.post<{ id: string }>('/archivos', fd, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      archivoId = up.data.id;
+    } catch {
+      setGastos((prev) => prev.map((g, i) =>
+        i === idx ? {
+          ...g,
+          _validando: false,
+          _facturaAlertas: ['No se pudo subir el archivo. Verifica tu conexión e intenta de nuevo.'],
+        } : g
+      ));
+      return;
+    }
 
-      // Hash del archivo para detección de duplicados
-      const hash = await hashFile(file);
+    // 2. Hash para duplicados
+    const hash = await hashFile(file);
 
-      // OCR para extraer datos
+    // 3. OCR — no bloquea el registro si falla
+    const alertas: string[] = [];
+    try {
       const ocr = await procesarArchivo(file);
-      const alertas: string[] = [];
-
       if (ocr) {
         const textoOcr = ocr.text;
-        const gasto = gastos[idx];
+        const gasto = gastosRef.current[idx];
         const valorStr = String(gasto.valor || '').replace(/\./g, '').replace(',', '');
 
-        // Validar total en factura
         if (valorStr.length >= 3) {
           const v = validarOcrContraDato(textoOcr, valorStr, 'cc');
           if (!v.coincide) {
             alertas.push(`El valor $${formatearMiles(parseInt(valorStr))} no se identificó claramente en la factura.`);
           }
         }
-        // Validar NIT proveedor
         if (gasto.nitProveedor) {
           const vNit = validarOcrContraDato(textoOcr, gasto.nitProveedor, 'cc');
           if (!vNit.coincide) alertas.push(`El NIT ${gasto.nitProveedor} no coincide con el de la factura.`);
         }
-        // Confianza
         if (ocr.confidence < 45) {
           alertas.push(`Lectura de baja calidad (${Math.round(ocr.confidence)}%). Verifica que la imagen sea legible.`);
         }
-        // Señales de factura
         const t = textoOcr.toLowerCase();
         const marcadores = ['total', 'nit', 'valor', 'fecha'].filter((k) => t.includes(k)).length;
         if (marcadores < 2) {
           alertas.push('El archivo no parece ser una factura válida. Verifica que sea el documento correcto.');
         }
       }
-
-      setGastos((prev) => prev.map((g, i) =>
-        i === idx ? {
-          ...g,
-          _facturaArchivoId: archivoId,
-          _factura: file.name,
-          _facturaHash: hash,
-          _facturaConfianza: ocr?.confidence ?? 0,
-          _facturaAlertas: alertas,
-          _validando: false,
-        } : g
-      ));
     } catch {
-      setGastos((prev) => prev.map((g, i) =>
-        i === idx ? { ...g, _validando: false, _facturaAlertas: ['No se pudo procesar el archivo.'] } : g
-      ));
+      alertas.push('No se pudo analizar el contenido automáticamente. El archivo fue registrado correctamente.');
     }
-  }, [gastos, procesarArchivo]);
+
+    setGastos((prev) => prev.map((g, i) =>
+      i === idx ? {
+        ...g,
+        _facturaArchivoId: archivoId,
+        _factura: file.name,
+        _facturaHash: hash,
+        _facturaConfianza: 0,
+        _facturaAlertas: alertas,
+        _validando: false,
+      } : g
+    ));
+  }, [procesarArchivo]);
 
   function validarPaso(): string {
     if (paso === 1) {
