@@ -2294,11 +2294,12 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
   }
 
   .admin-panel-head {
-    flex-direction: column;
+    flex-wrap: wrap;
+    align-items: center;
   }
 
   .admin-kpi-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, 1fr);
   }
 
   .admin-form-grid {
@@ -2474,12 +2475,17 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
     gap: 12px;
   }
 
-  input, select, textarea, button {
+  input, select, textarea {
     font-size: 16px; /* evita zoom iOS */
     min-height: 44px;
   }
 
-  button:not(.admin-ghost-button):not(.admin-primary-button):not(.admin-bell-button):not(.admin-nav-item):not(.admin-module-item):not(.radicaciones-nav-item):not(.bandeja-item-head):not(.admin-refresh-button):not(.leg-cat-btn):not(.leg-sugerido-item):not(.leg-gasto-del):not([class*="icon"]) {
+  button {
+    font-size: 16px;
+  }
+
+  /* Botones que deben ocupar ancho completo en formularios */
+  button:not(.admin-ghost-button):not(.admin-primary-button):not(.admin-bell-button):not(.admin-nav-item):not(.admin-module-item):not(.radicaciones-nav-item):not(.bandeja-item-head):not(.admin-refresh-button):not(.leg-cat-btn):not(.leg-sugerido-item):not(.leg-gasto-del):not(.payops-theme-toggle):not(.secondary-link):not(.secondary-button):not(.radicado-action-button):not([class*="icon"]) {
     width: 100%;
   }
 
@@ -2488,15 +2494,28 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
     width: 100%;
   }
 
+  /* Botones que deben permanecer compactos */
   .admin-bell-button,
   .admin-nav-item,
   .admin-module-item,
   .radicaciones-nav-item,
   .admin-refresh-button,
   .leg-cat-btn,
-  .leg-gasto-del {
-    width: auto;
-    min-height: 36px;
+  .leg-gasto-del,
+  .secondary-link,
+  .secondary-button,
+  .payops-theme-toggle,
+  .radicado-action-button {
+    width: auto !important;
+    min-height: auto;
+  }
+
+  /* Tema toggle: mantener circular */
+  .payops-theme-toggle {
+    width: 44px !important;
+    height: 44px !important;
+    min-height: 44px;
+    flex-shrink: 0;
   }
 
   .btn-row,
@@ -2544,6 +2563,44 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
   .box {
     padding: 16px;
   }
+
+  /* Formulario de busqueda de radicado: apilar input y boton */
+  .inicio-seguimiento-input {
+    flex-direction: column;
+    gap: 8px;
+  }
+  .inicio-seguimiento-input input {
+    max-width: 100%;
+    width: 100%;
+  }
+  .inicio-seguimiento-input .radicado-action-button {
+    width: 100% !important;
+    min-height: 48px;
+  }
+
+  /* Admin panel head: mantener row en movil, boton compacto */
+  .admin-panel-head {
+    flex-direction: row !important;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .admin-panel-head > div { flex: 1; min-width: 0; }
+  .admin-refresh-button { flex-shrink: 0; }
+
+  /* Header compacto: role pill + cerrar sesion en fila */
+  .admin-header.admin-header-compact {
+    padding: 6px 0;
+  }
+  .admin-header-actions {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  /* Header inicio: reducir h1 */
+  .admin-header h1 { font-size: 18px; }
+  .admin-header-brand { gap: 8px; }
+  .admin-header-logo { width: 48px !important; max-height: 28px !important; }
 }
 
 /* === Tablet (641px - 1023px) === */
