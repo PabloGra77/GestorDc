@@ -2236,9 +2236,9 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
   }
 
   .admin-sidebar {
-    flex-direction: column;
-    align-items: flex-start;
-    padding: 16px 14px;
+    flex-wrap: wrap;
+    padding: 10px 14px;
+    gap: 8px;
   }
 
   .admin-notifications-panel {
@@ -2247,6 +2247,7 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
 
   .admin-sidebar-nav {
     justify-content: flex-start;
+    flex-wrap: wrap;
   }
 
   .admin-workspace,
@@ -2478,7 +2479,7 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
     min-height: 44px;
   }
 
-  button:not(.admin-ghost-button):not(.admin-primary-button):not(.admin-bell-button):not(.admin-nav-item):not(.admin-module-item):not(.bandeja-item-head):not(.admin-refresh-button):not(.leg-cat-btn):not(.leg-sugerido-item):not(.leg-gasto-del):not([class*="icon"]) {
+  button:not(.admin-ghost-button):not(.admin-primary-button):not(.admin-bell-button):not(.admin-nav-item):not(.admin-module-item):not(.radicaciones-nav-item):not(.bandeja-item-head):not(.admin-refresh-button):not(.leg-cat-btn):not(.leg-sugerido-item):not(.leg-gasto-del):not([class*="icon"]) {
     width: 100%;
   }
 
@@ -2490,10 +2491,12 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
   .admin-bell-button,
   .admin-nav-item,
   .admin-module-item,
+  .radicaciones-nav-item,
   .admin-refresh-button,
   .leg-cat-btn,
   .leg-gasto-del {
     width: auto;
+    min-height: 36px;
   }
 
   .btn-row,
@@ -8418,11 +8421,12 @@ textarea {
 
   /* Sidebar sticky horizontal en móvil */
   .admin-sidebar {
-    max-height: 60px;
+    max-height: none;
     overflow-x: auto;
     overflow-y: hidden;
     display: flex;
     flex-direction: row !important;
+    flex-wrap: nowrap !important;
     gap: 4px;
     padding: 6px 10px;
     border-bottom: 1px solid var(--border-soft);
@@ -8435,6 +8439,7 @@ textarea {
   .admin-sidebar-nav {
     display: flex;
     flex-direction: row !important;
+    flex-wrap: nowrap !important;
     gap: 4px;
     overflow-x: auto;
     scrollbar-width: none;
@@ -8459,6 +8464,46 @@ textarea {
   }
   .bandeja-actions-row button {
     width: 100%;
+  }
+
+  /* Radicaciones nav: ancho completo y scroll horizontal */
+  .radicaciones-nav {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+  }
+
+  /* KPI grid: 2 columnas en tablet/móvil */
+  .radicaciones-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  /* Header: apilar en móvil */
+  .admin-header {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .admin-header h1 {
+    font-size: 20px;
+  }
+
+  /* Form de legalización: campos en 1 columna */
+  .leg-form .leg-field,
+  .leg-form input,
+  .leg-form select,
+  .leg-form textarea {
+    width: 100%;
+  }
+
+  /* Resumen de legalización: 1 columna */
+  .leg-resumen-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Bandeja items: cards en lugar de tabla */
+  .bandeja-item {
+    flex-direction: column;
+    gap: 6px;
   }
 }
 

@@ -12,7 +12,6 @@ import { BulkCreatePanel } from '../admin/BulkCreatePanel';
 import { PersonalAutorizadoPanel } from '../admin/PersonalAutorizadoPanel';
 import { ConfiguracionSmtpPanel } from '../admin/ConfiguracionSmtpPanel';
 import { LegalizacionConfigPanel } from '../admin/LegalizacionConfigPanel';
-import { LegalizacionPanel } from '../solicitudes/LegalizacionPanel';
 import { InicioStats, InicioRecientes, SeguimientoRadicado } from './InicioStats';
 import type { Role } from '../../types/role';
 import type { Radicado, VerificarRadicadoResponse } from '../../types/radicado';
@@ -1521,13 +1520,6 @@ export function DashboardPage() {
 
 			{activeSection === 'Radicaciones' ? <RadicacionesModule /> : null}
 
-			{activeSection === 'Legalizaciones' ? (
-				<section className="card-surface module-card">
-					<h3>Nueva legalización de gastos</h3>
-					<LegalizacionPanel onCreada={() => {}} />
-				</section>
-			) : null}
-
 			{isUserPermisosOpen && usuarioPermisosObjetivo ? (
 				<div className="admin-permissions-overlay" role="dialog" aria-modal="true" aria-label="Permisos de usuario">
 					<div className="admin-permissions-modal card-surface">
@@ -1576,7 +1568,7 @@ export function DashboardPage() {
 				</div>
 			) : null}
 
-			{activeSection !== 'Inicio' && activeSection !== 'Panel administrador' && activeSection !== 'Radicaciones' && activeSection !== 'Legalizaciones' ? (
+			{activeSection !== 'Inicio' && activeSection !== 'Panel administrador' && activeSection !== 'Radicaciones' ? (
 				<section className="card-surface module-card">
 					<h3>{activeSection}</h3>
 					<p>Vista en construcción. Este módulo se conectará en el siguiente paso.</p>
