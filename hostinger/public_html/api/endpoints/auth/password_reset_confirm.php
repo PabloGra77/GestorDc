@@ -3,6 +3,9 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../bootstrap.php';
 
+Throttle::hit('pwd-reset-confirm:' . Throttle::clientIp(), 10, 60);
+Throttle::hit('pwd-reset-confirm-hour:' . Throttle::clientIp(), 30, 3600);
+
 $data = Request::body();
 $token = trim((string)($data['token'] ?? ''));
 // El frontend envia 'newPassword'; se aceptan ambos nombres por compatibilidad.

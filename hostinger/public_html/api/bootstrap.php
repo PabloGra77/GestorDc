@@ -14,6 +14,7 @@ date_default_timezone_set('UTC');
 header_remove('X-Powered-By');
 header('X-Content-Type-Options: nosniff');
 header('X-Frame-Options: DENY');
+header('X-XSS-Protection: 0');
 header('Referrer-Policy: no-referrer');
 
 require_once __DIR__ . '/lib/config.php';

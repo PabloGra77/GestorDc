@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 $jwt = Auth::requireUser();
+Throttle::hit('chg-init-pwd:' . Throttle::clientIp(), 5, 60);
 $usuarioId = (int)($jwt['sub'] ?? 0);
 
 $body = Request::body();

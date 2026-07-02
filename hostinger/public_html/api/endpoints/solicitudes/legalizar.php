@@ -54,7 +54,12 @@ foreach ($docs as $k => $info) {
     if (isset($info['nombre'])) $entry['nombre'] = mb_substr((string)$info['nombre'], 0, 200);
     if (isset($info['ocrTexto'])) $entry['ocrTexto'] = mb_substr((string)$info['ocrTexto'], 0, 5000);
     if (isset($info['ocrConfianza'])) $entry['ocrConfianza'] = (float)$info['ocrConfianza'];
-    if (isset($info['archivoId'])) $entry['archivoId'] = mb_substr((string)$info['archivoId'], 0, 100);
+    if (isset($info['archivoId'])) {
+        $aid = (string)$info['archivoId'];
+        if (preg_match('/^[a-f0-9]{32}\.(pdf|jpg|png|webp)$/i', $aid)) {
+            $entry['archivoId'] = $aid;
+        }
+    }
     if (!empty($info['ocrAlertas']) && is_array($info['ocrAlertas'])) {
         $entry['ocrAlertas'] = array_slice(array_map(fn($a) => mb_substr((string)$a, 0, 500), $info['ocrAlertas']), 0, 10);
         foreach ($entry['ocrAlertas'] as $a) {

@@ -19,6 +19,9 @@ if ($sol['estado'] !== 'en_validacion') {
 if ($firma === '' || strpos($firma, 'data:image') !== 0) {
     Response::error('Se requiere la firma del validador', 400);
 }
+if (strlen($firma) > 300_000) {
+    Response::error('La firma excede el tamaño máximo permitido (300 KB)', 413);
+}
 
 $siguiente = FlujoHelpers::siguientePaso($sol['flujo_aprobacion'] ?? '[]', $sol['paso_actual']);
 
