@@ -352,7 +352,7 @@ export function LegalizacionPanel({ onCreada }: LegalizacionPanelProps) {
       const fd = new FormData();
       fd.append('archivo', archivoParaSubir);
       const up = await api.post<{ id: string }>('/archivos', fd, {
-        headers: { 'Content-Type': 'multipart/form-data' },
+        headers: { 'Content-Type': undefined },
       });
       archivoId = up.data.id;
     } catch {

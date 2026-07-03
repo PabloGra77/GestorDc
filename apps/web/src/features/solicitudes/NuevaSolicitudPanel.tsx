@@ -6,6 +6,7 @@ import { SignaturePad } from '../../components/SignaturePad';
 import { BANCOS_COLOMBIA } from '../../utils/bancos';
 import { etiquetaDocumento } from '../../utils/documentoLabels';
 import { DireccionField } from '../../components/DireccionField';
+import { LegalizacionPanel } from './LegalizacionPanel';
 import { ordenarCamposPorPlantilla } from '../../utils/ordenCamposPlantilla';
 
 interface Area {
@@ -439,7 +440,7 @@ export function NuevaSolicitudPanel({ onCreada }: NuevaSolicitudPanelProps) {
     try {
       const fd = new FormData();
       fd.append('archivo', file);
-      const up = await api.post<{ id: string }>('/archivos', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+      const up = await api.post<{ id: string }>('/archivos', fd, { headers: { 'Content-Type': undefined } });
       setDocArchivos((p) => ({ ...p, [key]: up.data.id }));
     } catch {
       setErr('No se pudo subir “' + file.name + '”. Verifica que sea PDF/JPG/PNG y pese menos de 10 MB.');
@@ -820,6 +821,9 @@ export function NuevaSolicitudPanel({ onCreada }: NuevaSolicitudPanelProps) {
             </button>
           </header>
 
+          {tipoSel.slug === 'legalizacion' ? (
+            <LegalizacionPanel onCreada={onCreada} />
+          ) : (
           <form className="nueva-sol-form" onSubmit={enviar}>
             {/* Indicador de sub-pasos */}
             <div className="nueva-sol-substeps">
@@ -1109,6 +1113,7 @@ export function NuevaSolicitudPanel({ onCreada }: NuevaSolicitudPanelProps) {
               )}
             </div>
           </form>
+          )}
         </>
       ) : null}
     </section>

@@ -4,9 +4,8 @@ import { getAuthSession } from '../auth/auth.service';
 import { BandejaPanel } from '../solicitudes/BandejaPanel';
 import { MisSolicitudesPanel } from '../solicitudes/MisSolicitudesPanel';
 import { NuevaSolicitudPanel } from '../solicitudes/NuevaSolicitudPanel';
-import { LegalizacionPanel } from '../solicitudes/LegalizacionPanel';
 
-type Vista = 'bandeja' | 'misSolicitudes' | 'nueva' | 'legalizacion' | 'tablero';
+type Vista = 'bandeja' | 'misSolicitudes' | 'nueva' | 'tablero';
 
 interface SolicitudResumen {
   id: number;
@@ -114,13 +113,6 @@ export function RadicacionesModule() {
         </button>
         <button
           type="button"
-          className={`radicaciones-nav-item${vista === 'legalizacion' ? ' active' : ''}`}
-          onClick={() => setVista('legalizacion')}
-        >
-          Nueva legalizacion
-        </button>
-        <button
-          type="button"
           className={`radicaciones-nav-item${vista === 'tablero' ? ' active' : ''}`}
           onClick={() => setVista('tablero')}
         >
@@ -131,7 +123,6 @@ export function RadicacionesModule() {
       {vista === 'bandeja' ? <BandejaPanel /> : null}
       {vista === 'misSolicitudes' ? <MisSolicitudesPanel /> : null}
       {vista === 'nueva' ? <NuevaSolicitudPanel /> : null}
-      {vista === 'legalizacion' ? <LegalizacionPanel onCreada={() => setVista('misSolicitudes')} /> : null}
 
       {vista === 'tablero' ? (
         <div className="radicaciones-tablero">
