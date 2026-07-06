@@ -70,6 +70,7 @@ function getPreciosRef(origen: string, destino: string): PrecioRef | null {
 /* ─── Tipos ─────────────────────────────────────────────────── */
 interface UsuarioSugerido { id: number; nombreCompleto: string; rol: string; area: string | null; }
 interface FacturaAdj { archivoId: string; nombre: string; alertas: string[]; }
+interface OpcionViaje { id: string; tipo: 'vuelo' | 'bus' | 'vuelo_escala'; empresa: string; salida: string; llegada: string; duracion: string; precio: number; esEstimado: boolean; }
 
 /* ─── Helpers ───────────────────────────────────────────────── */
 async function prepararImagen(file: File): Promise<File> {
@@ -311,6 +312,36 @@ export function ViaticosPanel({ onCreada }: { onCreada?: (info: { id: number; nu
 
   const preciosRef = useMemo(() => getPreciosRef(ciudadOrigen, ciudadDestino), [ciudadOrigen, ciudadDestino]);
 
+  /* ─── API precios de viaje ──────────────────────────────────── */
+  const [opcionesViaje, setOpcionesViaje] = useState<OpcionViaje[]>([]);
+  const [opcionesRegreso, setOpcionesRegreso] = useState<OpcionViaje[]>([]);
+  const [cargandoPrecios, setCargandoPrecios] = useState(false);
+  const [fuentePrecios, setFuentePrecios] = useState<'api' | 'estimado' | null>(null);
+
+  useEffect(() => {
+    if (paso !== 3 || !ciudadOrigen || !ciudadDestino || !fechaIda) return;
+    let cancelled = false;
+    setCargandoPrecios(true);
+    setOpcionesViaje([]);
+    setOpcionesRegreso([]);
+    const qs = new URLSearchParams({
+      origen: ciudadOrigen,
+      destino: ciudadDestino,
+      fecha_ida: fechaIda,
+      ...(esIdaVuelta && fechaRegreso ? { fecha_regreso: fechaRegreso } : {}),
+    });
+    api.get<{ opciones: OpcionViaje[]; opcionesRegreso: OpcionViaje[]; fuente: string }>(`/viajes/buscar?${qs}`)
+      .then((r) => {
+        if (cancelled) return;
+        setOpcionesViaje(r.data.opciones ?? []);
+        setOpcionesRegreso(r.data.opcionesRegreso ?? []);
+        setFuentePrecios(r.data.fuente === 'api' ? 'api' : 'estimado');
+      })
+      .catch(() => { /* silencioso: usará PRECIOS_REF estático */ })
+      .finally(() => { if (!cancelled) setCargandoPrecios(false); });
+    return () => { cancelled = true; };
+  }, [paso, ciudadOrigen, ciudadDestino, fechaIda, fechaRegreso, esIdaVuelta]);
+
   const totalTransporte = useMemo(() => {
     const ida = parseInt(valorIda.replace(/\D/g, '')) || 0;
     const vuelta = esIdaVuelta ? (parseInt(valorVuelta.replace(/\D/g, '')) || 0) : 0;
@@ -422,6 +453,7 @@ export function ViaticosPanel({ onCreada }: { onCreada?: (info: { id: number; nu
     setFacturaTransporte(null); setTieneHospedaje(false); setHotelNombre(''); setHotelEntrada(''); setHotelSalida(''); setHotelValorNoche(''); setFacturaHotel(null);
     setDiasDesayuno(''); setValorDesayuno(''); setDiasAlmuerzo(''); setValorAlmuerzo(''); setDiasCena(''); setValorCena(''); setFacturaComidas(null);
     setFirma(''); setMsg('');
+    setOpcionesViaje([]); setOpcionesRegreso([]); setFuentePrecios(null);
   }
 
   async function enviar() {
@@ -644,53 +676,69 @@ export function ViaticosPanel({ onCreada }: { onCreada?: (info: { id: number; nu
           <h3>Datos del tiquete de transporte</h3>
           <p className="leg-nota">Ingresa los datos exactos de tu tiquete o comprobante de viaje.</p>
 
-          {/* Referencia de precios — solo informativa, sin sugerencias de precio mínimo */}
-          {preciosRef && (
-            <div className="viatico-ref-box">
-              <div className="viatico-ref-titulo">📊 Precios habituales para esta ruta</div>
-              <div className="viatico-ref-opciones">
-                {preciosRef.aereo && (
-                  <div className="viatico-ref-opcion">
-                    <span className="viatico-ref-icon">✈</span>
-                    <div>
-                      <div className="viatico-ref-tipo">Aéreo · {ciudadOrigen} → {ciudadDestino}</div>
-                      <div className="viatico-ref-rango">
-                        ${formatearMiles(preciosRef.aereo[0])} – ${formatearMiles(preciosRef.aereo[1])} COP
+          {/* Precios de referencia: API en tiempo real → fallback estático */}
+          <div className="viatico-ref-box">
+            {cargandoPrecios ? (
+              <div className="viatico-ref-titulo">⏳ Consultando precios para {ciudadOrigen} → {ciudadDestino}…</div>
+            ) : opcionesViaje.length > 0 ? (
+              <>
+                <div className="viatico-ref-titulo">
+                  📊 Opciones disponibles · {ciudadOrigen} → {ciudadDestino}
+                  {fuentePrecios === 'api' && <span className="viatico-fuente-badge">Precios actualizados</span>}
+                  {fuentePrecios === 'estimado' && <span className="viatico-fuente-badge viatico-fuente-est">Estimados de referencia</span>}
+                </div>
+                <div className="viatico-opciones-lista">
+                  {opcionesViaje.slice(0, 5).map((op) => (
+                    <div key={op.id} className="viatico-opcion-item">
+                      <span className="viatico-opcion-icono">{op.tipo === 'bus' ? '🚌' : '✈'}</span>
+                      <div className="viatico-opcion-info">
+                        <strong>{op.empresa}</strong>
+                        <span>{op.salida}{op.llegada !== '—' ? ` → ${op.llegada}` : ''} · {op.duracion}</span>
+                      </div>
+                      <div className="viatico-opcion-precio">${formatearMiles(op.precio)}</div>
+                    </div>
+                  ))}
+                </div>
+                {/* Validación en tiempo real contra precios de API */}
+                {(() => {
+                  const v = parseInt(valorIda.replace(/\D/g, '')) || 0;
+                  if (v === 0) return null;
+                  const filtradas = opcionesViaje.filter((o) => tipoTrIda === 'aereo' ? o.tipo !== 'bus' : o.tipo === 'bus');
+                  if (filtradas.length === 0) return null;
+                  const precios = filtradas.map((o) => o.precio);
+                  const maxRef = Math.max(...precios) * 1.4;
+                  const minRef = Math.min(...precios) * 0.7;
+                  if (v > maxRef) return <div className="viatico-precio-alerta">⚠ ${formatearMiles(v)} supera el rango de referencia para esta ruta. El aprobador revisará.</div>;
+                  if (v >= minRef) return <div className="viatico-precio-ok">✓ Precio dentro del rango de referencia para esta ruta.</div>;
+                  return null;
+                })()}
+              </>
+            ) : preciosRef ? (
+              <>
+                <div className="viatico-ref-titulo">📊 Precios habituales para esta ruta</div>
+                <div className="viatico-ref-opciones">
+                  {preciosRef.aereo && (
+                    <div className="viatico-ref-opcion">
+                      <span className="viatico-ref-icon">✈</span>
+                      <div>
+                        <div className="viatico-ref-tipo">Aéreo · {ciudadOrigen} → {ciudadDestino}</div>
+                        <div className="viatico-ref-rango">${formatearMiles(preciosRef.aereo[0])} – ${formatearMiles(preciosRef.aereo[1])} COP</div>
                       </div>
                     </div>
-                  </div>
-                )}
-                {preciosRef.terrestre && (
-                  <div className="viatico-ref-opcion">
-                    <span className="viatico-ref-icon">🚌</span>
-                    <div>
-                      <div className="viatico-ref-tipo">Terrestre · {ciudadOrigen} → {ciudadDestino}</div>
-                      <div className="viatico-ref-rango">
-                        ${formatearMiles(preciosRef.terrestre[0])} – ${formatearMiles(preciosRef.terrestre[1])} COP
+                  )}
+                  {preciosRef.terrestre && (
+                    <div className="viatico-ref-opcion">
+                      <span className="viatico-ref-icon">🚌</span>
+                      <div>
+                        <div className="viatico-ref-tipo">Terrestre · {ciudadOrigen} → {ciudadDestino}</div>
+                        <div className="viatico-ref-rango">${formatearMiles(preciosRef.terrestre[0])} – ${formatearMiles(preciosRef.terrestre[1])} COP</div>
                       </div>
                     </div>
-                  </div>
-                )}
-              </div>
-              {/* Validación en tiempo real del precio ingresado */}
-              {valorIda && (() => {
-                const v = parseInt(valorIda.replace(/\D/g, '')) || 0;
-                const ref = tipoTrIda === 'aereo' ? preciosRef.aereo : preciosRef.terrestre;
-                if (!ref || v === 0) return null;
-                if (v > ref[1] * 1.4) {
-                  return (
-                    <div className="viatico-precio-alerta">
-                      ⚠ El valor ${formatearMiles(v)} supera el rango habitual para {tipoTrIda === 'aereo' ? 'vuelo' : 'transporte terrestre'} en esta ruta. El aprobador revisará esta diferencia.
-                    </div>
-                  );
-                }
-                if (v >= ref[0] && v <= ref[1]) {
-                  return <div className="viatico-precio-ok">✓ Precio dentro del rango habitual para esta ruta.</div>;
-                }
-                return null;
-              })()}
-            </div>
-          )}
+                  )}
+                </div>
+              </>
+            ) : null}
+          </div>
 
           <TiqueteForm
             titulo={esIdaVuelta ? '🛫 Tiquete de ida' : '🛫 Tiquete'}
@@ -707,19 +755,32 @@ export function ViaticosPanel({ onCreada }: { onCreada?: (info: { id: number; nu
           />
 
           {esIdaVuelta && (
-            <TiqueteForm
-              titulo="🛬 Tiquete de regreso"
-              ciudadOrigen={ciudadDestino} ciudadDestino={ciudadOrigen} fecha={fechaRegreso}
-              tipo={tipoTrVuelta} onTipo={setTipoTrVuelta}
-              empresa={empresaVuelta} onEmpresa={setEmpresaVuelta}
-              numDoc={numDocVuelta} onNumDoc={setNumDocVuelta}
-              codReserva={codResVuelta} onCodReserva={setCodResVuelta}
-              tramo={tramoVuelta} onTramo={setTramoVuelta}
-              puesto={puestoVuelta} onPuesto={setPuestoVuelta}
-              horaSalida={hrSalidaVuelta} onHoraSalida={setHrSalidaVuelta}
-              horaLlegada={hrLlegadaVuelta} onHoraLlegada={setHrLlegadaVuelta}
-              valor={valorVuelta} onValor={setValorVuelta}
-            />
+            <>
+              <TiqueteForm
+                titulo="🛬 Tiquete de regreso"
+                ciudadOrigen={ciudadDestino} ciudadDestino={ciudadOrigen} fecha={fechaRegreso}
+                tipo={tipoTrVuelta} onTipo={setTipoTrVuelta}
+                empresa={empresaVuelta} onEmpresa={setEmpresaVuelta}
+                numDoc={numDocVuelta} onNumDoc={setNumDocVuelta}
+                codReserva={codResVuelta} onCodReserva={setCodResVuelta}
+                tramo={tramoVuelta} onTramo={setTramoVuelta}
+                puesto={puestoVuelta} onPuesto={setPuestoVuelta}
+                horaSalida={hrSalidaVuelta} onHoraSalida={setHrSalidaVuelta}
+                horaLlegada={hrLlegadaVuelta} onHoraLlegada={setHrLlegadaVuelta}
+                valor={valorVuelta} onValor={setValorVuelta}
+              />
+              {/* Validación precio regreso contra opciones API */}
+              {opcionesRegreso.length > 0 && valorVuelta && (() => {
+                const v = parseInt(valorVuelta.replace(/\D/g, '')) || 0;
+                if (v === 0) return null;
+                const filtradas = opcionesRegreso.filter((o) => tipoTrVuelta === 'aereo' ? o.tipo !== 'bus' : o.tipo === 'bus');
+                if (filtradas.length === 0) return null;
+                const precios = filtradas.map((o) => o.precio);
+                if (v > Math.max(...precios) * 1.4) return <div className="viatico-precio-alerta">⚠ Regreso ${formatearMiles(v)}: supera el rango de referencia.</div>;
+                if (v >= Math.min(...precios) * 0.7) return <div className="viatico-precio-ok">✓ Precio de regreso dentro del rango de referencia.</div>;
+                return null;
+              })()}
+            </>
           )}
 
           {totalTransporte > 0 && (
