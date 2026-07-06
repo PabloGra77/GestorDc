@@ -4,10 +4,7 @@ import { getAuthSession } from '../auth/auth.service';
 import { BandejaPanel } from '../solicitudes/BandejaPanel';
 import { MisSolicitudesPanel } from '../solicitudes/MisSolicitudesPanel';
 import { NuevaSolicitudPanel } from '../solicitudes/NuevaSolicitudPanel';
-import { LegalizacionPanel } from '../solicitudes/LegalizacionPanel';
-import { ViaticosPanel } from '../solicitudes/ViaticosPanel';
-
-type Vista = 'bandeja' | 'misSolicitudes' | 'nueva' | 'legalizacion' | 'viaticos' | 'tablero';
+type Vista = 'bandeja' | 'misSolicitudes' | 'nueva' | 'tablero';
 
 interface SolicitudResumen {
   id: number;
@@ -32,8 +29,6 @@ const VISTAS_LABELS: Record<Vista, string> = {
   bandeja: 'Bandeja de validación',
   misSolicitudes: 'Mis solicitudes',
   nueva: 'Nueva solicitud',
-  legalizacion: 'Nueva legalización',
-  viaticos: 'Viáticos',
   tablero: 'Tablero general',
 };
 
@@ -120,8 +115,6 @@ export function RadicacionesModule() {
             ['bandeja',        'Bandeja de validación'],
             ['misSolicitudes', 'Mis solicitudes'],
             ['nueva',          'Nueva solicitud'],
-            ['legalizacion',   'Nueva legalización'],
-            ['viaticos',       'Viáticos'],
             ['tablero',        'Tablero general'],
           ] as [Vista, string][]).map(([key, label]) => (
             <button key={key} type="button"
@@ -135,9 +128,7 @@ export function RadicacionesModule() {
         <div className="radicaciones-content">
           {vista === 'bandeja' ? <BandejaPanel /> : null}
           {vista === 'misSolicitudes' ? <MisSolicitudesPanel /> : null}
-          {vista === 'nueva' ? <NuevaSolicitudPanel /> : null}
-          {vista === 'legalizacion' ? <LegalizacionPanel onCreada={() => irA('misSolicitudes')} /> : null}
-          {vista === 'viaticos' ? <ViaticosPanel onCreada={() => irA('misSolicitudes')} /> : null}
+          {vista === 'nueva' ? <NuevaSolicitudPanel onCreada={() => irA('misSolicitudes')} /> : null}
 
           {vista === 'tablero' ? (
         <div className="radicaciones-tablero">

@@ -8507,18 +8507,18 @@ textarea {
 
   /* Sidebar sticky horizontal en móvil */
   .admin-sidebar {
+    width: 100%;
+    max-width: 100vw;
+    box-sizing: border-box;
     max-height: none;
-    overflow-x: auto;
-    overflow-y: hidden;
+    overflow: hidden;
     display: flex;
     flex-direction: row !important;
     flex-wrap: nowrap !important;
     gap: 4px;
     padding: 6px 10px;
     border-bottom: 1px solid var(--border-soft);
-    scrollbar-width: none;
   }
-  .admin-sidebar::-webkit-scrollbar { display: none; }
   .admin-sidebar-brand-wrap {
     flex-shrink: 0;
   }
@@ -8527,17 +8527,21 @@ textarea {
     flex-direction: row !important;
     flex-wrap: nowrap !important;
     gap: 4px;
-    overflow-x: auto;
-    scrollbar-width: none;
+    overflow: hidden;
+    flex: 1 1 0;
+    min-width: 0;
   }
   .admin-nav-item {
     white-space: nowrap;
-    flex-shrink: 0;
-    padding: 6px 10px;
-    font-size: 12px;
+    flex-shrink: 1;
+    padding: 6px 8px;
+    font-size: 11px;
     min-height: 36px;
     border-radius: 8px;
     width: auto !important;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
   }
 
   /* Workspace: padding reducido */
@@ -8566,7 +8570,6 @@ textarea {
     display: flex;
     flex-direction: row;
     position: relative;
-    min-height: 70dvh;
     gap: 0;
   }
   .radicaciones-content {

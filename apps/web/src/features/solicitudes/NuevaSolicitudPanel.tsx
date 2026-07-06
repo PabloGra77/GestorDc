@@ -7,6 +7,8 @@ import { BANCOS_COLOMBIA } from '../../utils/bancos';
 import { etiquetaDocumento } from '../../utils/documentoLabels';
 import { DireccionField } from '../../components/DireccionField';
 import { ordenarCamposPorPlantilla } from '../../utils/ordenCamposPlantilla';
+import { LegalizacionPanel } from './LegalizacionPanel';
+import { ViaticosPanel } from './ViaticosPanel';
 
 interface Area {
   id: number;
@@ -820,6 +822,11 @@ export function NuevaSolicitudPanel({ onCreada }: NuevaSolicitudPanelProps) {
             </button>
           </header>
 
+          {tipoSel.slug === 'legalizacion' ? (
+            <LegalizacionPanel onCreada={onCreada} />
+          ) : tipoSel.slug === 'viaticos' ? (
+            <ViaticosPanel onCreada={onCreada} />
+          ) : (
           <form className="nueva-sol-form" onSubmit={enviar}>
             {/* Indicador de sub-pasos */}
             <div className="nueva-sol-substeps">
@@ -1109,6 +1116,7 @@ export function NuevaSolicitudPanel({ onCreada }: NuevaSolicitudPanelProps) {
               )}
             </div>
           </form>
+          )}
         </>
       ) : null}
     </section>
