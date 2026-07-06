@@ -80,7 +80,6 @@ export function Sidebar({ esAdmin, activeSection, onSelectSection }: SidebarProp
 				>
 					☰
 				</button>
-				<span className="admin-movil-topbar-brand">PAYOPS</span>
 				<span className="admin-movil-topbar-seccion">{activeSection}</span>
 			</div>
 
@@ -122,7 +121,7 @@ export function Sidebar({ esAdmin, activeSection, onSelectSection }: SidebarProp
 
 						{showNotifications ? createPortal(
 							<div
-								className="admin-notifications-panel card-surface"
+								className="admin-notifications-panel"
 								role="status"
 								aria-live="polite"
 								ref={(el) => {
@@ -130,25 +129,43 @@ export function Sidebar({ esAdmin, activeSection, onSelectSection }: SidebarProp
 									const btn = notificationsRef.current?.querySelector('.admin-bell-button') as HTMLElement | null;
 									if (btn) {
 										const r = btn.getBoundingClientRect();
-										el.style.top = `${r.bottom + 8}px`;
-										el.style.left = `${Math.max(12, r.left)}px`;
+										const vw = window.innerWidth;
+										const panelW = Math.min(360, vw - 32);
+										const rawLeft = Math.max(12, r.left);
+										const left = Math.min(rawLeft, vw - panelW - 12);
+										el.style.top = `${r.bottom + 10}px`;
+										el.style.left = `${left}px`;
+										el.style.width = `${panelW}px`;
 									}
 								}}
 							>
-								<h4>Notificaciones</h4>
-								{items.length === 0 ? (
-									<p>Sin notificaciones por el momento.</p>
-								) : (
-									<ul>
-										{items.map((n) => (
-											<li key={n.id} className={`notif-item notif-${n.tipo}`}>
-												<div className="notif-titulo">{n.titulo}</div>
-												<div className="notif-detalle">{n.detalle}</div>
-												<div className="notif-rad">{n.numeroRadicado}</div>
-											</li>
-										))}
-									</ul>
-								)}
+								<div className="admin-notif-panel-head">
+									<h4>Notificaciones</h4>
+									<button
+										type="button"
+										className="admin-notif-panel-cerrar"
+										onClick={() => setShowNotifications(false)}
+										aria-label="Cerrar notificaciones"
+									>✕</button>
+								</div>
+								<div className="admin-notif-panel-body">
+									{items.length === 0 ? (
+										<div className="admin-notif-vacio">
+											<span className="admin-notif-vacio-icon">📭</span>
+											<p>Sin notificaciones por el momento.</p>
+										</div>
+									) : (
+										<ul>
+											{items.map((n) => (
+												<li key={n.id} className={`notif-item notif-${n.tipo}`}>
+													<div className="notif-titulo">{n.titulo}</div>
+													<div className="notif-detalle">{n.detalle}</div>
+													<div className="notif-rad">{n.numeroRadicado}</div>
+												</li>
+											))}
+										</ul>
+									)}
+								</div>
 							</div>,
 							document.body
 						) : null}

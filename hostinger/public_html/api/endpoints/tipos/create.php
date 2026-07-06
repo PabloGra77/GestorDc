@@ -15,7 +15,11 @@ if (!$check->fetch()) Response::error('Area no encontrada', 404);
 
 $slug = strtolower(trim((string)($body['slug'] ?? '')));
 if ($slug === '') {
-    $slug = strtolower(preg_replace('/[^a-z0-9]+/i', '-', $nombre));
+    $sin_tildes = strtr($nombre, [
+        'á'=>'a','é'=>'e','í'=>'i','ó'=>'o','ú'=>'u','ü'=>'u','ñ'=>'n',
+        'Á'=>'a','É'=>'e','Í'=>'i','Ó'=>'o','Ú'=>'u','Ü'=>'u','Ñ'=>'n',
+    ]);
+    $slug = strtolower(preg_replace('/[^a-z0-9]+/', '-', $sin_tildes));
     $slug = trim($slug, '-');
 }
 
