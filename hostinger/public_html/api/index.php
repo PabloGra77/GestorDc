@@ -87,6 +87,9 @@ $routes = [
     ['POST',   '#^/solicitudes/(?P<id>\d+)/autorizar-legalizacion$#', 'solicitudes/autorizar_legalizacion'],
     ['DELETE', '#^/solicitudes/(?P<id>\d+)$#',                        'solicitudes/delete'],
 
+    // Viajes (búsqueda de tiquetes con Amadeus + precios estimados Colombia)
+    ['GET',    '#^/viajes/buscar$#',                             'viajes/buscar'],
+
     // Adjuntos (subir / ver con sesión)
     ['POST',   '#^/archivos$#',                                  'archivos/subir'],
     ['GET',    '#^/archivos/ver$#',                              'archivos/ver'],

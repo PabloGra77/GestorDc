@@ -47,8 +47,12 @@ if ($frontendChanged.Count -gt 0) {
     Write-Host "[$step] Build frontend..." -ForegroundColor Cyan
     Push-Location "$RepoRoot\apps\web"
     try {
+        # Usar Continue para evitar que stderr de vite (advertencias) aborte el script
+        $eap = $ErrorActionPreference; $ErrorActionPreference = "Continue"
         & npm run build
-        if ($LASTEXITCODE -ne 0) { throw "npm run build fallo" }
+        $buildCode = $LASTEXITCODE
+        $ErrorActionPreference = $eap
+        if ($buildCode -ne 0) { throw "npm run build fallo (exit $buildCode)" }
     } finally { Pop-Location }
     Write-Host "Build OK" -ForegroundColor Green
     $step++
@@ -78,8 +82,29 @@ if ($backendChanged.Count -gt 0) {
     Write-Host "[$step] Subiendo backend PHP..." -ForegroundColor Cyan
 
     foreach ($relPath in $backendChanged) {
-        $localFile = "$RepoRoot\$($relPath.Replace('/', '\'))"
+        $localFile = "$RepoRoot\$($relPath.Replace('/', '\').TrimEnd('\'))"
         if (-not (Test-Path $localFile)) { Write-Host "  [SKIP] $relPath" -ForegroundColor DarkYellow; continue }
+        # Omitir directorios (git status los muestra como entries cuando son nuevos)
+        if (Test-Path $localFile -PathType Container) {
+            # Subir todos los archivos dentro recursivamente
+            Get-ChildItem $localFile -Recurse -File | ForEach-Object {
+                $subRel = $_.FullName.Substring($RepoRoot.Length + 1).Replace('\', '/')
+                $subLocal = $_.FullName
+                $subRemote = $subRel -replace "^hostinger/public_html/", ""
+                $subParts = $subRemote -split "/"
+                if ($subParts.Count -gt 1) {
+                    $subDir = ($subParts[0..($subParts.Count - 2)]) -join "/"
+                    SSH-Run "mkdir -p $REMOTE_ROOT/$subDir"
+                }
+                Write-Host "  $subRemote"
+                SCP-Put $subLocal $subRemote
+                if ($subRel -match "\.php$") {
+                    $phpOut = & ssh @SSH_OPTS "${SSH_USER}@${SSH_HOST}" "php -l $REMOTE_ROOT/$subRemote 2>&1"
+                    if ($LASTEXITCODE -ne 0) { Write-Warning "PHP syntax error en $subRemote" } else { Write-Host "  PHP OK" -ForegroundColor DarkGreen }
+                }
+            }
+            continue
+        }
 
         $remotePart = $relPath -replace "^hostinger/public_html/", ""
         $parts = $remotePart -split "/"

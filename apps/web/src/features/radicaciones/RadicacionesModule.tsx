@@ -4,8 +4,10 @@ import { getAuthSession } from '../auth/auth.service';
 import { BandejaPanel } from '../solicitudes/BandejaPanel';
 import { MisSolicitudesPanel } from '../solicitudes/MisSolicitudesPanel';
 import { NuevaSolicitudPanel } from '../solicitudes/NuevaSolicitudPanel';
+import { LegalizacionPanel } from '../solicitudes/LegalizacionPanel';
+import { ViaticosPanel } from '../solicitudes/ViaticosPanel';
 
-type Vista = 'bandeja' | 'misSolicitudes' | 'nueva' | 'tablero';
+type Vista = 'bandeja' | 'misSolicitudes' | 'nueva' | 'legalizacion' | 'viaticos' | 'tablero';
 
 interface SolicitudResumen {
   id: number;
@@ -26,11 +28,21 @@ const ETIQUETAS_ESTADO: Record<string, string> = {
   devuelto: 'Devuelto',
 };
 
+const VISTAS_LABELS: Record<Vista, string> = {
+  bandeja: 'Bandeja de validación',
+  misSolicitudes: 'Mis solicitudes',
+  nueva: 'Nueva solicitud',
+  legalizacion: 'Nueva legalización',
+  viaticos: 'Viáticos',
+  tablero: 'Tablero general',
+};
+
 export function RadicacionesModule() {
   const [vista, setVista] = useState<Vista>('bandeja');
   const [items, setItems] = useState<SolicitudResumen[]>([]);
   const [loading, setLoading] = useState(false);
   const [borrando, setBorrando] = useState<number | null>(null);
+  const [menuMovil, setMenuMovil] = useState(false);
   const isAdmin = (getAuthSession()?.usuario?.rol?.nombre || '').toLowerCase() === 'administrador';
 
   const eliminarSolicitud = useCallback(async (it: SolicitudResumen) => {
@@ -77,6 +89,8 @@ export function RadicacionesModule() {
     return cont;
   }, [items]);
 
+  function irA(v: Vista) { setVista(v); setMenuMovil(false); }
+
   return (
     <section className="card-surface radicaciones-module">
       <header className="radicaciones-head">
@@ -89,42 +103,43 @@ export function RadicacionesModule() {
         </div>
       </header>
 
-      <nav className="radicaciones-nav" aria-label="Modulos de radicación">
-        <button
-          type="button"
-          className={`radicaciones-nav-item${vista === 'bandeja' ? ' active' : ''}`}
-          onClick={() => setVista('bandeja')}
-        >
-          Bandeja de validación
-        </button>
-        <button
-          type="button"
-          className={`radicaciones-nav-item${vista === 'misSolicitudes' ? ' active' : ''}`}
-          onClick={() => setVista('misSolicitudes')}
-        >
-          Mis solicitudes
-        </button>
-        <button
-          type="button"
-          className={`radicaciones-nav-item${vista === 'nueva' ? ' active' : ''}`}
-          onClick={() => setVista('nueva')}
-        >
-          Nueva solicitud
-        </button>
-        <button
-          type="button"
-          className={`radicaciones-nav-item${vista === 'tablero' ? ' active' : ''}`}
-          onClick={() => setVista('tablero')}
-        >
-          Tablero general
-        </button>
-      </nav>
+      {/* Botón hamburguesa — solo visible en móvil */}
+      <button type="button" className="radicaciones-menu-btn" onClick={() => setMenuMovil((v) => !v)}>
+        <span className="radicaciones-menu-icon">{menuMovil ? '✕' : '☰'}</span>
+        <span className="radicaciones-menu-label">{VISTAS_LABELS[vista]}</span>
+      </button>
 
-      {vista === 'bandeja' ? <BandejaPanel /> : null}
-      {vista === 'misSolicitudes' ? <MisSolicitudesPanel /> : null}
-      {vista === 'nueva' ? <NuevaSolicitudPanel /> : null}
+      <div className="radicaciones-layout">
+        {/* Overlay oscuro para cerrar el menú en móvil */}
+        {menuMovil && (
+          <div className="radicaciones-overlay" role="presentation" onClick={() => setMenuMovil(false)} />
+        )}
 
-      {vista === 'tablero' ? (
+        <nav className={`radicaciones-nav${menuMovil ? ' movil-abierto' : ''}`} aria-label="Módulos de radicación">
+          {([
+            ['bandeja',        'Bandeja de validación'],
+            ['misSolicitudes', 'Mis solicitudes'],
+            ['nueva',          'Nueva solicitud'],
+            ['legalizacion',   'Nueva legalización'],
+            ['viaticos',       'Viáticos'],
+            ['tablero',        'Tablero general'],
+          ] as [Vista, string][]).map(([key, label]) => (
+            <button key={key} type="button"
+              className={`radicaciones-nav-item${vista === key ? ' active' : ''}`}
+              onClick={() => irA(key)}>
+              {label}
+            </button>
+          ))}
+        </nav>
+
+        <div className="radicaciones-content">
+          {vista === 'bandeja' ? <BandejaPanel /> : null}
+          {vista === 'misSolicitudes' ? <MisSolicitudesPanel /> : null}
+          {vista === 'nueva' ? <NuevaSolicitudPanel /> : null}
+          {vista === 'legalizacion' ? <LegalizacionPanel onCreada={() => irA('misSolicitudes')} /> : null}
+          {vista === 'viaticos' ? <ViaticosPanel onCreada={() => irA('misSolicitudes')} /> : null}
+
+          {vista === 'tablero' ? (
         <div className="radicaciones-tablero">
           {loading ? <p className="admin-help-text">Cargando indicadores…</p> : null}
           <div className="radicaciones-grid">
@@ -201,8 +216,10 @@ export function RadicacionesModule() {
               </tbody>
             </table>
           )}
+          </div>
+          ) : null}
         </div>
-      ) : null}
+      </div>
     </section>
   );
 }

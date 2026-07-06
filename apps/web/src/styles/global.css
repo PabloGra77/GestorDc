@@ -1900,6 +1900,22 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
   max-width: 860px;
 }
 
+/* Contenedor layout: desktop = columna, móvil = fila (sidebar + content) */
+.radicaciones-layout {
+  display: contents; /* En desktop no cambia el flujo del grid padre */
+}
+.radicaciones-content {
+  display: contents; /* En desktop los panels son hijos directos del grid */
+}
+
+/* Botón hamburguesa — oculto en desktop */
+.radicaciones-menu-btn {
+  display: none;
+}
+.radicaciones-overlay {
+  display: none;
+}
+
 .radicaciones-nav {
   display: inline-flex;
   width: fit-content;
@@ -4964,8 +4980,12 @@ button.mail-tracking-search-button,
 }
 .nueva-sol-grupo-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 12px 14px;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 14px 16px;
+}
+/* Campos anchos que siempre ocupan toda la fila */
+.nueva-sol-grupo-grid .form-group--wide {
+  grid-column: 1 / -1;
 }
 .nueva-sol-actions {
   display: flex;
@@ -8532,11 +8552,106 @@ textarea {
     width: 100%;
   }
 
-  /* Radicaciones nav: ancho completo y scroll horizontal */
-  .radicaciones-nav {
+  /* ── Radicaciones móvil: nav lateral tipo drawer ──────── */
+
+  /* El módulo ya no usa display:grid — se convierte en columna */
+  .radicaciones-module {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  /* Layout = flex fila: nav izquierda | contenido derecha */
+  .radicaciones-layout {
+    display: flex;
+    flex-direction: row;
+    position: relative;
+    min-height: 70dvh;
+    gap: 0;
+  }
+  .radicaciones-content {
+    display: block;
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 12px 4px 12px 8px;
+    overflow-x: hidden;
+  }
+
+  /* Botón hamburguesa visible en móvil */
+  .radicaciones-menu-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    border: none;
+    border-bottom: 1px solid var(--gold-line);
+    background: var(--bg-elevated);
+    color: var(--text-primary);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
     width: 100%;
-    max-width: 100%;
-    overflow-x: auto;
+    text-align: left;
+  }
+  .radicaciones-menu-icon {
+    font-size: 20px;
+    line-height: 1;
+    flex-shrink: 0;
+  }
+  .radicaciones-menu-label {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Overlay oscuro detrás del sidebar */
+  .radicaciones-overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.55);
+    z-index: 98;
+  }
+
+  /* Nav se oculta fuera de pantalla a la izquierda */
+  .radicaciones-nav {
+    position: fixed;
+    top: 0;
+    left: -280px;
+    bottom: 0;
+    width: 240px;
+    max-width: 80vw;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    overflow-x: visible;
+    overflow-y: auto;
+    z-index: 99;
+    border-radius: 0 16px 16px 0;
+    border: none;
+    border-right: 1px solid var(--gold-line);
+    gap: 6px;
+    padding: 16px 10px;
+    transition: left 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+  }
+
+  /* Sidebar abierto: desliza hacia adentro */
+  .radicaciones-nav.movil-abierto {
+    left: 0;
+    box-shadow: 8px 0 32px rgba(0, 0, 0, 0.45);
+  }
+
+  /* Items del sidebar vertical */
+  .radicaciones-nav-item {
+    width: 100%;
+    height: auto;
+    padding: 12px 14px;
+    text-align: left;
+    justify-content: flex-start;
+    font-size: 14px;
+    border-radius: 10px;
+    white-space: normal;
   }
 
   /* KPI grid: 2 columnas en tablet/móvil */
@@ -8570,6 +8685,322 @@ textarea {
   .bandeja-item {
     flex-direction: column;
     gap: 6px;
+  }
+}
+
+/* ===================================================================
+   VIÁTICOS PANEL
+   =================================================================== */
+
+/* Selección de tipo (anticipo / legalizar) */
+.viaticos-tipo-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-top: 8px;
+}
+.viaticos-tipo-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 18px 16px;
+  border: 2px solid var(--gold-line);
+  border-radius: 10px;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s, background 0.15s;
+}
+.viaticos-tipo-card:hover {
+  border-color: var(--accent);
+  background: rgba(218,165,32,0.06);
+}
+.viaticos-tipo-card.selected {
+  border-color: var(--accent);
+  background: rgba(218,165,32,0.12);
+}
+.viaticos-tipo-icon {
+  font-size: 28px;
+  line-height: 1;
+}
+.viaticos-tipo-card strong {
+  font-size: 15px;
+  color: var(--text-primary);
+}
+.viaticos-tipo-card p {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+/* CTA para buscar vuelos */
+.viaticos-buscar-cta {
+  text-align: center;
+  padding: 24px 0;
+}
+.viaticos-buscar-btn {
+  font-size: 16px !important;
+  padding: 14px 32px !important;
+}
+
+/* Estado de carga */
+.viaticos-buscando {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 32px 0;
+  color: var(--text-muted);
+}
+.viaticos-buscando-spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid var(--gold-line);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Sección de opciones de viaje */
+.viaticos-opciones-section {
+  margin-top: 20px;
+}
+.viaticos-opciones-section h4 {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 10px;
+}
+
+/* Lista de opciones */
+.viaticos-opciones-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Tarjeta de opción de viaje */
+.viatico-opcion-card {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border: 1.5px solid var(--gold-line);
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  transition: border-color 0.15s, background 0.15s;
+  grid-template-areas:
+    "empresa  precio  check"
+    "horario  precio  check";
+}
+.viatico-opcion-card:hover {
+  border-color: var(--accent);
+  background: rgba(218,165,32,0.04);
+}
+.viatico-opcion-card.selected {
+  border-color: var(--accent);
+  background: rgba(218,165,32,0.10);
+}
+.viatico-opcion-empresa {
+  grid-area: empresa;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.viatico-badge-estimado {
+  font-size: 10px;
+  font-weight: 500;
+  background: rgba(218,165,32,0.18);
+  color: var(--accent);
+  border-radius: 4px;
+  padding: 2px 6px;
+}
+.viatico-opcion-horario {
+  grid-area: horario;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.viatico-hora {
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+.viatico-duracion {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.viatico-opcion-precio {
+  grid-area: precio;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--accent);
+  white-space: nowrap;
+}
+.viatico-seleccionado {
+  grid-area: check;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+/* Total de transporte */
+.viatico-total-linea {
+  margin-top: 12px;
+  padding: 10px 14px;
+  background: rgba(218,165,32,0.08);
+  border-radius: 8px;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+.viatico-total-linea strong {
+  color: var(--accent);
+}
+
+/* Secciones Hospedaje / Alimentación */
+.viaticos-seccion-titulo {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--gold-line);
+  margin-bottom: 12px;
+}
+.viaticos-check-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  cursor: pointer;
+}
+.viaticos-check-label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+}
+
+/* Grid de comidas */
+.viaticos-comidas-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin: 12px 0;
+}
+.viaticos-comida-item {
+  border: 1.5px solid var(--gold-line);
+  border-radius: 8px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.viaticos-comida-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+.viaticos-comida-inputs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.viaticos-comida-inputs input {
+  min-width: 0;
+  flex: 1;
+  padding: 6px 8px !important;
+  font-size: 13px !important;
+}
+.viaticos-comida-x {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+.viaticos-comida-subtotal {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+  text-align: right;
+}
+
+/* Resumen final (paso 5) */
+.leg-resumen-final {
+  border: 1px solid var(--gold-line);
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 20px;
+}
+.leg-resumen-final h4 {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  margin: 14px 0 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--gold-line);
+}
+.leg-resumen-final h4:first-child {
+  margin-top: 0;
+}
+.leg-resumen-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 5px 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+.leg-resumen-row span {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+.leg-resumen-row strong {
+  text-align: right;
+}
+.leg-resumen-total-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0 0;
+  margin-top: 12px;
+  border-top: 2px solid var(--gold-line);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+.leg-resumen-total-line strong {
+  color: var(--accent);
+  font-size: 20px;
+}
+
+/* Responsive viáticos */
+@media (max-width: 640px) {
+  .viaticos-tipo-grid {
+    grid-template-columns: 1fr;
+  }
+  .viaticos-comidas-grid {
+    grid-template-columns: 1fr;
+  }
+  .viatico-opcion-card {
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      "empresa  check"
+      "horario  check"
+      "precio   precio";
   }
 }
 

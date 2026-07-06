@@ -6,7 +6,6 @@ import { SignaturePad } from '../../components/SignaturePad';
 import { BANCOS_COLOMBIA } from '../../utils/bancos';
 import { etiquetaDocumento } from '../../utils/documentoLabels';
 import { DireccionField } from '../../components/DireccionField';
-import { LegalizacionPanel } from './LegalizacionPanel';
 import { ordenarCamposPorPlantilla } from '../../utils/ordenCamposPlantilla';
 
 interface Area {
@@ -821,9 +820,6 @@ export function NuevaSolicitudPanel({ onCreada }: NuevaSolicitudPanelProps) {
             </button>
           </header>
 
-          {tipoSel.slug === 'legalizacion' ? (
-            <LegalizacionPanel onCreada={onCreada} />
-          ) : (
           <form className="nueva-sol-form" onSubmit={enviar}>
             {/* Indicador de sub-pasos */}
             <div className="nueva-sol-substeps">
@@ -844,7 +840,7 @@ export function NuevaSolicitudPanel({ onCreada }: NuevaSolicitudPanelProps) {
                 <h4 className="nueva-sol-grupo-titulo">{grupo}</h4>
                 <div className="nueva-sol-grupo-grid">
                   {campos.filter((c) => esVisible(c)).map((c) => (
-                    <div key={c.key} className="form-group">
+                    <div key={c.key} className={`form-group${(c.type === 'direccion' || c.type === 'textarea' || c.type === 'tabla-items' || c.type === 'file' || c.type === 'texto-fijo') ? ' form-group--wide' : ''}`}>
                       <label htmlFor={`f-${c.key}`}>
                         {c.label} {c.required ? <span className="req">*</span> : null}
                       </label>
@@ -1113,7 +1109,6 @@ export function NuevaSolicitudPanel({ onCreada }: NuevaSolicitudPanelProps) {
               )}
             </div>
           </form>
-          )}
         </>
       ) : null}
     </section>
