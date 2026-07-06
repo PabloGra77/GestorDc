@@ -115,41 +115,38 @@ export function Sidebar({ esAdmin, activeSection, onSelectSection, currentUser, 
 		document.body
 	) : null;
 
+	const topbarPortal = createPortal(
+		<div className="admin-movil-topbar">
+			<button
+				type="button"
+				className="admin-movil-hamburger"
+				onClick={() => setMovilAbierto(true)}
+				aria-label="Abrir menú"
+			>
+				☰
+			</button>
+			<span className="admin-movil-brand">PAYOPS</span>
+			<span className="admin-movil-sep">·</span>
+			<span className="admin-movil-modulo">{activeSection}</span>
+			<button
+				ref={bellMovilRef}
+				type="button"
+				className="admin-movil-bell"
+				onClick={abrirNotif}
+				aria-label="Notificaciones"
+			>
+				🔔
+				{unread.length > 0 ? (
+					<span className="admin-movil-bell-badge">{unread.length}</span>
+				) : null}
+			</button>
+		</div>,
+		document.body
+	);
+
 	return (
 		<>
-			{/* ═══ TOPBAR MÓVIL ═══ */}
-			<div className="admin-movil-topbar">
-				{/* Cuadro hamburger izquierda */}
-				<button
-					type="button"
-					className="admin-movil-hamburger"
-					onClick={() => setMovilAbierto(true)}
-					aria-label="Abrir menú"
-				>
-					☰
-				</button>
-
-				{/* Brand */}
-				<span className="admin-movil-brand">PAYOPS</span>
-				<span className="admin-movil-sep">·</span>
-
-				{/* Módulo activo */}
-				<span className="admin-movil-modulo">{activeSection}</span>
-
-				{/* Campana */}
-				<button
-					ref={bellMovilRef}
-					type="button"
-					className="admin-movil-bell"
-					onClick={abrirNotif}
-					aria-label="Notificaciones"
-				>
-					🔔
-					{unread.length > 0 ? (
-						<span className="admin-movil-bell-badge">{unread.length}</span>
-					) : null}
-				</button>
-			</div>
+			{topbarPortal}
 
 			{/* Overlay */}
 			{movilAbierto ? (

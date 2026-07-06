@@ -8877,14 +8877,15 @@ textarea {
     overflow-x: hidden;
   }
 
-  /* Botón hamburguesa visible en móvil */
+  /* Selector de vista en móvil — diseño tipo desplegable claro */
   .radicaciones-menu-btn {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 10px 14px;
+    gap: 10px;
+    padding: 11px 16px;
     border: none;
-    border-bottom: 1px solid var(--gold-line);
+    border-bottom: 2px solid rgba(184,134,11,0.22);
+    border-radius: 0;
     background: var(--bg-elevated);
     color: var(--text-primary);
     font-size: 14px;
@@ -8892,11 +8893,11 @@ textarea {
     cursor: pointer;
     width: 100%;
     text-align: left;
+    position: relative;
   }
   .radicaciones-menu-icon {
-    font-size: 20px;
-    line-height: 1;
-    flex-shrink: 0;
+    /* Chevron reemplaza el ☰ */
+    display: none;
   }
   .radicaciones-menu-label {
     flex: 1;
@@ -8904,12 +8905,39 @@ textarea {
     overflow: hidden;
     text-overflow: ellipsis;
   }
+  /* Prefijo "Sección:" visible antes del label */
+  .radicaciones-menu-btn::before {
+    content: "Sección:";
+    font-size: 11px;
+    font-weight: 400;
+    color: var(--text-secondary, #888);
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  /* Flecha ▾ al final */
+  .radicaciones-menu-btn::after {
+    content: "▾";
+    font-size: 16px;
+    color: #b8860b;
+    flex-shrink: 0;
+    margin-left: auto;
+    transition: transform 0.2s;
+  }
+  .radicaciones-menu-btn[aria-expanded="true"]::after {
+    transform: rotate(180deg);
+  }
+  [data-theme="dark"] .radicaciones-menu-btn::after {
+    color: #D4AF37;
+  }
 
   /* Overlay oscuro detrás del sidebar */
   .radicaciones-overlay {
     display: block;
     position: fixed;
-    inset: 0;
+    top: 52px;
+    left: 0;
+    right: 0;
+    bottom: 0;
     background: rgba(0, 0, 0, 0.55);
     z-index: 98;
   }
@@ -8917,7 +8945,7 @@ textarea {
   /* Nav se oculta fuera de pantalla a la izquierda */
   .radicaciones-nav {
     position: fixed;
-    top: 0;
+    top: 52px;
     left: -280px;
     bottom: 0;
     width: 240px;

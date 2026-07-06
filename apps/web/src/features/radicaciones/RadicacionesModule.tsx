@@ -98,9 +98,13 @@ export function RadicacionesModule() {
         </div>
       </header>
 
-      {/* Botón hamburguesa — solo visible en móvil */}
-      <button type="button" className="radicaciones-menu-btn" onClick={() => setMenuMovil((v) => !v)}>
-        <span className="radicaciones-menu-icon">{menuMovil ? '✕' : '☰'}</span>
+      {/* Selector de vista — solo visible en móvil */}
+      <button
+        type="button"
+        className="radicaciones-menu-btn"
+        aria-expanded={menuMovil}
+        onClick={() => setMenuMovil((v) => !v)}
+      >
         <span className="radicaciones-menu-label">{VISTAS_LABELS[vista]}</span>
       </button>
 
