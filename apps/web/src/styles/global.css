@@ -8335,6 +8335,16 @@ textarea {
   background: rgba(255,122,51,0.1);
   border-radius: 6px;
 }
+.leg-ocr-datos { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.leg-ocr-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 10px;
+  background: rgba(72,199,142,0.15);
+  color: #48c78e;
+  border: 1px solid rgba(72,199,142,0.25);
+}
 
 /* Agregar gasto */
 .leg-add-gasto { margin-top: 4px; width: auto !important; }
@@ -8586,7 +8596,7 @@ textarea {
 
   /* === NAV LATERAL (DRAWER) EN MÓVIL === */
 
-  /* ── TOPBAR MÓVIL — modo claro (base) ── */
+  /* ── TOPBAR MÓVIL — tema oscuro (coincide con el tema global de la app) ── */
   .admin-movil-topbar {
     display: flex !important;
     align-items: center;
@@ -8596,9 +8606,9 @@ textarea {
     height: 52px;
     padding: 0;
     z-index: 190;
-    background: #ffffff;
-    border-bottom: 2px solid rgba(184,134,11,0.28);
-    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    background: #070B1D !important;
+    border-bottom: 1px solid rgba(212,175,55,0.28);
+    box-shadow: 0 2px 16px rgba(0,0,0,0.5);
     overflow: visible;
   }
   /* Cuadro hamburger */
@@ -8607,12 +8617,12 @@ textarea {
     min-width: 52px;
     height: 52px;
     flex-shrink: 0;
-    background: rgba(184,134,11,0.07);
+    background: rgba(212,175,55,0.08);
     border: none;
-    border-right: 1px solid rgba(184,134,11,0.2);
+    border-right: 1px solid rgba(212,175,55,0.18);
     font-size: 20px;
     cursor: pointer;
-    color: #b8860b !important;
+    color: #D4AF37 !important;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -8620,41 +8630,38 @@ textarea {
   }
   /* "PAYOPS" */
   .admin-movil-topbar .admin-movil-brand {
-    font-size: 14px !important;
-    font-weight: 800 !important;
-    color: #b8860b !important;
+    font-size: 14px;
+    font-weight: 800;
+    color: #D4AF37 !important;
     letter-spacing: 1.5px;
     flex-shrink: 0;
     white-space: nowrap;
     padding: 0 8px 0 10px;
-    display: block !important;
-    visibility: visible !important;
-    opacity: 1 !important;
+    display: inline-block;
+    line-height: 52px;
   }
   /* Separador · */
   .admin-movil-topbar .admin-movil-sep {
-    color: rgba(184,134,11,0.45) !important;
+    color: rgba(212,175,55,0.45) !important;
     flex-shrink: 0;
     font-size: 15px;
     padding-right: 8px;
     white-space: nowrap;
-    display: block !important;
-    visibility: visible !important;
-    opacity: 1 !important;
+    display: inline-block;
+    line-height: 52px;
   }
   /* Nombre del módulo */
   .admin-movil-topbar .admin-movil-modulo {
     flex: 1;
     min-width: 0;
-    font-size: 13px !important;
+    font-size: 13px;
     font-weight: 600;
-    color: rgba(0,0,0,0.58) !important;
+    color: rgba(255,255,255,0.72) !important;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    display: block !important;
-    visibility: visible !important;
-    opacity: 1 !important;
+    display: block;
+    line-height: 52px;
   }
   /* Campana */
   .admin-movil-topbar .admin-movil-bell {
@@ -8668,12 +8675,10 @@ textarea {
     flex-shrink: 0;
     background: none;
     border: none;
-    border-left: 1px solid rgba(184,134,11,0.2);
+    border-left: 1px solid rgba(212,175,55,0.18);
     font-size: 18px;
     cursor: pointer;
-    color: rgba(0,0,0,0.55) !important;
-    visibility: visible !important;
-    opacity: 1 !important;
+    color: rgba(255,255,255,0.82) !important;
   }
   .admin-movil-bell-badge {
     position: absolute;
@@ -8686,25 +8691,6 @@ textarea {
     padding: 1px 4px;
     min-width: 15px;
     text-align: center;
-  }
-
-  /* ── MODO OSCURO — fondo #070B1D + dorado/blanco ── */
-  [data-theme="dark"] .admin-movil-topbar {
-    background: #070B1D !important;
-    border-bottom: 1px solid rgba(212,175,55,0.22) !important;
-    box-shadow: 0 2px 16px rgba(0,0,0,0.5);
-  }
-  [data-theme="dark"] .admin-movil-topbar .admin-movil-hamburger {
-    color: #D4AF37 !important;
-    background: rgba(212,175,55,0.08);
-    border-right-color: rgba(212,175,55,0.18);
-  }
-  [data-theme="dark"] .admin-movil-topbar .admin-movil-brand  { color: #D4AF37 !important; }
-  [data-theme="dark"] .admin-movil-topbar .admin-movil-sep    { color: rgba(212,175,55,0.38) !important; }
-  [data-theme="dark"] .admin-movil-topbar .admin-movil-modulo { color: rgba(255,255,255,0.72) !important; }
-  [data-theme="dark"] .admin-movil-topbar .admin-movil-bell   {
-    color: rgba(255,255,255,0.82) !important;
-    border-left-color: rgba(212,175,55,0.18);
   }
 
   /* Ocultar Rol y Cerrar sesión del header en móvil — van en el drawer */
@@ -9241,6 +9227,61 @@ textarea {
   color: var(--text-muted);
   margin: 0 0 12px;
 }
+/* ── Opciones de viaje en tiempo real (API) ── */
+.viatico-opciones-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+.viatico-opcion-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(212,175,55,0.2);
+  border-radius: 8px;
+}
+.viatico-opcion-icono {
+  font-size: 18px;
+  flex-shrink: 0;
+}
+.viatico-opcion-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.viatico-opcion-info strong {
+  font-size: 13px;
+  color: var(--text-primary);
+}
+.viatico-opcion-item .viatico-opcion-precio {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--accent);
+  white-space: nowrap;
+  grid-area: unset;
+}
+.viatico-fuente-badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  background: rgba(72,199,142,0.18);
+  color: #48c78e;
+  vertical-align: middle;
+}
+.viatico-fuente-est {
+  background: rgba(255,189,0,0.18);
+  color: #ffbd00;
+}
+
 .viatico-ref-opciones {
   display: flex;
   flex-direction: column;
@@ -9251,7 +9292,7 @@ textarea {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  background: var(--surface-1, #fff);
+  background: rgba(255,255,255,0.05);
   border: 1px solid var(--gold-line);
   border-radius: 8px;
   padding: 10px 12px;

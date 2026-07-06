@@ -379,8 +379,17 @@ export function ViaticosPanel({ onCreada }: { onCreada?: (info: { id: number; nu
         if (marcadores < 2) alertas.push('El archivo no parece ser un tiquete válido. Verifica el documento.');
       }
       setFactura({ archivoId, nombre: file.name, alertas });
-    } catch {
-      setFactura({ archivoId: '', nombre: '', alertas: ['No se pudo subir el archivo. Intenta de nuevo.'] });
+    } catch (ex: unknown) {
+      const serverMsg = (ex as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      const isServerError = (ex as { response?: unknown })?.response !== undefined;
+      const errMsg = isServerError
+        ? (serverMsg?.toLowerCase().includes('tamaño') || serverMsg?.toLowerCase().includes('excede')
+            ? 'El archivo es demasiado grande para Hostinger. Usa JPG, PNG o PDF de menos de 10 MB.'
+            : serverMsg?.toLowerCase().includes('tipo') || serverMsg?.toLowerCase().includes('formato')
+              ? 'Formato no permitido por Hostinger. Solo JPG, PNG, WEBP o PDF.'
+              : `Error en el servidor de Hostinger${serverMsg ? ': ' + serverMsg : '. Intenta de nuevo o contacta al administrador.'}`)
+        : 'No se pudo subir el archivo. Verifica tu conexión e inténtalo de nuevo.';
+      setFactura({ archivoId: '', nombre: '', alertas: [errMsg] });
     } finally {
       setSubiendo(false);
     }

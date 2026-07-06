@@ -67,6 +67,38 @@ function gastoVacio(): Gasto {
   };
 }
 
+/** Extrae el NIT del proveedor del texto OCR de una factura colombiana.
+ *  Maneja: 14.880.564-8, 208098979, 900.346.046-9, 1.005.870.382-1 */
+function extraerNitDeOcr(texto: string): string {
+  const m = texto.match(/N\.?I\.?T\.?\s*[:#]?\s*([\d]{1,3}(?:[\s.][\d]{3})+|[\d]{7,12})(?:[\s\-][\d])?/i);
+  if (m) return m[1].replace(/[\s.]/g, '');
+  return '';
+}
+
+/** Extrae el número de factura del texto OCR.
+ *  Maneja: "FACTURA DE VENTA #NC-14362", "No. 4713", "FACTURA ELECTRÓNICA A326-0046604" */
+function extraerNumFacturaDeOcr(texto: string): string {
+  const patterns = [
+    // "FACTURA DE VENTA #NC-14362" o "FACTURA VENTA #FV-123"
+    /factura\s+(?:de\s+)?venta\s*#([A-Z0-9][A-Z0-9\-_]{1,25})/i,
+    // "Factura electrónica de venta No. 4713" (texto entre factura y No.)
+    /factura[^#\n]{0,50}?\bN(?:[°oO]|o)\.?\s*(\w[\w\-]{1,20})/i,
+    // "FACTURA ELECTRÓNICA A326-0046604" (código alfanumérico directo)
+    /factura\s*electr[oó]nica\s+([A-Z0-9][A-Z0-9\-_]{3,25})/i,
+    // "N° de factura: XXX"
+    /N[°oO]\.?\s*(?:de\s+)?factura\s*:?\s*([A-Z0-9][A-Z0-9\-_]{1,25})/i,
+    // "factura No. XXX" o "fact. N° XXX" directamente
+    /(?:factura|fact)[.\s]*(?:N[°oO]\.?|No\.?|Nro\.?|#|n[uú]m\.?)\s*:?\s*([A-Z0-9][A-Z0-9\-_]{1,25})/i,
+    // "número de factura: XXX"
+    /(?:n[uú]mero|n[uú]m)\.?\s+(?:de\s+)?factura\s*:?\s*([A-Z0-9][A-Z0-9\-_]{1,25})/i,
+  ];
+  for (const p of patterns) {
+    const m = texto.match(p);
+    if (m?.[1]) return m[1].trim();
+  }
+  return '';
+}
+
 async function hashFile(file: File): Promise<string> {
   try {
     const buf = await file.arrayBuffer();
@@ -172,19 +204,6 @@ function FilaGasto({
         </div>
 
         <div className="leg-field">
-          <label>NIT del proveedor</label>
-          <input type="text" inputMode="numeric" value={gasto.nitProveedor}
-            onChange={(e) => set('nitProveedor', e.target.value.replace(/\D/g, ''))}
-            placeholder="NIT sin dígito de verificación" />
-        </div>
-
-        <div className="leg-field">
-          <label>N° de factura</label>
-          <input type="text" value={gasto.numeroFactura} onChange={(e) => set('numeroFactura', e.target.value)}
-            placeholder="Número o código de la factura" />
-        </div>
-
-        <div className="leg-field">
           <label>Fecha de la factura</label>
           <input type="date" value={gasto.fechaFactura} onChange={(e) => set('fechaFactura', e.target.value)} />
         </div>
@@ -255,6 +274,18 @@ function FilaGasto({
           <ul className="leg-alertas-list">
             {gasto._facturaAlertas.map((a, i) => <li key={i}>{a}</li>)}
           </ul>
+        )}
+
+        {/* Datos extraídos automáticamente por OCR */}
+        {tieneFactura && (gasto.nitProveedor || gasto.numeroFactura) && (
+          <div className="leg-ocr-datos">
+            {gasto.nitProveedor && (
+              <span className="leg-ocr-badge">NIT: {gasto.nitProveedor}</span>
+            )}
+            {gasto.numeroFactura && (
+              <span className="leg-ocr-badge">Factura: {gasto.numeroFactura}</span>
+            )}
+          </div>
         )}
       </div>
     </div>
@@ -355,13 +386,18 @@ export function LegalizacionPanel({ onCreada }: LegalizacionPanelProps) {
         headers: { 'Content-Type': undefined },
       });
       archivoId = up.data.id;
-    } catch {
+    } catch (ex: unknown) {
+      const serverMsg = (ex as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      const isServerError = (ex as { response?: unknown })?.response !== undefined;
+      const errMsg = isServerError
+        ? (serverMsg?.toLowerCase().includes('tamaño') || serverMsg?.toLowerCase().includes('excede')
+            ? 'El archivo es demasiado grande para Hostinger. Usa JPG, PNG o PDF de menos de 10 MB.'
+            : serverMsg?.toLowerCase().includes('tipo') || serverMsg?.toLowerCase().includes('formato')
+              ? 'Formato no permitido por Hostinger. Solo JPG, PNG, WEBP o PDF.'
+              : `Error en el servidor de Hostinger${serverMsg ? ': ' + serverMsg : '. Intenta de nuevo o contacta al administrador.'}`)
+        : 'No se pudo subir el archivo. Verifica tu conexión e inténtalo de nuevo.';
       setGastos((prev) => prev.map((g, i) =>
-        i === idx ? {
-          ...g,
-          _validando: false,
-          _facturaAlertas: ['No se pudo subir el archivo. Verifica tu conexión e intenta de nuevo.'],
-        } : g
+        i === idx ? { ...g, _validando: false, _facturaAlertas: [errMsg] } : g
       ));
       return;
     }
@@ -371,6 +407,8 @@ export function LegalizacionPanel({ onCreada }: LegalizacionPanelProps) {
 
     // 3. OCR — no bloquea el registro si falla
     const alertas: string[] = [];
+    let nitExtraido = '';
+    let numFacturaExtraido = '';
     try {
       const ocr = await procesarArchivo(file);
       if (ocr) {
@@ -378,15 +416,15 @@ export function LegalizacionPanel({ onCreada }: LegalizacionPanelProps) {
         const gasto = gastosRef.current[idx];
         const valorStr = String(gasto.valor || '').replace(/\./g, '').replace(',', '');
 
+        // Extraer NIT y número de factura del texto OCR
+        nitExtraido = extraerNitDeOcr(textoOcr);
+        numFacturaExtraido = extraerNumFacturaDeOcr(textoOcr);
+
         if (valorStr.length >= 3) {
           const v = validarOcrContraDato(textoOcr, valorStr, 'cc');
           if (!v.coincide) {
             alertas.push(`El valor $${formatearMiles(parseInt(valorStr))} no se identificó claramente en la factura.`);
           }
-        }
-        if (gasto.nitProveedor) {
-          const vNit = validarOcrContraDato(textoOcr, gasto.nitProveedor, 'cc');
-          if (!vNit.coincide) alertas.push(`El NIT ${gasto.nitProveedor} no coincide con el de la factura.`);
         }
         if (ocr.confidence < 45) {
           alertas.push(`Lectura de baja calidad (${Math.round(ocr.confidence)}%). Verifica que la imagen sea legible.`);
@@ -410,6 +448,9 @@ export function LegalizacionPanel({ onCreada }: LegalizacionPanelProps) {
         _facturaConfianza: 0,
         _facturaAlertas: alertas,
         _validando: false,
+        // Auto-llenar campos vacíos desde el OCR
+        nitProveedor: g.nitProveedor || nitExtraido,
+        numeroFactura: g.numeroFactura || numFacturaExtraido,
       } : g
     ));
   }, [procesarArchivo]);
