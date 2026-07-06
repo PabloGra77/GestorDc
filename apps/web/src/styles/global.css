@@ -575,6 +575,11 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
   background: linear-gradient(120deg, rgba(15, 23, 42, 0.04), rgba(61, 90, 254, 0.08));
 }
 
+/* Elementos solo para móvil — ocultos en desktop */
+.admin-movil-topbar { display: none; }
+.admin-nav-overlay  { display: none; }
+.admin-sidebar-cerrar { display: none; }
+
 .admin-sidebar {
   background: #070B1D;
   color: var(--bg-elevated);
@@ -8505,47 +8510,119 @@ textarea {
     gap: 6px;
   }
 
-  /* Sidebar sticky horizontal en móvil */
-  .admin-sidebar {
-    width: 100%;
-    max-width: 100vw;
-    box-sizing: border-box;
-    max-height: none;
-    overflow: hidden;
+  /* === NAV LATERAL (DRAWER) EN MÓVIL === */
+
+  /* Topbar fija con hamburger — visible solo en móvil */
+  .admin-movil-topbar {
     display: flex;
-    flex-direction: row !important;
-    flex-wrap: nowrap !important;
-    gap: 4px;
-    padding: 6px 10px;
-    border-bottom: 1px solid var(--border-soft);
+    align-items: center;
+    gap: 10px;
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: 48px;
+    padding: 0 14px;
+    z-index: 190;
+    background: var(--surface-1, #fff);
+    border-bottom: 1px solid var(--border-soft, #e5e7eb);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.07);
   }
-  .admin-sidebar-brand-wrap {
-    flex-shrink: 0;
+  .admin-movil-hamburger {
+    background: none;
+    border: none;
+    font-size: 22px;
+    cursor: pointer;
+    color: var(--text-primary, #1a1a2e);
+    padding: 4px 6px;
+    line-height: 1;
   }
-  .admin-sidebar-nav {
-    display: flex;
-    flex-direction: row !important;
-    flex-wrap: nowrap !important;
-    gap: 4px;
-    overflow: hidden;
-    flex: 1 1 0;
-    min-width: 0;
+  .admin-movil-topbar-brand {
+    font-weight: 800;
+    font-size: 16px;
+    color: var(--accent, #b8860b);
+    letter-spacing: 0.5px;
   }
-  .admin-nav-item {
-    white-space: nowrap;
-    flex-shrink: 1;
-    padding: 6px 8px;
-    font-size: 11px;
-    min-height: 36px;
-    border-radius: 8px;
-    width: auto !important;
+  .admin-movil-topbar-seccion {
+    font-size: 13px;
+    color: var(--text-secondary, #666);
+    margin-left: 4px;
     overflow: hidden;
     text-overflow: ellipsis;
-    min-width: 0;
+    white-space: nowrap;
   }
 
-  /* Workspace: padding reducido */
-  .admin-workspace { padding: 10px 12px !important; }
+  /* Overlay oscuro cuando nav está abierta */
+  .admin-nav-overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.55);
+    z-index: 199;
+  }
+
+  /* Sidebar: se convierte en drawer lateral */
+  .admin-sidebar {
+    position: fixed !important;
+    top: 0; left: -280px; bottom: 0;
+    width: 260px;
+    max-height: none;
+    flex-direction: column !important;
+    flex-wrap: wrap !important;
+    overflow-y: auto;
+    overflow-x: hidden;
+    z-index: 200;
+    transition: left 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+    padding: 16px 10px;
+    gap: 6px;
+    border-right: 1px solid var(--border-soft, #e5e7eb);
+    scrollbar-width: none;
+  }
+  .admin-sidebar::-webkit-scrollbar { display: none; }
+  .admin-sidebar.movil-abierto {
+    left: 0;
+    box-shadow: 8px 0 32px rgba(0,0,0,0.45);
+  }
+
+  /* Brand row dentro del drawer */
+  .admin-sidebar-brand-wrap {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+    margin-bottom: 8px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-soft, #e5e7eb);
+  }
+  .admin-sidebar-cerrar {
+    display: flex;
+    background: none;
+    border: none;
+    font-size: 18px;
+    cursor: pointer;
+    color: var(--text-secondary, #666);
+    padding: 2px 6px;
+  }
+
+  /* Nav items verticales en el drawer */
+  .admin-sidebar-nav {
+    display: flex;
+    flex-direction: column !important;
+    flex-wrap: nowrap !important;
+    gap: 4px;
+    width: 100%;
+  }
+  .admin-nav-item {
+    white-space: normal;
+    width: 100% !important;
+    text-align: left;
+    padding: 10px 12px;
+    font-size: 14px;
+    min-height: auto;
+    border-radius: 8px;
+  }
+
+  /* Empujar el workspace para que no quede debajo de la topbar */
+  .admin-workspace { padding-top: 58px !important; }
 
   /* Bandeja actions row: columna */
   .bandeja-actions-row {

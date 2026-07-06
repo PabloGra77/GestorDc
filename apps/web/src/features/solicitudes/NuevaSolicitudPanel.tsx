@@ -822,11 +822,13 @@ export function NuevaSolicitudPanel({ onCreada }: NuevaSolicitudPanelProps) {
             </button>
           </header>
 
-          {tipoSel.slug === 'legalizacion' ? (
-            <LegalizacionPanel onCreada={onCreada} />
-          ) : tipoSel.slug === 'viaticos' ? (
-            <ViaticosPanel onCreada={onCreada} />
-          ) : (
+          {(() => {
+            const norm = (s: string) => (s ?? '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]/g,'');
+            const esLegal = norm(tipoSel.slug) === 'legalizacion' || norm(tipoSel.nombre) === 'legalizacion';
+            const esViat  = norm(tipoSel.slug) === 'viaticos'    || norm(tipoSel.nombre) === 'viaticos';
+            if (esLegal) return <LegalizacionPanel onCreada={onCreada} />;
+            if (esViat)  return <ViaticosPanel     onCreada={onCreada} />;
+            return (
           <form className="nueva-sol-form" onSubmit={enviar}>
             {/* Indicador de sub-pasos */}
             <div className="nueva-sol-substeps">
@@ -1116,7 +1118,8 @@ export function NuevaSolicitudPanel({ onCreada }: NuevaSolicitudPanelProps) {
               )}
             </div>
           </form>
-          )}
+            );
+          })()}
         </>
       ) : null}
     </section>
