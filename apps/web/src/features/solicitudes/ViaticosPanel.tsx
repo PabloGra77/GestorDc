@@ -15,6 +15,58 @@ const CIUDADES_CO = [
   'Rionegro', 'Envigado', 'Bello', 'Palmira', 'Buenaventura',
 ];
 
+/* ─── Precios de referencia por ruta ────────────────────────── */
+const IATA_MAP: Record<string, string> = {
+  'Bogotá': 'BOG', 'Medellín': 'MDE', 'Cali': 'CLO', 'Cartagena': 'CTG',
+  'Barranquilla': 'BAQ', 'Bucaramanga': 'BGA', 'Pereira': 'PEI',
+  'Santa Marta': 'SMR', 'Cúcuta': 'CUC', 'Manizales': 'MZL',
+  'Armenia': 'AXM', 'Ibagué': 'IBE', 'Montería': 'MTR',
+  'Villavicencio': 'VVC', 'Pasto': 'PSO', 'Neiva': 'HEI',
+  'Valledupar': 'VUP', 'San Andrés': 'ADZ', 'Popayán': 'PPN',
+  'Leticia': 'LET', 'Yopal': 'EYP', 'Riohacha': 'RCH',
+};
+
+interface PrecioRef { aereo?: [number, number]; terrestre?: [number, number] }
+
+const PRECIOS_REF: Record<string, PrecioRef> = {
+  'BOG-MDE': { aereo: [220000, 580000], terrestre: [50000, 120000] },
+  'BOG-CTG': { aereo: [260000, 640000], terrestre: [200000, 340000] },
+  'BOG-CLO': { aereo: [200000, 560000], terrestre: [80000, 175000] },
+  'BOG-BAQ': { aereo: [245000, 630000], terrestre: [220000, 390000] },
+  'BOG-BGA': { aereo: [185000, 480000], terrestre: [55000, 135000] },
+  'BOG-PEI': { aereo: [165000, 430000], terrestre: [32000, 68000] },
+  'BOG-SMR': { aereo: [255000, 620000], terrestre: [235000, 400000] },
+  'BOG-MZL': { aereo: [175000, 450000], terrestre: [32000, 72000] },
+  'BOG-CUC': { aereo: [210000, 545000], terrestre: [130000, 245000] },
+  'BOG-VVC': { aereo: [160000, 405000], terrestre: [50000, 115000] },
+  'BOG-PSO': { aereo: [230000, 590000], terrestre: [180000, 310000] },
+  'BOG-HEI': { aereo: [195000, 500000], terrestre: [80000, 155000] },
+  'BOG-MTR': { aereo: [235000, 600000], terrestre: [165000, 290000] },
+  'BOG-AXM': { aereo: [165000, 430000], terrestre: [28000, 60000] },
+  'BOG-IBE': { terrestre: [22000, 48000] },
+  'BOG-ADZ': { aereo: [280000, 720000] },
+  'BOG-LET': { aereo: [340000, 900000] },
+  'MDE-CTG': { aereo: [235000, 595000], terrestre: [150000, 275000] },
+  'MDE-CLO': { aereo: [195000, 500000], terrestre: [55000, 125000] },
+  'MDE-BAQ': { aereo: [230000, 575000], terrestre: [140000, 265000] },
+  'MDE-BGA': { aereo: [200000, 510000], terrestre: [80000, 165000] },
+  'MDE-SMR': { aereo: [245000, 610000], terrestre: [170000, 310000] },
+  'MDE-CUC': { aereo: [215000, 555000], terrestre: [110000, 220000] },
+  'CTG-BAQ': { terrestre: [28000, 65000] },
+  'CTG-SMR': { terrestre: [38000, 80000] },
+  'CLO-PEI': { aereo: [160000, 405000], terrestre: [28000, 58000] },
+  'CLO-MZL': { terrestre: [32000, 68000] },
+  'CLO-BAQ': { aereo: [220000, 560000], terrestre: [240000, 410000] },
+  'BGA-CUC': { terrestre: [45000, 90000] },
+  'PEI-MZL': { terrestre: [12000, 28000] },
+};
+
+function getPreciosRef(origen: string, destino: string): PrecioRef | null {
+  const o = IATA_MAP[origen] || origen.slice(0, 3).toUpperCase();
+  const d = IATA_MAP[destino] || destino.slice(0, 3).toUpperCase();
+  return PRECIOS_REF[`${o}-${d}`] || PRECIOS_REF[`${d}-${o}`] || null;
+}
+
 /* ─── Tipos ─────────────────────────────────────────────────── */
 interface UsuarioSugerido { id: number; nombreCompleto: string; rol: string; area: string | null; }
 interface FacturaAdj { archivoId: string; nombre: string; alertas: string[]; }
@@ -256,6 +308,8 @@ export function ViaticosPanel({ onCreada }: { onCreada?: (info: { id: number; nu
     setAutorizadorInput(u.nombreCompleto);
     setShowSugeridos(false);
   }
+
+  const preciosRef = useMemo(() => getPreciosRef(ciudadOrigen, ciudadDestino), [ciudadOrigen, ciudadDestino]);
 
   const totalTransporte = useMemo(() => {
     const ida = parseInt(valorIda.replace(/\D/g, '')) || 0;
@@ -589,6 +643,86 @@ export function ViaticosPanel({ onCreada }: { onCreada?: (info: { id: number; nu
         <div className="leg-form card-surface">
           <h3>Datos del tiquete de transporte</h3>
           <p className="leg-nota">Ingresa los datos exactos de tu tiquete o comprobante de viaje.</p>
+
+          {/* Comparador de precios de referencia */}
+          {preciosRef && (
+            <div className="viatico-ref-box">
+              <div className="viatico-ref-titulo">
+                💡 Precios de referencia: <strong>{ciudadOrigen} → {ciudadDestino}</strong>
+              </div>
+              <p className="viatico-ref-desc">
+                Rango habitual del mercado para esta ruta. Usa "Aplicar" para pre-llenar el valor de tu tiquete de ida.
+              </p>
+              <div className="viatico-ref-opciones">
+                {preciosRef.aereo && (
+                  <div className="viatico-ref-opcion">
+                    <div className="viatico-ref-opcion-left">
+                      <span className="viatico-ref-icon">✈</span>
+                      <div>
+                        <div className="viatico-ref-tipo">Aéreo</div>
+                        <div className="viatico-ref-rango">
+                          ${formatearMiles(preciosRef.aereo[0])} – ${formatearMiles(preciosRef.aereo[1])} COP
+                        </div>
+                      </div>
+                    </div>
+                    <div className="viatico-ref-acciones">
+                      <button type="button" className="viatico-ref-btn"
+                        onClick={() => { setTipoTrIda('aereo'); setValorIda(String(preciosRef.aereo![0])); }}>
+                        Min
+                      </button>
+                      <button type="button" className="viatico-ref-btn"
+                        onClick={() => { setTipoTrIda('aereo'); setValorIda(String(Math.round((preciosRef.aereo![0] + preciosRef.aereo![1]) / 2))); }}>
+                        Prom
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {preciosRef.terrestre && (
+                  <div className="viatico-ref-opcion">
+                    <div className="viatico-ref-opcion-left">
+                      <span className="viatico-ref-icon">🚌</span>
+                      <div>
+                        <div className="viatico-ref-tipo">Terrestre</div>
+                        <div className="viatico-ref-rango">
+                          ${formatearMiles(preciosRef.terrestre[0])} – ${formatearMiles(preciosRef.terrestre[1])} COP
+                        </div>
+                      </div>
+                    </div>
+                    <div className="viatico-ref-acciones">
+                      <button type="button" className="viatico-ref-btn"
+                        onClick={() => { setTipoTrIda('terrestre'); setValorIda(String(preciosRef.terrestre![0])); }}>
+                        Min
+                      </button>
+                      <button type="button" className="viatico-ref-btn"
+                        onClick={() => { setTipoTrIda('terrestre'); setValorIda(String(Math.round((preciosRef.terrestre![0] + preciosRef.terrestre![1]) / 2))); }}>
+                        Prom
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+              {/* Alerta si el precio ingresado excede el rango */}
+              {valorIda && (() => {
+                const v = parseInt(valorIda.replace(/\D/g, '')) || 0;
+                const ref = tipoTrIda === 'aereo' ? preciosRef.aereo : preciosRef.terrestre;
+                if (ref && v > 0 && v > ref[1] * 1.5) {
+                  return (
+                    <div className="viatico-precio-alerta">
+                      ⚠ El valor ${formatearMiles(v)} supera 1.5× el máximo de referencia para transporte {tipoTrIda} en esta ruta. Será revisado por el aprobador.
+                    </div>
+                  );
+                }
+                if (ref && v > 0 && v <= ref[0]) {
+                  return (
+                    <div className="viatico-precio-ok">
+                      ✓ Valor dentro del rango mínimo de referencia.
+                    </div>
+                  );
+                }
+                return null;
+              })()}
+            </div>
+          )}
 
           <TiqueteForm
             titulo={esIdaVuelta ? '🛫 Tiquete de ida' : '🛫 Tiquete'}

@@ -8586,7 +8586,7 @@ textarea {
 
   /* === NAV LATERAL (DRAWER) EN MÓVIL === */
 
-  /* Topbar fija con hamburger — visible solo en móvil */
+  /* ── TOPBAR MÓVIL (base: modo claro) ── */
   .admin-movil-topbar {
     display: flex;
     align-items: center;
@@ -8596,54 +8596,50 @@ textarea {
     height: 52px;
     padding: 0;
     z-index: 190;
-    background: #070B1D;
-    border-bottom: 1px solid rgba(212,175,55,0.25);
-    box-shadow: 0 2px 16px rgba(0,0,0,0.45);
+    background: #ffffff;
+    border-bottom: 2px solid rgba(184,134,11,0.3);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
   }
-  /* Cuadro hamburger — cuadrado exacto al alto del topbar */
   .admin-movil-hamburger {
     width: 52px;
     height: 52px;
     flex-shrink: 0;
-    background: rgba(212,175,55,0.08);
+    background: rgba(184,134,11,0.07);
     border: none;
-    border-right: 1px solid rgba(212,175,55,0.18);
+    border-right: 1px solid rgba(184,134,11,0.2);
     font-size: 20px;
     cursor: pointer;
-    color: #D4AF37;
+    color: #b8860b;
     display: flex;
     align-items: center;
     justify-content: center;
     line-height: 1;
   }
-  /* "PAYOPS" brand text */
   .admin-movil-brand {
     display: flex;
     align-items: center;
     font-size: 14px;
     font-weight: 800;
-    color: #D4AF37;
+    color: #b8860b;
     letter-spacing: 1.5px;
     flex-shrink: 0;
     padding: 0 8px 0 10px;
   }
-  /* Separador · */
   .admin-movil-sep {
-    color: rgba(212,175,55,0.35);
+    color: rgba(184,134,11,0.4);
     flex-shrink: 0;
     font-size: 16px;
     padding-right: 8px;
   }
-  /* Nombre del módulo activo */
   .admin-movil-modulo {
     flex: 1;
     font-size: 13px;
-    color: rgba(255,255,255,0.7);
+    font-weight: 600;
+    color: rgba(0,0,0,0.6);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  /* Bell en topbar móvil */
   .admin-movil-bell {
     display: flex;
     align-items: center;
@@ -8654,10 +8650,10 @@ textarea {
     flex-shrink: 0;
     background: none;
     border: none;
-    border-left: 1px solid rgba(212,175,55,0.18);
+    border-left: 1px solid rgba(184,134,11,0.2);
     font-size: 18px;
     cursor: pointer;
-    color: rgba(255,255,255,0.85);
+    color: rgba(0,0,0,0.6);
   }
   .admin-movil-bell-badge {
     position: absolute;
@@ -8671,6 +8667,26 @@ textarea {
     min-width: 15px;
     text-align: center;
   }
+
+  /* Modo OSCURO — topbar con fondo #070B1D y colores dorado/blanco */
+  [data-theme="dark"] .admin-movil-topbar {
+    background: #070B1D;
+    border-bottom: 1px solid rgba(212,175,55,0.22);
+    box-shadow: 0 2px 16px rgba(0,0,0,0.5);
+  }
+  [data-theme="dark"] .admin-movil-hamburger {
+    color: #D4AF37;
+    background: rgba(212,175,55,0.08);
+    border-right-color: rgba(212,175,55,0.18);
+  }
+  [data-theme="dark"] .admin-movil-brand  { color: #D4AF37; }
+  [data-theme="dark"] .admin-movil-sep    { color: rgba(212,175,55,0.35); }
+  [data-theme="dark"] .admin-movil-modulo { color: rgba(255,255,255,0.7); }
+  [data-theme="dark"] .admin-movil-bell   {
+    color: rgba(255,255,255,0.8);
+    border-left-color: rgba(212,175,55,0.18);
+  }
+
   /* Ocultar Rol y Cerrar sesión del header en móvil — están en el drawer */
   .admin-header-actions { display: none !important; }
 
@@ -9156,6 +9172,98 @@ textarea {
 }
 .viatico-total-linea strong {
   color: var(--accent);
+}
+
+/* ── Caja de referencia de precios ── */
+.viatico-ref-box {
+  border: 1.5px solid rgba(212,175,55,0.35);
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-bottom: 20px;
+  background: rgba(212,175,55,0.05);
+}
+.viatico-ref-titulo {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+.viatico-ref-desc {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 0 0 12px;
+}
+.viatico-ref-opciones {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.viatico-ref-opcion {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--surface-1, #fff);
+  border: 1px solid var(--gold-line);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+.viatico-ref-opcion-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.viatico-ref-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+}
+.viatico-ref-tipo {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+.viatico-ref-rango {
+  font-size: 12px;
+  color: var(--accent);
+  font-weight: 600;
+}
+.viatico-ref-acciones {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.viatico-ref-btn {
+  padding: 5px 10px;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+.viatico-ref-btn:hover {
+  background: rgba(218,165,32,0.12);
+}
+.viatico-precio-alerta {
+  margin-top: 10px;
+  padding: 8px 12px;
+  background: rgba(239,68,68,0.08);
+  border: 1px solid rgba(239,68,68,0.25);
+  border-radius: 7px;
+  font-size: 12px;
+  color: #dc2626;
+}
+.viatico-precio-ok {
+  margin-top: 10px;
+  padding: 8px 12px;
+  background: rgba(34,197,94,0.08);
+  border: 1px solid rgba(34,197,94,0.25);
+  border-radius: 7px;
+  font-size: 12px;
+  color: #16a34a;
 }
 
 /* Bloque de tiquete (ida / vuelta) */
