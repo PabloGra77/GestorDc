@@ -8586,9 +8586,9 @@ textarea {
 
   /* === NAV LATERAL (DRAWER) EN MÓVIL === */
 
-  /* ── TOPBAR MÓVIL (base: modo claro) ── */
+  /* ── TOPBAR MÓVIL — modo claro (base) ── */
   .admin-movil-topbar {
-    display: flex;
+    display: flex !important;
     align-items: center;
     gap: 0;
     position: fixed;
@@ -8597,11 +8597,14 @@ textarea {
     padding: 0;
     z-index: 190;
     background: #ffffff;
-    border-bottom: 2px solid rgba(184,134,11,0.3);
+    border-bottom: 2px solid rgba(184,134,11,0.28);
     box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    overflow: visible;
   }
-  .admin-movil-hamburger {
+  /* Cuadro hamburger */
+  .admin-movil-topbar .admin-movil-hamburger {
     width: 52px;
+    min-width: 52px;
     height: 52px;
     flex-shrink: 0;
     background: rgba(184,134,11,0.07);
@@ -8609,43 +8612,58 @@ textarea {
     border-right: 1px solid rgba(184,134,11,0.2);
     font-size: 20px;
     cursor: pointer;
-    color: #b8860b;
+    color: #b8860b !important;
     display: flex;
     align-items: center;
     justify-content: center;
     line-height: 1;
   }
-  .admin-movil-brand {
-    display: flex;
-    align-items: center;
-    font-size: 14px;
-    font-weight: 800;
-    color: #b8860b;
+  /* "PAYOPS" */
+  .admin-movil-topbar .admin-movil-brand {
+    font-size: 14px !important;
+    font-weight: 800 !important;
+    color: #b8860b !important;
     letter-spacing: 1.5px;
     flex-shrink: 0;
+    white-space: nowrap;
     padding: 0 8px 0 10px;
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
   }
-  .admin-movil-sep {
-    color: rgba(184,134,11,0.4);
+  /* Separador · */
+  .admin-movil-topbar .admin-movil-sep {
+    color: rgba(184,134,11,0.45) !important;
     flex-shrink: 0;
-    font-size: 16px;
+    font-size: 15px;
     padding-right: 8px;
+    white-space: nowrap;
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
   }
-  .admin-movil-modulo {
+  /* Nombre del módulo */
+  .admin-movil-topbar .admin-movil-modulo {
     flex: 1;
-    font-size: 13px;
+    min-width: 0;
+    font-size: 13px !important;
     font-weight: 600;
-    color: rgba(0,0,0,0.6);
+    color: rgba(0,0,0,0.58) !important;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
   }
-  .admin-movil-bell {
-    display: flex;
+  /* Campana */
+  .admin-movil-topbar .admin-movil-bell {
+    display: flex !important;
     align-items: center;
     justify-content: center;
     position: relative;
     width: 52px;
+    min-width: 52px;
     height: 52px;
     flex-shrink: 0;
     background: none;
@@ -8653,13 +8671,15 @@ textarea {
     border-left: 1px solid rgba(184,134,11,0.2);
     font-size: 18px;
     cursor: pointer;
-    color: rgba(0,0,0,0.6);
+    color: rgba(0,0,0,0.55) !important;
+    visibility: visible !important;
+    opacity: 1 !important;
   }
   .admin-movil-bell-badge {
     position: absolute;
     top: 8px; right: 8px;
     background: #EF4444;
-    color: #fff;
+    color: #fff !important;
     font-size: 9px;
     font-weight: 700;
     border-radius: 999px;
@@ -8668,26 +8688,26 @@ textarea {
     text-align: center;
   }
 
-  /* Modo OSCURO — topbar con fondo #070B1D y colores dorado/blanco */
+  /* ── MODO OSCURO — fondo #070B1D + dorado/blanco ── */
   [data-theme="dark"] .admin-movil-topbar {
-    background: #070B1D;
-    border-bottom: 1px solid rgba(212,175,55,0.22);
+    background: #070B1D !important;
+    border-bottom: 1px solid rgba(212,175,55,0.22) !important;
     box-shadow: 0 2px 16px rgba(0,0,0,0.5);
   }
-  [data-theme="dark"] .admin-movil-hamburger {
-    color: #D4AF37;
+  [data-theme="dark"] .admin-movil-topbar .admin-movil-hamburger {
+    color: #D4AF37 !important;
     background: rgba(212,175,55,0.08);
     border-right-color: rgba(212,175,55,0.18);
   }
-  [data-theme="dark"] .admin-movil-brand  { color: #D4AF37; }
-  [data-theme="dark"] .admin-movil-sep    { color: rgba(212,175,55,0.35); }
-  [data-theme="dark"] .admin-movil-modulo { color: rgba(255,255,255,0.7); }
-  [data-theme="dark"] .admin-movil-bell   {
-    color: rgba(255,255,255,0.8);
+  [data-theme="dark"] .admin-movil-topbar .admin-movil-brand  { color: #D4AF37 !important; }
+  [data-theme="dark"] .admin-movil-topbar .admin-movil-sep    { color: rgba(212,175,55,0.38) !important; }
+  [data-theme="dark"] .admin-movil-topbar .admin-movil-modulo { color: rgba(255,255,255,0.72) !important; }
+  [data-theme="dark"] .admin-movil-topbar .admin-movil-bell   {
+    color: rgba(255,255,255,0.82) !important;
     border-left-color: rgba(212,175,55,0.18);
   }
 
-  /* Ocultar Rol y Cerrar sesión del header en móvil — están en el drawer */
+  /* Ocultar Rol y Cerrar sesión del header en móvil — van en el drawer */
   .admin-header-actions { display: none !important; }
 
   /* Overlay oscuro cuando nav está abierta */

@@ -644,80 +644,48 @@ export function ViaticosPanel({ onCreada }: { onCreada?: (info: { id: number; nu
           <h3>Datos del tiquete de transporte</h3>
           <p className="leg-nota">Ingresa los datos exactos de tu tiquete o comprobante de viaje.</p>
 
-          {/* Comparador de precios de referencia */}
+          {/* Referencia de precios — solo informativa, sin sugerencias de precio mínimo */}
           {preciosRef && (
             <div className="viatico-ref-box">
-              <div className="viatico-ref-titulo">
-                💡 Precios de referencia: <strong>{ciudadOrigen} → {ciudadDestino}</strong>
-              </div>
-              <p className="viatico-ref-desc">
-                Rango habitual del mercado para esta ruta. Usa "Aplicar" para pre-llenar el valor de tu tiquete de ida.
-              </p>
+              <div className="viatico-ref-titulo">📊 Precios habituales para esta ruta</div>
               <div className="viatico-ref-opciones">
                 {preciosRef.aereo && (
                   <div className="viatico-ref-opcion">
-                    <div className="viatico-ref-opcion-left">
-                      <span className="viatico-ref-icon">✈</span>
-                      <div>
-                        <div className="viatico-ref-tipo">Aéreo</div>
-                        <div className="viatico-ref-rango">
-                          ${formatearMiles(preciosRef.aereo[0])} – ${formatearMiles(preciosRef.aereo[1])} COP
-                        </div>
+                    <span className="viatico-ref-icon">✈</span>
+                    <div>
+                      <div className="viatico-ref-tipo">Aéreo · {ciudadOrigen} → {ciudadDestino}</div>
+                      <div className="viatico-ref-rango">
+                        ${formatearMiles(preciosRef.aereo[0])} – ${formatearMiles(preciosRef.aereo[1])} COP
                       </div>
-                    </div>
-                    <div className="viatico-ref-acciones">
-                      <button type="button" className="viatico-ref-btn"
-                        onClick={() => { setTipoTrIda('aereo'); setValorIda(String(preciosRef.aereo![0])); }}>
-                        Min
-                      </button>
-                      <button type="button" className="viatico-ref-btn"
-                        onClick={() => { setTipoTrIda('aereo'); setValorIda(String(Math.round((preciosRef.aereo![0] + preciosRef.aereo![1]) / 2))); }}>
-                        Prom
-                      </button>
                     </div>
                   </div>
                 )}
                 {preciosRef.terrestre && (
                   <div className="viatico-ref-opcion">
-                    <div className="viatico-ref-opcion-left">
-                      <span className="viatico-ref-icon">🚌</span>
-                      <div>
-                        <div className="viatico-ref-tipo">Terrestre</div>
-                        <div className="viatico-ref-rango">
-                          ${formatearMiles(preciosRef.terrestre[0])} – ${formatearMiles(preciosRef.terrestre[1])} COP
-                        </div>
+                    <span className="viatico-ref-icon">🚌</span>
+                    <div>
+                      <div className="viatico-ref-tipo">Terrestre · {ciudadOrigen} → {ciudadDestino}</div>
+                      <div className="viatico-ref-rango">
+                        ${formatearMiles(preciosRef.terrestre[0])} – ${formatearMiles(preciosRef.terrestre[1])} COP
                       </div>
-                    </div>
-                    <div className="viatico-ref-acciones">
-                      <button type="button" className="viatico-ref-btn"
-                        onClick={() => { setTipoTrIda('terrestre'); setValorIda(String(preciosRef.terrestre![0])); }}>
-                        Min
-                      </button>
-                      <button type="button" className="viatico-ref-btn"
-                        onClick={() => { setTipoTrIda('terrestre'); setValorIda(String(Math.round((preciosRef.terrestre![0] + preciosRef.terrestre![1]) / 2))); }}>
-                        Prom
-                      </button>
                     </div>
                   </div>
                 )}
               </div>
-              {/* Alerta si el precio ingresado excede el rango */}
+              {/* Validación en tiempo real del precio ingresado */}
               {valorIda && (() => {
                 const v = parseInt(valorIda.replace(/\D/g, '')) || 0;
                 const ref = tipoTrIda === 'aereo' ? preciosRef.aereo : preciosRef.terrestre;
-                if (ref && v > 0 && v > ref[1] * 1.5) {
+                if (!ref || v === 0) return null;
+                if (v > ref[1] * 1.4) {
                   return (
                     <div className="viatico-precio-alerta">
-                      ⚠ El valor ${formatearMiles(v)} supera 1.5× el máximo de referencia para transporte {tipoTrIda} en esta ruta. Será revisado por el aprobador.
+                      ⚠ El valor ${formatearMiles(v)} supera el rango habitual para {tipoTrIda === 'aereo' ? 'vuelo' : 'transporte terrestre'} en esta ruta. El aprobador revisará esta diferencia.
                     </div>
                   );
                 }
-                if (ref && v > 0 && v <= ref[0]) {
-                  return (
-                    <div className="viatico-precio-ok">
-                      ✓ Valor dentro del rango mínimo de referencia.
-                    </div>
-                  );
+                if (v >= ref[0] && v <= ref[1]) {
+                  return <div className="viatico-precio-ok">✓ Precio dentro del rango habitual para esta ruta.</div>;
                 }
                 return null;
               })()}
