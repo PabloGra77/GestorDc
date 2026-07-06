@@ -28,6 +28,8 @@ export function AppLayout({
 				activeSection={activeSection}
 				onSelectSection={onSelectSection}
 				currentUser={nombre}
+				rol={rol}
+				onLogout={onLogout}
 			/>
 
 			<div className="admin-workspace chat-collapsed">

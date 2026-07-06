@@ -6,48 +6,17 @@ import { useOcrDocument, validarOcrContraDato } from '../../hooks/useOcrDocument
 
 /* ─── Ciudades Colombia ──────────────────────────────────────── */
 const CIUDADES_CO = [
-  { nombre: 'Bogotá', iata: 'BOG' },
-  { nombre: 'Medellín', iata: 'MDE' },
-  { nombre: 'Cali', iata: 'CLO' },
-  { nombre: 'Cartagena', iata: 'CTG' },
-  { nombre: 'Barranquilla', iata: 'BAQ' },
-  { nombre: 'Bucaramanga', iata: 'BGA' },
-  { nombre: 'Pereira', iata: 'PEI' },
-  { nombre: 'Santa Marta', iata: 'SMR' },
-  { nombre: 'Cúcuta', iata: 'CUC' },
-  { nombre: 'Manizales', iata: 'MZL' },
-  { nombre: 'Armenia', iata: 'AXM' },
-  { nombre: 'Ibagué', iata: 'IBE' },
-  { nombre: 'Montería', iata: 'MTR' },
-  { nombre: 'Villavicencio', iata: 'VVC' },
-  { nombre: 'Pasto', iata: 'PSO' },
-  { nombre: 'Neiva', iata: 'HEI' },
-  { nombre: 'Valledupar', iata: 'VUP' },
-  { nombre: 'San Andrés', iata: 'ADZ' },
-  { nombre: 'Popayán', iata: 'PPN' },
-  { nombre: 'Leticia', iata: 'LET' },
-  { nombre: 'Florencia', iata: 'FLA' },
-  { nombre: 'Yopal', iata: 'EYP' },
-  { nombre: 'Riohacha', iata: 'RCH' },
-  { nombre: 'Tunja', iata: '' },
-  { nombre: 'Duitama', iata: '' },
-  { nombre: 'Sogamoso', iata: '' },
+  'Bogotá', 'Medellín', 'Cali', 'Cartagena', 'Barranquilla', 'Bucaramanga',
+  'Pereira', 'Santa Marta', 'Cúcuta', 'Manizales', 'Armenia', 'Ibagué',
+  'Montería', 'Villavicencio', 'Pasto', 'Neiva', 'Valledupar', 'San Andrés',
+  'Popayán', 'Leticia', 'Florencia', 'Yopal', 'Riohacha', 'Tunja',
+  'Duitama', 'Sogamoso', 'Santa Rosa de Viterbo', 'Chiquinquirá', 'Zipaquirá',
+  'Facatativá', 'Girardot', 'Espinal', 'Honda', 'Barrancabermeja', 'Sincelejo',
+  'Rionegro', 'Envigado', 'Bello', 'Palmira', 'Buenaventura',
 ];
 
 /* ─── Tipos ─────────────────────────────────────────────────── */
 interface UsuarioSugerido { id: number; nombreCompleto: string; rol: string; area: string | null; }
-
-interface OpcionViaje {
-  id: string;
-  tipo: 'vuelo' | 'bus';
-  empresa: string;
-  salida: string;
-  llegada: string;
-  duracion: string;
-  precio: number;
-  esEstimado: boolean;
-}
-
 interface FacturaAdj { archivoId: string; nombre: string; alertas: string[]; }
 
 /* ─── Helpers ───────────────────────────────────────────────── */
@@ -85,6 +54,115 @@ async function subirArchivo(file: File): Promise<string> {
   return r.data.id;
 }
 
+function fmtValor(v: string) {
+  const n = parseInt(v.replace(/\D/g, '')) || 0;
+  return n > 0 ? formatearMiles(n) : '';
+}
+
+/* ─── Sub-formulario de tiquete ────────────────────────────── */
+interface TiqueteFormProps {
+  titulo: string;
+  ciudadOrigen: string;
+  ciudadDestino: string;
+  fecha: string;
+  tipo: 'aereo' | 'terrestre';
+  onTipo: (v: 'aereo' | 'terrestre') => void;
+  empresa: string; onEmpresa: (v: string) => void;
+  numDoc: string; onNumDoc: (v: string) => void;
+  codReserva: string; onCodReserva: (v: string) => void;
+  tramo: string; onTramo: (v: string) => void;
+  puesto: string; onPuesto: (v: string) => void;
+  horaSalida: string; onHoraSalida: (v: string) => void;
+  horaLlegada: string; onHoraLlegada: (v: string) => void;
+  valor: string; onValor: (v: string) => void;
+}
+
+function TiqueteForm({
+  titulo, ciudadOrigen, ciudadDestino, fecha, tipo, onTipo,
+  empresa, onEmpresa, numDoc, onNumDoc, codReserva, onCodReserva,
+  tramo, onTramo, puesto, onPuesto,
+  horaSalida, onHoraSalida, horaLlegada, onHoraLlegada,
+  valor, onValor,
+}: TiqueteFormProps) {
+  return (
+    <div className="viatico-tiquete-bloque">
+      <div className="viatico-tiquete-titulo">{titulo}</div>
+      <p className="leg-nota">{ciudadOrigen} → {ciudadDestino} · {fecha}</p>
+
+      {/* Tipo de transporte */}
+      <div className="leg-field">
+        <label>Tipo de transporte *</label>
+        <div className="viaticos-tipo-transport-row">
+          <button type="button"
+            className={`viatico-tr-btn${tipo === 'aereo' ? ' selected' : ''}`}
+            onClick={() => onTipo('aereo')}>
+            ✈ Aéreo
+          </button>
+          <button type="button"
+            className={`viatico-tr-btn${tipo === 'terrestre' ? ' selected' : ''}`}
+            onClick={() => onTipo('terrestre')}>
+            🚌 Terrestre
+          </button>
+        </div>
+      </div>
+
+      <div className="leg-gasto-fields">
+        <div className="leg-field">
+          <label>Empresa transportadora *</label>
+          <input type="text" value={empresa} onChange={(e) => onEmpresa(e.target.value)}
+            placeholder={tipo === 'aereo' ? 'Ej: Avianca, LATAM, Aero República' : 'Ej: COOFLOTAX, Flota Magdalena'} />
+        </div>
+
+        <div className="leg-field">
+          <label>{tipo === 'aereo' ? 'Número de vuelo *' : 'Número de tiquete *'}</label>
+          <input type="text" value={numDoc} onChange={(e) => onNumDoc(e.target.value.toUpperCase())}
+            placeholder={tipo === 'aereo' ? 'Ej: AV 8001, P5 7506' : 'Ej: DEST4-83964'} />
+        </div>
+
+        {tipo === 'aereo' && (
+          <div className="leg-field">
+            <label>Código de reserva</label>
+            <input type="text" value={codReserva} onChange={(e) => onCodReserva(e.target.value.toUpperCase())}
+              placeholder="Ej: J48SQO" maxLength={10} />
+          </div>
+        )}
+
+        {tipo === 'terrestre' && (
+          <>
+            <div className="leg-field">
+              <label>Tramo / Ruta</label>
+              <input type="text" value={tramo} onChange={(e) => onTramo(e.target.value)}
+                placeholder="Ej: SANTA ROSA - DUITAMA" />
+            </div>
+            <div className="leg-field">
+              <label>Puesto / Silla</label>
+              <input type="text" value={puesto} onChange={(e) => onPuesto(e.target.value)}
+                placeholder="Ej: 3, 12A" maxLength={6} />
+            </div>
+          </>
+        )}
+
+        <div className="leg-field">
+          <label>Hora de salida</label>
+          <input type="time" value={horaSalida} onChange={(e) => onHoraSalida(e.target.value)} />
+        </div>
+
+        <div className="leg-field">
+          <label>Hora de llegada</label>
+          <input type="time" value={horaLlegada} onChange={(e) => onHoraLlegada(e.target.value)} />
+        </div>
+
+        <div className="leg-field">
+          <label>Valor total del tiquete ($) *</label>
+          <input type="text" inputMode="numeric" value={fmtValor(valor) ? `$${fmtValor(valor)}` : ''}
+            onChange={(e) => onValor(e.target.value.replace(/\D/g, ''))}
+            placeholder="$ 0" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ─── Panel Viáticos ────────────────────────────────────────── */
 export function ViaticosPanel({ onCreada }: { onCreada?: (info: { id: number; numeroRadicado: string }) => void }) {
   const [paso, setPaso] = useState<1 | 2 | 3 | 4 | 5>(1);
@@ -96,6 +174,7 @@ export function ViaticosPanel({ onCreada }: { onCreada?: (info: { id: number; nu
   const [autorizadorNombre, setAutorizadorNombre] = useState('');
   const [usuarios, setUsuarios] = useState<UsuarioSugerido[]>([]);
   const [showSugeridos, setShowSugeridos] = useState(false);
+  const [motivoViaje, setMotivoViaje] = useState('');
 
   /* Paso 2 */
   const [ciudadOrigen, setCiudadOrigen] = useState('');
@@ -103,16 +182,29 @@ export function ViaticosPanel({ onCreada }: { onCreada?: (info: { id: number; nu
   const [esIdaVuelta, setEsIdaVuelta] = useState(true);
   const [fechaIda, setFechaIda] = useState('');
   const [fechaRegreso, setFechaRegreso] = useState('');
-  const [tipoTransporte, setTipoTransporte] = useState<'aereo' | 'terrestre' | 'cualquiera'>('cualquiera');
 
-  /* Paso 3 — búsqueda */
-  const [opcionesIda, setOpcionesIda] = useState<OpcionViaje[]>([]);
-  const [opcionesVuelta, setOpcionesVuelta] = useState<OpcionViaje[]>([]);
-  const [buscando, setBuscando] = useState(false);
-  const [yaFueBuscado, setYaFueBuscado] = useState(false);
-  const [errBusqueda, setErrBusqueda] = useState('');
-  const [viajeIda, setViajeIda] = useState<OpcionViaje | null>(null);
-  const [viajeVuelta, setViajeVuelta] = useState<OpcionViaje | null>(null);
+  /* Paso 3 — tiquete IDA */
+  const [tipoTrIda, setTipoTrIda] = useState<'aereo' | 'terrestre'>('aereo');
+  const [empresaIda, setEmpresaIda] = useState('');
+  const [numDocIda, setNumDocIda] = useState('');
+  const [codResIda, setCodResIda] = useState('');
+  const [tramoIda, setTramoIda] = useState('');
+  const [puestoIda, setPuestoIda] = useState('');
+  const [hrSalidaIda, setHrSalidaIda] = useState('');
+  const [hrLlegadaIda, setHrLlegadaIda] = useState('');
+  const [valorIda, setValorIda] = useState('');
+
+  /* Paso 3 — tiquete VUELTA */
+  const [tipoTrVuelta, setTipoTrVuelta] = useState<'aereo' | 'terrestre'>('aereo');
+  const [empresaVuelta, setEmpresaVuelta] = useState('');
+  const [numDocVuelta, setNumDocVuelta] = useState('');
+  const [codResVuelta, setCodResVuelta] = useState('');
+  const [tramoVuelta, setTramoVuelta] = useState('');
+  const [puestoVuelta, setPuestoVuelta] = useState('');
+  const [hrSalidaVuelta, setHrSalidaVuelta] = useState('');
+  const [hrLlegadaVuelta, setHrLlegadaVuelta] = useState('');
+  const [valorVuelta, setValorVuelta] = useState('');
+
   const [facturaTransporte, setFacturaTransporte] = useState<FacturaAdj | null>(null);
   const [subiendoTransporte, setSubiendoTransporte] = useState(false);
 
@@ -165,35 +257,11 @@ export function ViaticosPanel({ onCreada }: { onCreada?: (info: { id: number; nu
     setShowSugeridos(false);
   }
 
-  const ciudadOrigenObj = useMemo(() => CIUDADES_CO.find((c) => c.nombre === ciudadOrigen), [ciudadOrigen]);
-  const ciudadDestinoObj = useMemo(() => CIUDADES_CO.find((c) => c.nombre === ciudadDestino), [ciudadDestino]);
-
-  async function buscarViajes() {
-    if (!ciudadOrigenObj || !ciudadDestinoObj || !fechaIda) return;
-    setBuscando(true);
-    setErrBusqueda('');
-    setOpcionesIda([]);
-    setOpcionesVuelta([]);
-    setViajeIda(null);
-    setViajeVuelta(null);
-    try {
-      const params: Record<string, string> = {
-        origen: ciudadOrigenObj.iata || ciudadOrigen,
-        destino: ciudadDestinoObj.iata || ciudadDestino,
-        fecha_ida: fechaIda,
-      };
-      if (esIdaVuelta && fechaRegreso) params.fecha_regreso = fechaRegreso;
-      const r = await api.get<{ opciones: OpcionViaje[]; opcionesRegreso?: OpcionViaje[] }>('/viajes/buscar', { params });
-      setOpcionesIda(r.data.opciones || []);
-      if (esIdaVuelta) setOpcionesVuelta(r.data.opcionesRegreso || r.data.opciones || []);
-      setYaFueBuscado(true);
-    } catch {
-      setErrBusqueda('No se pudieron cargar las opciones de viaje. Verifica tu conexión e intenta de nuevo.');
-      setYaFueBuscado(true);
-    } finally {
-      setBuscando(false);
-    }
-  }
+  const totalTransporte = useMemo(() => {
+    const ida = parseInt(valorIda.replace(/\D/g, '')) || 0;
+    const vuelta = esIdaVuelta ? (parseInt(valorVuelta.replace(/\D/g, '')) || 0) : 0;
+    return ida + vuelta;
+  }, [valorIda, valorVuelta, esIdaVuelta]);
 
   const subirFactura = useCallback(async (
     file: File,
@@ -222,8 +290,8 @@ export function ViaticosPanel({ onCreada }: { onCreada?: (info: { id: number; nu
           const v = validarOcrContraDato(texto, contexto.ciudad, 'texto');
           if (!v.coincide) alertas.push(`No se identificó "${contexto.ciudad}" en el soporte.`);
         }
-        const marcadores = ['total', 'nit', 'valor', 'fecha', 'factura'].filter((k) => t.includes(k)).length;
-        if (marcadores < 2) alertas.push('El archivo no parece ser una factura válida. Verifica el documento.');
+        const marcadores = ['total', 'nit', 'valor', 'fecha', 'factura', 'tiquete', 'vuelo'].filter((k) => t.includes(k)).length;
+        if (marcadores < 2) alertas.push('El archivo no parece ser un tiquete válido. Verifica el documento.');
       }
       setFactura({ archivoId, nombre: file.name, alertas });
     } catch {
@@ -233,46 +301,44 @@ export function ViaticosPanel({ onCreada }: { onCreada?: (info: { id: number; nu
     }
   }, [procesarArchivo]);
 
-  /* Cálculos de totales */
+  /* Cálculos */
   const noches = useMemo(() => {
     if (!tieneHospedaje || !hotelEntrada || !hotelSalida) return 0;
-    const diff = (new Date(hotelSalida).getTime() - new Date(hotelEntrada).getTime()) / 86400000;
-    return Math.max(0, Math.round(diff));
+    return Math.max(0, Math.round((new Date(hotelSalida).getTime() - new Date(hotelEntrada).getTime()) / 86400000));
   }, [tieneHospedaje, hotelEntrada, hotelSalida]);
 
-  const totalTransporte = useMemo(() => (viajeIda?.precio || 0) + (esIdaVuelta ? (viajeVuelta?.precio || 0) : 0), [viajeIda, viajeVuelta, esIdaVuelta]);
   const totalHospedaje = useMemo(() => tieneHospedaje ? (parseInt(hotelValorNoche) || 0) * noches : 0, [tieneHospedaje, hotelValorNoche, noches]);
   const totalComidas = useMemo(() => {
-    const d = (parseInt(diasDesayuno) || 0) * (parseInt(valorDesayuno) || 0);
-    const a = (parseInt(diasAlmuerzo) || 0) * (parseInt(valorAlmuerzo) || 0);
-    const c = (parseInt(diasCena) || 0) * (parseInt(valorCena) || 0);
-    return d + a + c;
+    return (parseInt(diasDesayuno) || 0) * (parseInt(valorDesayuno) || 0)
+      + (parseInt(diasAlmuerzo) || 0) * (parseInt(valorAlmuerzo) || 0)
+      + (parseInt(diasCena) || 0) * (parseInt(valorCena) || 0);
   }, [diasDesayuno, valorDesayuno, diasAlmuerzo, valorAlmuerzo, diasCena, valorCena]);
   const totalGeneral = useMemo(() => totalTransporte + totalHospedaje + totalComidas, [totalTransporte, totalHospedaje, totalComidas]);
-
-  const opsFiltradas = useCallback((ops: OpcionViaje[]) => ops.filter((o) =>
-    tipoTransporte === 'cualquiera' ||
-    (tipoTransporte === 'aereo' && o.tipo === 'vuelo') ||
-    (tipoTransporte === 'terrestre' && o.tipo === 'bus'),
-  ), [tipoTransporte]);
 
   function validarPaso(): string {
     if (paso === 1) {
       if (!tipoViatico) return 'Selecciona si es anticipo o legalización de viático';
       if (!autorizadorId) return 'Selecciona el autorizador del viaje de la lista';
       if (autorizadorInput.trim() !== autorizadorNombre) return 'Selecciona el autorizador de la lista de sugerencias';
+      if (!motivoViaje.trim()) return 'Describe el motivo o propósito del viaje';
     }
     if (paso === 2) {
       if (!ciudadOrigen) return 'Selecciona la ciudad de origen';
       if (!ciudadDestino) return 'Selecciona la ciudad de destino';
-      if (ciudadOrigen === ciudadDestino) return 'Origen y destino deben ser ciudades diferentes';
+      if (ciudadOrigen === ciudadDestino) return 'Origen y destino deben ser diferentes';
       if (!fechaIda) return 'Indica la fecha de ida';
       if (esIdaVuelta && !fechaRegreso) return 'Indica la fecha de regreso';
       if (esIdaVuelta && fechaRegreso && fechaRegreso < fechaIda) return 'La fecha de regreso debe ser posterior a la de ida';
     }
     if (paso === 3) {
-      if (!viajeIda) return 'Selecciona una opción de viaje de ida';
-      if (esIdaVuelta && !viajeVuelta) return 'Selecciona una opción de viaje de regreso';
+      if (!empresaIda.trim()) return 'Ingresa la empresa de transporte (tiquete de ida)';
+      if (!numDocIda.trim()) return tipoTrIda === 'aereo' ? 'Ingresa el número de vuelo' : 'Ingresa el número del tiquete';
+      if (!valorIda.replace(/\D/g, '')) return 'Ingresa el valor del tiquete de ida';
+      if (esIdaVuelta) {
+        if (!empresaVuelta.trim()) return 'Ingresa la empresa de transporte (tiquete de regreso)';
+        if (!numDocVuelta.trim()) return tipoTrVuelta === 'aereo' ? 'Ingresa el número de vuelo de regreso' : 'Ingresa el número del tiquete de regreso';
+        if (!valorVuelta.replace(/\D/g, '')) return 'Ingresa el valor del tiquete de regreso';
+      }
       if (!facturaTransporte?.archivoId) return 'Adjunta el tiquete o comprobante de transporte';
     }
     if (paso === 4) {
@@ -294,16 +360,27 @@ export function ViaticosPanel({ onCreada }: { onCreada?: (info: { id: number; nu
   function siguiente() { const e = validarPaso(); if (e) { setErr(e); return; } setErr(''); setPaso((p) => Math.min(5, p + 1) as 1|2|3|4|5); }
   function anterior() { setErr(''); setPaso((p) => Math.max(1, p - 1) as 1|2|3|4|5); }
 
+  function resetear() {
+    setPaso(1); setTipoViatico(''); setAutorizadorInput(''); setAutorizadorId(0); setAutorizadorNombre(''); setMotivoViaje('');
+    setCiudadOrigen(''); setCiudadDestino(''); setFechaIda(''); setFechaRegreso(''); setEsIdaVuelta(true);
+    setEmpresaIda(''); setNumDocIda(''); setCodResIda(''); setTramoIda(''); setPuestoIda(''); setHrSalidaIda(''); setHrLlegadaIda(''); setValorIda('');
+    setEmpresaVuelta(''); setNumDocVuelta(''); setCodResVuelta(''); setTramoVuelta(''); setPuestoVuelta(''); setHrSalidaVuelta(''); setHrLlegadaVuelta(''); setValorVuelta('');
+    setFacturaTransporte(null); setTieneHospedaje(false); setHotelNombre(''); setHotelEntrada(''); setHotelSalida(''); setHotelValorNoche(''); setFacturaHotel(null);
+    setDiasDesayuno(''); setValorDesayuno(''); setDiasAlmuerzo(''); setValorAlmuerzo(''); setDiasCena(''); setValorCena(''); setFacturaComidas(null);
+    setFirma(''); setMsg('');
+  }
+
   async function enviar() {
     const e = validarPaso();
     if (e) { setErr(e); return; }
     setErr('');
     setEnviando(true);
     try {
-      const tipos = await api.get<Array<{ id: number; slug: string }>>('/tipos');
-      const tipo = tipos.data.find((t) => t.slug === 'viaticos');
+      const norm = (s: string) => (s ?? '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]/g, '');
+      const tipos = await api.get<Array<{ id: number; slug: string; nombre: string }>>('/tipos');
+      const tipo = tipos.data.find((t) => norm(t.slug) === 'viaticos' || norm(t.nombre) === 'viaticos');
       if (!tipo) {
-        setErr('No se encontró el tipo "Viáticos" en el sistema. El administrador debe crearlo en Panel → Tipos de solicitud con slug "viaticos".');
+        setErr('No se encontró el tipo "Viáticos". El administrador debe crearlo en Panel → Tipos de solicitud con slug "viaticos".');
         return;
       }
       const docs: Record<string, unknown> = {};
@@ -311,10 +388,14 @@ export function ViaticosPanel({ onCreada }: { onCreada?: (info: { id: number; nu
       if (facturaHotel?.archivoId) docs['hotel'] = { archivoId: facturaHotel.archivoId, nombre: facturaHotel.nombre, ocrAlertas: facturaHotel.alertas };
       if (facturaComidas?.archivoId) docs['comidas'] = { archivoId: facturaComidas.archivoId, nombre: facturaComidas.nombre, ocrAlertas: facturaComidas.alertas };
 
+      const tiqueteIda = { tipo: tipoTrIda, empresa: empresaIda, numDoc: numDocIda, codReserva: codResIda, tramo: tramoIda, puesto: puestoIda, horaSalida: hrSalidaIda, horaLlegada: hrLlegadaIda, valor: valorIda.replace(/\D/g, '') };
+      const tiqueteVuelta = esIdaVuelta ? { tipo: tipoTrVuelta, empresa: empresaVuelta, numDoc: numDocVuelta, codReserva: codResVuelta, tramo: tramoVuelta, puesto: puestoVuelta, horaSalida: hrSalidaVuelta, horaLlegada: hrLlegadaVuelta, valor: valorVuelta.replace(/\D/g, '') } : null;
+
       const r = await api.post<{ id: number; numeroRadicado: string }>('/solicitudes', {
         tipoSolicitudId: tipo.id,
         datos: {
           tipoViatico,
+          motivoViaje,
           autorizadorId: String(autorizadorId),
           autorizadorNombre,
           ciudadOrigen,
@@ -322,9 +403,8 @@ export function ViaticosPanel({ onCreada }: { onCreada?: (info: { id: number; nu
           esIdaVuelta: String(esIdaVuelta),
           fechaIda,
           fechaRegreso: esIdaVuelta ? fechaRegreso : '',
-          tipoTransporte,
-          viajeIda: JSON.stringify(viajeIda),
-          viajeVuelta: esIdaVuelta && viajeVuelta ? JSON.stringify(viajeVuelta) : '',
+          tiqueteIda: JSON.stringify(tiqueteIda),
+          tiqueteVuelta: tiqueteVuelta ? JSON.stringify(tiqueteVuelta) : '',
           tieneHospedaje: String(tieneHospedaje),
           hotelNombre: tieneHospedaje ? hotelNombre : '',
           hotelEntrada: tieneHospedaje ? hotelEntrada : '',
@@ -352,7 +432,7 @@ export function ViaticosPanel({ onCreada }: { onCreada?: (info: { id: number; nu
     }
   }
 
-  const PASOS = ['Tipo y autorización', 'Detalles del viaje', 'Opciones de viaje', 'Alojamiento y comidas', 'Resumen y firma'];
+  const PASOS = ['Tipo y autorización', 'Detalles del viaje', 'Tiquetes de transporte', 'Alojamiento y comidas', 'Resumen y firma'];
 
   if (msg) {
     return (
@@ -361,9 +441,7 @@ export function ViaticosPanel({ onCreada }: { onCreada?: (info: { id: number; nu
         <h3>Viático radicado</h3>
         <p>{msg}</p>
         <p className="leg-success-note">Puedes hacer seguimiento en <strong>Mis solicitudes</strong>.</p>
-        <button type="button" className="admin-primary-button" onClick={() => { setMsg(''); setPaso(1); setTipoViatico(''); setAutorizadorInput(''); setAutorizadorId(0); setAutorizadorNombre(''); setCiudadOrigen(''); setCiudadDestino(''); setFechaIda(''); setFechaRegreso(''); setViajeIda(null); setViajeVuelta(null); setFacturaTransporte(null); setTieneHospedaje(false); setHotelNombre(''); setHotelEntrada(''); setHotelSalida(''); setHotelValorNoche(''); setFacturaHotel(null); setDiasDesayuno(''); setValorDesayuno(''); setDiasAlmuerzo(''); setValorAlmuerzo(''); setDiasCena(''); setValorCena(''); setFacturaComidas(null); setFirma(''); setYaFueBuscado(false); }}>
-          Nuevo viático
-        </button>
+        <button type="button" className="admin-primary-button" onClick={resetear}>Nuevo viático</button>
       </div>
     );
   }
@@ -405,6 +483,12 @@ export function ViaticosPanel({ onCreada }: { onCreada?: (info: { id: number; nu
                 <p>El viaje ya ocurrió y tienes facturas. Solicitas el reembolso de los gastos reales.</p>
               </button>
             </div>
+          </div>
+
+          <div className="leg-field" style={{ marginTop: 16 }}>
+            <label>Motivo / propósito del viaje *</label>
+            <textarea value={motivoViaje} onChange={(e) => setMotivoViaje(e.target.value)}
+              rows={2} placeholder="Ej: Visita a cliente, capacitación, reunión con proveedor…" />
           </div>
 
           <div className="leg-field leg-autocomplete-wrap" style={{ marginTop: 16 }}>
@@ -465,7 +549,7 @@ export function ViaticosPanel({ onCreada }: { onCreada?: (info: { id: number; nu
               <label>Ciudad de origen *</label>
               <select value={ciudadOrigen} onChange={(e) => setCiudadOrigen(e.target.value)} required>
                 <option value="">— Selecciona —</option>
-                {CIUDADES_CO.map((c) => <option key={c.nombre} value={c.nombre}>{c.nombre}</option>)}
+                {CIUDADES_CO.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
 
@@ -473,7 +557,7 @@ export function ViaticosPanel({ onCreada }: { onCreada?: (info: { id: number; nu
               <label>Ciudad de destino *</label>
               <select value={ciudadDestino} onChange={(e) => setCiudadDestino(e.target.value)} required>
                 <option value="">— Selecciona —</option>
-                {CIUDADES_CO.map((c) => <option key={c.nombre} value={c.nombre}>{c.nombre}</option>)}
+                {CIUDADES_CO.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
 
@@ -489,138 +573,63 @@ export function ViaticosPanel({ onCreada }: { onCreada?: (info: { id: number; nu
                   onChange={(e) => setFechaRegreso(e.target.value)} required />
               </div>
             )}
-
-            <div className="leg-field">
-              <label>Tipo de transporte</label>
-              <select value={tipoTransporte} onChange={(e) => setTipoTransporte(e.target.value as typeof tipoTransporte)}>
-                <option value="cualquiera">Cualquiera (vuelo o bus)</option>
-                <option value="aereo">Solo aéreo</option>
-                <option value="terrestre">Solo terrestre</option>
-              </select>
-            </div>
           </div>
 
           <div className="leg-actions">
             <button type="button" className="admin-ghost-button" onClick={anterior}>← Atrás</button>
             <button type="button" className="admin-primary-button" onClick={siguiente}>
-              Continuar → Buscar opciones de viaje
+              Continuar → Datos del tiquete
             </button>
           </div>
         </div>
       )}
 
-      {/* ── PASO 3: Opciones de viaje ── */}
+      {/* ── PASO 3: Tiquetes ── */}
       {paso === 3 && (
         <div className="leg-form card-surface">
-          <h3>Opciones de viaje disponibles</h3>
-          <p className="leg-nota">
-            ✈ {ciudadOrigen} → {ciudadDestino}
-            {esIdaVuelta ? ' (ida y vuelta)' : ' (solo ida)'}
-            {' · '}{fechaIda}{esIdaVuelta && fechaRegreso ? ` · Regreso: ${fechaRegreso}` : ''}
-          </p>
+          <h3>Datos del tiquete de transporte</h3>
+          <p className="leg-nota">Ingresa los datos exactos de tu tiquete o comprobante de viaje.</p>
 
-          {!yaFueBuscado && !buscando && (
-            <div className="viaticos-buscar-cta">
-              <button type="button" className="admin-primary-button viaticos-buscar-btn" onClick={buscarViajes}>
-                🔍 Buscar vuelos y buses disponibles
-              </button>
-              <p className="leg-nota">Consultamos vuelos (Avianca, LATAM, JetSmart) y buses para tu ruta.</p>
+          <TiqueteForm
+            titulo={esIdaVuelta ? '🛫 Tiquete de ida' : '🛫 Tiquete'}
+            ciudadOrigen={ciudadOrigen} ciudadDestino={ciudadDestino} fecha={fechaIda}
+            tipo={tipoTrIda} onTipo={setTipoTrIda}
+            empresa={empresaIda} onEmpresa={setEmpresaIda}
+            numDoc={numDocIda} onNumDoc={setNumDocIda}
+            codReserva={codResIda} onCodReserva={setCodResIda}
+            tramo={tramoIda} onTramo={setTramoIda}
+            puesto={puestoIda} onPuesto={setPuestoIda}
+            horaSalida={hrSalidaIda} onHoraSalida={setHrSalidaIda}
+            horaLlegada={hrLlegadaIda} onHoraLlegada={setHrLlegadaIda}
+            valor={valorIda} onValor={setValorIda}
+          />
+
+          {esIdaVuelta && (
+            <TiqueteForm
+              titulo="🛬 Tiquete de regreso"
+              ciudadOrigen={ciudadDestino} ciudadDestino={ciudadOrigen} fecha={fechaRegreso}
+              tipo={tipoTrVuelta} onTipo={setTipoTrVuelta}
+              empresa={empresaVuelta} onEmpresa={setEmpresaVuelta}
+              numDoc={numDocVuelta} onNumDoc={setNumDocVuelta}
+              codReserva={codResVuelta} onCodReserva={setCodResVuelta}
+              tramo={tramoVuelta} onTramo={setTramoVuelta}
+              puesto={puestoVuelta} onPuesto={setPuestoVuelta}
+              horaSalida={hrSalidaVuelta} onHoraSalida={setHrSalidaVuelta}
+              horaLlegada={hrLlegadaVuelta} onHoraLlegada={setHrLlegadaVuelta}
+              valor={valorVuelta} onValor={setValorVuelta}
+            />
+          )}
+
+          {totalTransporte > 0 && (
+            <div className="viatico-total-linea">
+              ✈ Total transporte: <strong>${formatearMiles(totalTransporte)} COP</strong>
             </div>
           )}
 
-          {buscando && (
-            <div className="viaticos-buscando">
-              <div className="viaticos-buscando-spinner" />
-              <p>Consultando disponibilidad de vuelos y buses…</p>
-            </div>
-          )}
-
-          {errBusqueda && <div className="admin-error">{errBusqueda}</div>}
-
-          {yaFueBuscado && !buscando && (
-            <>
-              {/* Ida */}
-              <div className="viaticos-opciones-section">
-                <h4>🛫 Viaje de ida: {ciudadOrigen} → {ciudadDestino} · {fechaIda}</h4>
-                {opsFiltradas(opcionesIda).length === 0
-                  ? <p className="leg-nota">No hay opciones disponibles para este trayecto.</p>
-                  : (
-                    <div className="viaticos-opciones-lista">
-                      {opsFiltradas(opcionesIda).map((op) => (
-                        <button key={op.id} type="button"
-                          className={`viatico-opcion-card${viajeIda?.id === op.id ? ' selected' : ''}`}
-                          onClick={() => setViajeIda(op)}>
-                          <div className="viatico-opcion-empresa">
-                            <span>{op.tipo === 'vuelo' ? '✈️' : '🚌'}</span>
-                            <strong>{op.empresa}</strong>
-                            {op.esEstimado && <span className="viatico-badge-estimado">Precio estimado</span>}
-                          </div>
-                          <div className="viatico-opcion-horario">
-                            <span className="viatico-hora">{op.salida}</span>
-                            <span className="viatico-duracion">— {op.duracion} —</span>
-                            <span className="viatico-hora">{op.llegada}</span>
-                          </div>
-                          <div className="viatico-opcion-precio">${formatearMiles(op.precio)} COP</div>
-                          {viajeIda?.id === op.id && <div className="viatico-seleccionado">✓ Seleccionado</div>}
-                        </button>
-                      ))}
-                    </div>
-                  )
-                }
-              </div>
-
-              {/* Vuelta */}
-              {esIdaVuelta && (
-                <div className="viaticos-opciones-section">
-                  <h4>🛬 Viaje de regreso: {ciudadDestino} → {ciudadOrigen} · {fechaRegreso}</h4>
-                  {opsFiltradas(opcionesVuelta).length === 0
-                    ? <p className="leg-nota">No hay opciones disponibles para el regreso.</p>
-                    : (
-                      <div className="viaticos-opciones-lista">
-                        {opsFiltradas(opcionesVuelta).map((op) => {
-                          const id = op.id + '-r';
-                          return (
-                            <button key={id} type="button"
-                              className={`viatico-opcion-card${viajeVuelta?.id === id ? ' selected' : ''}`}
-                              onClick={() => setViajeVuelta({ ...op, id })}>
-                              <div className="viatico-opcion-empresa">
-                                <span>{op.tipo === 'vuelo' ? '✈️' : '🚌'}</span>
-                                <strong>{op.empresa}</strong>
-                                {op.esEstimado && <span className="viatico-badge-estimado">Precio estimado</span>}
-                              </div>
-                              <div className="viatico-opcion-horario">
-                                <span className="viatico-hora">{op.salida}</span>
-                                <span className="viatico-duracion">— {op.duracion} —</span>
-                                <span className="viatico-hora">{op.llegada}</span>
-                              </div>
-                              <div className="viatico-opcion-precio">${formatearMiles(op.precio)} COP</div>
-                              {viajeVuelta?.id === id && <div className="viatico-seleccionado">✓ Seleccionado</div>}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )
-                  }
-                </div>
-              )}
-
-              {totalTransporte > 0 && (
-                <div className="viatico-total-linea">
-                  ✈ Total transporte: <strong>${formatearMiles(totalTransporte)} COP</strong>
-                </div>
-              )}
-
-              <button type="button" className="admin-ghost-button" style={{ marginTop: 12 }}
-                onClick={() => { setYaFueBuscado(false); buscarViajes(); }}>
-                🔄 Buscar de nuevo
-              </button>
-            </>
-          )}
-
-          {/* Factura de transporte */}
-          <div className="leg-factura-section" style={{ marginTop: 24 }}>
+          {/* Adjuntar tiquete */}
+          <div className="leg-factura-section" style={{ marginTop: 20 }}>
             <div className="leg-factura-label">
-              <strong>Tiquete / comprobante de transporte *</strong>
+              <strong>Adjuntar tiquete o comprobante *</strong>
               {!facturaTransporte?.archivoId && <span className="leg-factura-falta">⚠ Obligatorio</span>}
               {facturaTransporte?.archivoId && (
                 <span className={facturaTransporte.alertas.length ? 'leg-factura-warn' : 'leg-factura-ok'}>
@@ -629,6 +638,7 @@ export function ViaticosPanel({ onCreada }: { onCreada?: (info: { id: number; nu
                 </span>
               )}
             </div>
+            <p className="leg-nota" style={{ marginBottom: 8 }}>Sube una foto o PDF del tiquete (aéreo o terrestre).</p>
             <div className="leg-factura-actions">
               {subiendoTransporte
                 ? <span className="leg-validando">Subiendo y analizando…</span>
@@ -707,7 +717,6 @@ export function ViaticosPanel({ onCreada }: { onCreada?: (info: { id: number; nu
                   🏨 {noches} noche(s) × ${formatearMiles(parseInt(hotelValorNoche) || 0)} = <strong>${formatearMiles(totalHospedaje)}</strong>
                 </div>
               )}
-
               <div className="leg-factura-section">
                 <div className="leg-factura-label">
                   <strong>Factura del hotel *</strong>
@@ -761,12 +770,10 @@ export function ViaticosPanel({ onCreada }: { onCreada?: (info: { id: number; nu
                   <strong>{label}</strong>
                 </div>
                 <div className="viaticos-comida-inputs">
-                  <input type="number" min="0" max="30" value={dias} onChange={(e) => setDias(e.target.value)}
-                    placeholder="Días" />
+                  <input type="number" min="0" max="30" value={dias} onChange={(e) => setDias(e.target.value)} placeholder="Días" />
                   <span className="viaticos-comida-x">×</span>
                   <input type="text" inputMode="numeric" value={valor}
-                    onChange={(e) => setValor(e.target.value.replace(/\D/g, ''))}
-                    placeholder="$ por día" />
+                    onChange={(e) => setValor(e.target.value.replace(/\D/g, ''))} placeholder="$ por día" />
                 </div>
                 {(parseInt(dias) || 0) > 0 && (parseInt(valor) || 0) > 0 && (
                   <div className="viaticos-comida-subtotal">
@@ -841,24 +848,25 @@ export function ViaticosPanel({ onCreada }: { onCreada?: (info: { id: number; nu
               <strong>{tipoViatico === 'anticipo' ? 'Solicitud de anticipo de viáticos' : 'Legalización de viáticos'}</strong>
             </div>
             <div className="leg-resumen-row"><span>Autorizado por:</span> <strong>{autorizadorNombre}</strong></div>
+            <div className="leg-resumen-row"><span>Motivo:</span> <strong>{motivoViaje}</strong></div>
 
-            <h4>Viaje</h4>
+            <h4>Ruta</h4>
             <div className="leg-resumen-row">
-              <span>Ruta:</span>
+              <span>Trayecto:</span>
               <strong>{ciudadOrigen} → {ciudadDestino}{esIdaVuelta ? ' (ida y vuelta)' : ' (solo ida)'}</strong>
             </div>
             <div className="leg-resumen-row"><span>Fecha ida:</span> <strong>{fechaIda}</strong></div>
             {esIdaVuelta && <div className="leg-resumen-row"><span>Fecha regreso:</span> <strong>{fechaRegreso}</strong></div>}
-            {viajeIda && (
+
+            <h4>Transporte</h4>
+            <div className="leg-resumen-row">
+              <span>Ida:</span>
+              <strong>{tipoTrIda === 'aereo' ? '✈' : '🚌'} {empresaIda} — {numDocIda}{codResIda ? ` (Res. ${codResIda})` : ''} — ${formatearMiles(parseInt(valorIda.replace(/\D/g,''))||0)}</strong>
+            </div>
+            {esIdaVuelta && (
               <div className="leg-resumen-row">
-                <span>Transporte ida:</span>
-                <strong>{viajeIda.tipo === 'vuelo' ? '✈️' : '🚌'} {viajeIda.empresa} — ${formatearMiles(viajeIda.precio)}</strong>
-              </div>
-            )}
-            {esIdaVuelta && viajeVuelta && (
-              <div className="leg-resumen-row">
-                <span>Transporte regreso:</span>
-                <strong>{viajeVuelta.tipo === 'vuelo' ? '✈️' : '🚌'} {viajeVuelta.empresa} — ${formatearMiles(viajeVuelta.precio)}</strong>
+                <span>Regreso:</span>
+                <strong>{tipoTrVuelta === 'aereo' ? '✈' : '🚌'} {empresaVuelta} — {numDocVuelta}{codResVuelta ? ` (Res. ${codResVuelta})` : ''} — ${formatearMiles(parseInt(valorVuelta.replace(/\D/g,''))||0)}</strong>
               </div>
             )}
 
@@ -876,15 +884,9 @@ export function ViaticosPanel({ onCreada }: { onCreada?: (info: { id: number; nu
             {totalComidas > 0 && (
               <>
                 <h4>Alimentación</h4>
-                {(parseInt(diasDesayuno) || 0) > 0 && (
-                  <div className="leg-resumen-row"><span>Desayunos:</span> <strong>{diasDesayuno} × ${formatearMiles(parseInt(valorDesayuno) || 0)} = ${formatearMiles((parseInt(diasDesayuno) || 0) * (parseInt(valorDesayuno) || 0))}</strong></div>
-                )}
-                {(parseInt(diasAlmuerzo) || 0) > 0 && (
-                  <div className="leg-resumen-row"><span>Almuerzos:</span> <strong>{diasAlmuerzo} × ${formatearMiles(parseInt(valorAlmuerzo) || 0)} = ${formatearMiles((parseInt(diasAlmuerzo) || 0) * (parseInt(valorAlmuerzo) || 0))}</strong></div>
-                )}
-                {(parseInt(diasCena) || 0) > 0 && (
-                  <div className="leg-resumen-row"><span>Cenas:</span> <strong>{diasCena} × ${formatearMiles(parseInt(valorCena) || 0)} = ${formatearMiles((parseInt(diasCena) || 0) * (parseInt(valorCena) || 0))}</strong></div>
-                )}
+                {(parseInt(diasDesayuno) || 0) > 0 && <div className="leg-resumen-row"><span>Desayunos:</span> <strong>{diasDesayuno} × ${formatearMiles(parseInt(valorDesayuno)||0)} = ${formatearMiles((parseInt(diasDesayuno)||0)*(parseInt(valorDesayuno)||0))}</strong></div>}
+                {(parseInt(diasAlmuerzo) || 0) > 0 && <div className="leg-resumen-row"><span>Almuerzos:</span> <strong>{diasAlmuerzo} × ${formatearMiles(parseInt(valorAlmuerzo)||0)} = ${formatearMiles((parseInt(diasAlmuerzo)||0)*(parseInt(valorAlmuerzo)||0))}</strong></div>}
+                {(parseInt(diasCena) || 0) > 0 && <div className="leg-resumen-row"><span>Cenas:</span> <strong>{diasCena} × ${formatearMiles(parseInt(valorCena)||0)} = ${formatearMiles((parseInt(diasCena)||0)*(parseInt(valorCena)||0))}</strong></div>}
               </>
             )}
 
