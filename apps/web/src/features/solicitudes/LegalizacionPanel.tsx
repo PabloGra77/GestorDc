@@ -4,6 +4,7 @@ import { useOcrDocument, validarOcrContraDato } from '../../hooks/useOcrDocument
 import { formatearMiles } from '../../utils/numeroALetras';
 import { SignaturePad } from '../../components/SignaturePad';
 import { BANCOS_COLOMBIA } from '../../utils/bancos';
+import { getAuthSession } from '../auth/auth.service';
 
 /* ─── Tipos ────────────────────────────────────────────────── */
 interface UsuarioSugerido {
@@ -39,6 +40,7 @@ interface LegalizacionConfig {
 
 interface LegalizacionPanelProps {
   onCreada?: (info: { id: number; numeroRadicado: string }) => void;
+  tipoSolicitudId?: number;
 }
 
 const TIPOS_CUENTA = ['Ahorros', 'Corriente'];
@@ -293,7 +295,7 @@ function FilaGasto({
 }
 
 /* ─── Panel principal ───────────────────────────────────────── */
-export function LegalizacionPanel({ onCreada }: LegalizacionPanelProps) {
+export function LegalizacionPanel({ onCreada, tipoSolicitudId }: LegalizacionPanelProps) {
   const [paso, setPaso] = useState<1 | 2 | 3 | 4>(1);
   const [config, setConfig] = useState<LegalizacionConfig>({
     categorias: ['Alimentación', 'Viajes', 'Transporte', 'Papelería / Útiles', 'Representación', 'Otros'],
@@ -499,19 +501,26 @@ export function LegalizacionPanel({ onCreada }: LegalizacionPanelProps) {
     setEnviando(true);
 
     try {
-      // Cargar el tipo legalizacion
-      const tipos = await api.get<Array<{ id: number; slug: string; nombre: string }>>('/tipos');
-      const tipo = tipos.data.find((t) => t.slug === 'legalizacion');
-      if (!tipo) {
-        setErr('No se encontró el tipo "Legalizaciones" en el sistema. Pídele al administrador que lo configure.');
-        setEnviando(false);
-        return;
+      // Usar el tipoSolicitudId pasado desde el padre (área correcta ya seleccionada)
+      // Si no viene como prop, buscar por slug como fallback
+      let tipoId = tipoSolicitudId;
+      if (!tipoId) {
+        const tipos = await api.get<Array<{ id: number; slug: string; nombre: string }>>('/tipos');
+        const tipo = tipos.data.find((t) => t.slug === 'legalizacion');
+        if (!tipo) {
+          setErr('No se encontró el tipo "Legalizaciones" en el sistema. Pídele al administrador que lo configure.');
+          setEnviando(false);
+          return;
+        }
+        tipoId = tipo.id;
       }
 
       const gastosPayload = gastos.map(({ _validando, ...g }) => g);
+      const sesion = getAuthSession();
+      const usr = sesion?.usuario;
 
       const payload = {
-        tipoSolicitudId: tipo.id,
+        tipoSolicitudId: tipoId,
         datos: {
           concepto,
           fechaPeriodo,
@@ -523,6 +532,14 @@ export function LegalizacionPanel({ onCreada }: LegalizacionPanelProps) {
           tipoCuenta,
           numeroCuenta,
           titularCuenta,
+          // Datos personales del solicitante (auto-llenados desde el perfil)
+          ...(usr ? {
+            primerNombre: usr.primerNombre ?? usr.nombreCompleto.split(' ')[0] ?? '',
+            nombreCompleto: usr.nombreCompleto ?? '',
+            correoElectronico: usr.correo ?? '',
+            numeroDocumento: usr.numeroDocumento ?? '',
+            tipoDocumento: usr.tipoDocumento ?? '',
+          } : {}),
         },
         documentos: {},
         firmas: { profesional: firma },

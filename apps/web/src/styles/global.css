@@ -5150,6 +5150,11 @@ button.mail-tracking-search-button,
 .bandeja-alertas strong { color: var(--warm-orange); display: block; margin-bottom: 4px; }
 .bandeja-alertas ul { margin: 0; padding: 0 0 0 18px; font-size: 13px; }
 
+.bandeja-leg-gastos { margin-bottom: 18px; }
+.bandeja-leg-concepto { font-size: 13px; color: var(--text-secondary); margin: 4px 0; }
+.bandeja-leg-table { width: 100%; font-size: 12px; }
+.bandeja-leg-table tfoot td { border-top: 1px solid var(--gold-line); padding-top: 6px; }
+
 .bandeja-datos {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));

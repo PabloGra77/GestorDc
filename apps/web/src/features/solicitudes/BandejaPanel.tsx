@@ -470,6 +470,82 @@ export function BandejaPanel() {
                       </p>
                     )}
 
+                    {/* Bloque especial: gastos de legalización */}
+                    {(() => {
+                      const raw = detalle.datosFormulario['gastos'];
+                      if (!raw) return null;
+                      let gastos: Record<string, string>[] = [];
+                      try { const p = JSON.parse(String(raw)); if (Array.isArray(p)) gastos = p; } catch { return null; }
+                      if (!gastos.length) return null;
+                      const fmt = (v: string) => {
+                        const n = Number(String(v).replace(/[^0-9]/g, ''));
+                        return n ? `$ ${n.toLocaleString('es-CO')}` : v || '—';
+                      };
+                      const totalStr = String(detalle.datosFormulario['totalGastos'] || '');
+                      const total = Number(totalStr.replace(/[^0-9]/g, ''));
+                      return (
+                        <div className="bandeja-leg-gastos">
+                          <h4>Gastos legalizados</h4>
+                          {String(detalle.datosFormulario['concepto'] || '') && (
+                            <p className="bandeja-leg-concepto"><strong>Concepto:</strong> {String(detalle.datosFormulario['concepto'])}</p>
+                          )}
+                          {String(detalle.datosFormulario['fechaPeriodo'] || '') && (
+                            <p className="bandeja-leg-concepto"><strong>Período:</strong> {String(detalle.datosFormulario['fechaPeriodo'])}</p>
+                          )}
+                          <table className="bandeja-items-table bandeja-leg-table">
+                            <thead>
+                              <tr>
+                                <th>#</th><th>Categoría</th><th>Descripción</th><th>Fecha</th><th>Valor</th><th>Proveedor</th><th>Factura</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {gastos.map((g, i) => (
+                                <tr key={i}>
+                                  <td>{i + 1}</td>
+                                  <td>{g.categoria || '—'}</td>
+                                  <td>{g.descripcion || '—'}</td>
+                                  <td>{g.fechaGasto || '—'}</td>
+                                  <td>{fmt(g.valor)}</td>
+                                  <td>
+                                    {g.nombreProveedor || '—'}
+                                    {g.nitProveedor ? <span className="leg-ocr-badge" style={{ marginLeft: 6 }}>NIT: {g.nitProveedor}</span> : null}
+                                  </td>
+                                  <td>
+                                    {g._facturaArchivoId ? (
+                                      <button type="button" className="bandeja-abrir-adjunto" onClick={() => abrirArchivo(g._facturaArchivoId)}>
+                                        📎 {g._factura || 'Ver factura'}
+                                      </button>
+                                    ) : g._factura ? (
+                                      <span>📎 {g._factura}</span>
+                                    ) : (
+                                      <span className="factura-falta">⚠ sin factura</span>
+                                    )}
+                                    {g.numeroFactura ? <span className="leg-ocr-badge" style={{ marginLeft: 4 }}>N° {g.numeroFactura}</span> : null}
+                                    {(g._facturaAlertas && g._facturaAlertas !== '[]') ? (
+                                      <span title={(() => { try { return (JSON.parse(g._facturaAlertas) as string[]).join(' | '); } catch { return g._facturaAlertas; } })()}>⚠</span>
+                                    ) : null}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                            {total > 0 && (
+                              <tfoot>
+                                <tr>
+                                  <td colSpan={4}><strong>Total</strong></td>
+                                  <td colSpan={3}><strong>{fmt(totalStr)}</strong></td>
+                                </tr>
+                              </tfoot>
+                            )}
+                          </table>
+                          {String(detalle.datosFormulario['banco'] || '') && (
+                            <p className="bandeja-leg-concepto" style={{ marginTop: 8 }}>
+                              <strong>Cuenta:</strong> {String(detalle.datosFormulario['banco'])} {String(detalle.datosFormulario['tipoCuenta'] || '')} — {String(detalle.datosFormulario['numeroCuenta'] || '')} ({String(detalle.datosFormulario['titularCuenta'] || '')})
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })()}
+
                     <h4>Datos diligenciados</h4>
                     <div className="bandeja-datos">
                       {detalle.camposPlantilla

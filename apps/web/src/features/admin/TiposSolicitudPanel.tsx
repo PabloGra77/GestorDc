@@ -743,7 +743,7 @@ export function TiposSolicitudPanel() {
       setFlujo((t.flujoAprobacion || []).length > 0 ? t.flujoAprobacion : FLUJO_DEFAULT);
       const fa = t.flujoAreas;
       setAreasParticipantes(fa?.areasParticipantes || (t.areaId ? [t.areaId] : []));
-      setAreaInicialId(fa?.areaInicialId ?? t.areaId ?? null);
+      setAreaInicialId(fa?.areaInicialId ?? null);
       setAreaFinalId(fa?.areaFinalId ?? null);
       setRemision(fa?.remision || {});
       if (t.plantillaPdf) {
