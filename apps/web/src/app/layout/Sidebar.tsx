@@ -70,7 +70,7 @@ export function Sidebar({ esAdmin, activeSection, onSelectSection }: SidebarProp
 
 	return (
 		<>
-			{/* Barra superior en móvil con hamburger */}
+			{/* Barra superior en móvil */}
 			<div className="admin-movil-topbar">
 				<button
 					type="button"
@@ -81,6 +81,18 @@ export function Sidebar({ esAdmin, activeSection, onSelectSection }: SidebarProp
 					☰
 				</button>
 				<span className="admin-movil-topbar-seccion">{activeSection}</span>
+				{/* Bell en topbar móvil */}
+				<button
+					type="button"
+					className="admin-movil-bell"
+					onClick={() => setShowNotifications((v) => !v)}
+					aria-label="Notificaciones"
+				>
+					🔔
+					{unread.length > 0 ? (
+						<span className="admin-movil-bell-badge">{unread.length}</span>
+					) : null}
+				</button>
 			</div>
 
 			{/* Overlay oscuro */}
