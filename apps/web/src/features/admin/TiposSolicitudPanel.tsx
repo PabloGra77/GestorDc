@@ -1263,6 +1263,22 @@ export function TiposSolicitudPanel() {
                     <input type="checkbox" checked={usaPlantillaPdf} onChange={(e) => setUsaPlantillaPdf(e.target.checked)} /> Usar plantilla personalizada
                   </label>
                 </header>
+                {/* Aviso para tipos con PDF especial autogenerado */}
+                {(() => {
+                  const n = (slug || nombre).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]/g,'');
+                  const esEspecial = n === 'legalizacion' || n === 'viaticos' || n === 'anticipo';
+                  if (!esEspecial) return null;
+                  const labels: Record<string, string> = { legalizacion: 'legalización de gastos', viaticos: 'viáticos', anticipo: 'anticipo de gastos' };
+                  return (
+                    <div className="tipos-pdf-especial-aviso">
+                      <span>⚡</span>
+                      <div>
+                        <strong>Este tipo usa un PDF especial autogenerado</strong>
+                        <p>El PDF de <em>{labels[n]}</em> incluye tablas dinámicas (tiquetes, gastos, desglose económico) que el editor de bloques no puede representar. El diseñador de arriba aplica solo para tipos genéricos. El PDF real se genera automáticamente al descargar o previsualizar desde la bandeja.</p>
+                      </div>
+                    </div>
+                  );
+                })()}
                 {usaPlantillaPdf ? (
                   <PlantillaPdfEditor
                     plantilla={plantillaPdf}

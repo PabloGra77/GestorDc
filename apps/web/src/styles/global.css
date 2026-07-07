@@ -6659,6 +6659,15 @@ textarea {
   text-transform: uppercase;
 }
 .tipos-editor-section > .admin-help-text { margin: 0; }
+.tipos-pdf-especial-aviso {
+  display: flex; gap: 12px; align-items: flex-start;
+  background: rgba(212, 175, 55, 0.08);
+  border: 1px solid rgba(212, 175, 55, 0.4);
+  border-radius: 8px; padding: 12px 14px; margin: 10px 0;
+}
+.tipos-pdf-especial-aviso > span { font-size: 20px; flex-shrink: 0; }
+.tipos-pdf-especial-aviso strong { display: block; color: var(--gold); margin-bottom: 4px; }
+.tipos-pdf-especial-aviso p { margin: 0; font-size: 12px; color: var(--text-secondary); line-height: 1.5; }
 [data-theme="light"] .tipos-editor-section {
   background: #FFFFFF !important;
   border-color: rgba(212, 175, 55, 0.4) !important;
@@ -9395,6 +9404,109 @@ textarea {
   border-radius: 7px;
   font-size: 12px;
   color: #16a34a;
+}
+
+/* Tarjetas de opciones clickables */
+.viatico-opcion-btn {
+  all: unset;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  border: 1.5px solid var(--gold-line);
+  border-radius: 8px;
+  padding: 8px 12px;
+  background: rgba(212,175,55,0.04);
+  transition: background 0.15s, border-color 0.15s;
+  width: 100%;
+  box-sizing: border-box;
+}
+.viatico-opcion-btn:hover {
+  background: rgba(212,175,55,0.1);
+  border-color: var(--gold);
+}
+.viatico-opcion-regreso {
+  border-color: rgba(61,90,254,0.35);
+  background: rgba(61,90,254,0.04);
+}
+.viatico-opcion-regreso:hover {
+  border-color: var(--royal-blue);
+  background: rgba(61,90,254,0.1);
+}
+.viatico-usar-tag {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--gold-bright);
+  white-space: nowrap;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: rgba(212,175,55,0.12);
+}
+.viatico-opcion-regreso .viatico-usar-tag {
+  color: var(--royal-blue-hover);
+  background: rgba(61,90,254,0.12);
+}
+
+/* Referencia de precios de hotel */
+.viatico-hotel-ref {
+  margin: 12px 0 16px;
+  padding: 14px 16px;
+  background: rgba(61,90,254,0.07);
+  border: 1.5px solid rgba(61,90,254,0.3);
+  border-radius: 10px;
+}
+.viatico-hotel-ref-titulo {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--sky-blue);
+  margin-bottom: 8px;
+}
+.viatico-hotel-ref-rango {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+.viatico-hotel-ref-min { color: #4ade80; }
+.viatico-hotel-ref-sep { color: var(--text-muted); }
+.viatico-hotel-ref-max { color: var(--warm-orange); }
+.viatico-hotel-ref-unit { font-size: 12px; color: var(--text-muted); font-weight: 400; }
+.viatico-hotel-ref-nota {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin: 2px 0 10px;
+}
+.viatico-hotel-ref-acciones {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.viatico-hotel-ref-btn {
+  padding: 5px 12px;
+  border-radius: 7px;
+  border: 1.5px solid rgba(61,90,254,0.4);
+  background: rgba(61,90,254,0.1);
+  color: var(--sky-blue);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.viatico-hotel-ref-btn:hover {
+  background: rgba(61,90,254,0.22);
+  border-color: var(--royal-blue);
+}
+.viatico-hotel-ref-btn-mid {
+  border-color: rgba(212,175,55,0.4);
+  background: rgba(212,175,55,0.08);
+  color: var(--gold-bright);
+}
+.viatico-hotel-ref-btn-mid:hover {
+  background: rgba(212,175,55,0.18);
+  border-color: var(--gold);
 }
 
 /* Bloque de tiquete (ida / vuelta) */

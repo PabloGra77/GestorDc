@@ -67,6 +67,33 @@ function getPreciosRef(origen: string, destino: string): PrecioRef | null {
   return PRECIOS_REF[`${o}-${d}`] || PRECIOS_REF[`${d}-${o}`] || null;
 }
 
+/* ─── Precios de referencia de hoteles por ciudad ─────────────── */
+const HOTELES_REF: Record<string, { min: number; max: number; nota: string }> = {
+  'Bogotá':         { min: 80000,  max: 450000, nota: 'Zona Rosa, Chapinero, Usaquén, Candelaria' },
+  'Medellín':       { min: 70000,  max: 350000, nota: 'El Poblado, Laureles, Centro' },
+  'Cartagena':      { min: 120000, max: 700000, nota: 'Centro Histórico, Bocagrande, Getsemaní' },
+  'Barranquilla':   { min: 80000,  max: 300000, nota: 'Norte, El Prado, Riomar' },
+  'Cali':           { min: 70000,  max: 280000, nota: 'Granada, San Fernando, Ciudad Jardín' },
+  'Bucaramanga':    { min: 65000,  max: 250000, nota: 'Cabecera, Sotomayor, Cañaveral' },
+  'Santa Marta':    { min: 100000, max: 500000, nota: 'El Rodadero, Bello Horizonte, Centro' },
+  'Pereira':        { min: 60000,  max: 220000, nota: 'Pinares, Cerritos, Centro' },
+  'Manizales':      { min: 60000,  max: 200000, nota: 'Cable, La Enea, Chipre' },
+  'Armenia':        { min: 55000,  max: 180000, nota: 'Centro, Pinares de San Martín' },
+  'Ibagué':         { min: 55000,  max: 180000, nota: 'Centro, Picaleña' },
+  'Neiva':          { min: 60000,  max: 190000, nota: 'Centro, Quirinal' },
+  'Villavicencio':  { min: 65000,  max: 210000, nota: 'Maracos, Villa Bolívar' },
+  'Montería':       { min: 60000,  max: 200000, nota: 'Centro, La Castellana' },
+  'Pasto':          { min: 55000,  max: 180000, nota: 'Centro, El Norte' },
+  'Valledupar':     { min: 70000,  max: 220000, nota: 'Centro, Los Músicos' },
+  'Cúcuta':         { min: 60000,  max: 200000, nota: 'Cúcuta Norte, Centro' },
+  'Popayán':        { min: 50000,  max: 170000, nota: 'Centro Histórico, Bolívar' },
+  'Tunja':          { min: 50000,  max: 160000, nota: 'Centro, Samán del Norte' },
+  'San Andrés':     { min: 150000, max: 800000, nota: 'Sector Norte, Centro, West View' },
+  'Leticia':        { min: 90000,  max: 300000, nota: 'Centro, Tabatinga' },
+  'Sincelejo':      { min: 55000,  max: 170000, nota: 'Centro, La Florida' },
+  'Riohacha':       { min: 70000,  max: 250000, nota: 'Centro, Manaure' },
+};
+
 /* ─── Tipos ─────────────────────────────────────────────────── */
 interface UsuarioSugerido { id: number; nombreCompleto: string; rol: string; area: string | null; }
 interface FacturaAdj { archivoId: string; nombre: string; alertas: string[]; }
@@ -696,18 +723,61 @@ export function ViaticosPanel({ onCreada }: { onCreada?: (info: { id: number; nu
                   {fuentePrecios === 'api' && <span className="viatico-fuente-badge">Precios actualizados</span>}
                   {fuentePrecios === 'estimado' && <span className="viatico-fuente-badge viatico-fuente-est">Estimados de referencia</span>}
                 </div>
+                <p className="leg-nota" style={{ marginBottom: 6 }}>Haz clic en una opción para pre-llenar el tiquete de <strong>ida</strong>.</p>
                 <div className="viatico-opciones-lista">
-                  {opcionesViaje.slice(0, 5).map((op) => (
-                    <div key={op.id} className="viatico-opcion-item">
+                  {opcionesViaje.slice(0, 6).map((op) => (
+                    <button
+                      key={op.id}
+                      type="button"
+                      className="viatico-opcion-item viatico-opcion-btn"
+                      onClick={() => {
+                        setTipoTrIda(op.tipo === 'bus' ? 'terrestre' : 'aereo');
+                        setEmpresaIda(op.empresa);
+                        if (op.salida && op.salida !== '—') setHrSalidaIda(op.salida);
+                        if (op.llegada && op.llegada !== '—') setHrLlegadaIda(op.llegada);
+                        setValorIda(String(op.precio));
+                      }}
+                    >
                       <span className="viatico-opcion-icono">{op.tipo === 'bus' ? '🚌' : '✈'}</span>
                       <div className="viatico-opcion-info">
                         <strong>{op.empresa}</strong>
-                        <span>{op.salida}{op.llegada !== '—' ? ` → ${op.llegada}` : ''} · {op.duracion}</span>
+                        <span>{op.salida !== '—' ? op.salida : ''}{op.llegada !== '—' ? ` → ${op.llegada}` : ''}{op.duracion !== '—' ? ` · ${op.duracion}` : ''}</span>
                       </div>
                       <div className="viatico-opcion-precio">${formatearMiles(op.precio)}</div>
-                    </div>
+                      <span className="viatico-usar-tag">Usar ↓</span>
+                    </button>
                   ))}
                 </div>
+                {/* Opciones de regreso */}
+                {esIdaVuelta && opcionesRegreso.length > 0 && (
+                  <>
+                    <p className="leg-nota" style={{ margin: '10px 0 6px' }}>Opciones de <strong>regreso</strong> · {ciudadDestino} → {ciudadOrigen}:</p>
+                    <div className="viatico-opciones-lista">
+                      {opcionesRegreso.slice(0, 4).map((op) => (
+                        <button
+                          key={op.id}
+                          type="button"
+                          className="viatico-opcion-item viatico-opcion-btn viatico-opcion-regreso"
+                          onClick={() => {
+                            setTipoTrVuelta(op.tipo === 'bus' ? 'terrestre' : 'aereo');
+                            setEmpresaVuelta(op.empresa);
+                            if (op.salida && op.salida !== '—') setHrSalidaVuelta(op.salida);
+                            if (op.llegada && op.llegada !== '—') setHrLlegadaVuelta(op.llegada);
+                            setValorVuelta(String(op.precio));
+                          }}
+                        >
+                          <span className="viatico-opcion-icono">{op.tipo === 'bus' ? '🚌' : '✈'}</span>
+                          <div className="viatico-opcion-info">
+                            <strong>{op.empresa}</strong>
+                            <span>{op.salida !== '—' ? op.salida : ''}{op.llegada !== '—' ? ` → ${op.llegada}` : ''}{op.duracion !== '—' ? ` · ${op.duracion}` : ''}</span>
+                          </div>
+                          <div className="viatico-opcion-precio">${formatearMiles(op.precio)}</div>
+                          <span className="viatico-usar-tag">Usar ↓</span>
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
                 {/* Validación en tiempo real contra precios de API */}
                 {(() => {
                   const v = parseInt(valorIda.replace(/\D/g, '')) || 0;
@@ -858,6 +928,35 @@ export function ViaticosPanel({ onCreada }: { onCreada?: (info: { id: number; nu
               El viaje requirió / requerirá hospedaje
             </label>
           </div>
+
+          {/* Referencia de precios de hotel por ciudad */}
+          {tieneHospedaje && ciudadDestino && HOTELES_REF[ciudadDestino] && (
+            <div className="viatico-hotel-ref">
+              <div className="viatico-hotel-ref-titulo">
+                🏨 Referencia de precios · {ciudadDestino}
+              </div>
+              <div className="viatico-hotel-ref-rango">
+                <span className="viatico-hotel-ref-min">${formatearMiles(HOTELES_REF[ciudadDestino].min)}</span>
+                <span className="viatico-hotel-ref-sep">–</span>
+                <span className="viatico-hotel-ref-max">${formatearMiles(HOTELES_REF[ciudadDestino].max)}</span>
+                <span className="viatico-hotel-ref-unit">por noche</span>
+              </div>
+              <p className="viatico-hotel-ref-nota">{HOTELES_REF[ciudadDestino].nota}</p>
+              <div className="viatico-hotel-ref-acciones">
+                <button type="button" className="viatico-hotel-ref-btn"
+                  onClick={() => setHotelValorNoche(String(HOTELES_REF[ciudadDestino].min))}>
+                  Usar mínimo (${formatearMiles(HOTELES_REF[ciudadDestino].min)})
+                </button>
+                <button type="button" className="viatico-hotel-ref-btn viatico-hotel-ref-btn-mid"
+                  onClick={() => {
+                    const mid = Math.round((HOTELES_REF[ciudadDestino].min + HOTELES_REF[ciudadDestino].max) / 2 / 1000) * 1000;
+                    setHotelValorNoche(String(mid));
+                  }}>
+                  Usar promedio (${formatearMiles(Math.round((HOTELES_REF[ciudadDestino].min + HOTELES_REF[ciudadDestino].max) / 2 / 1000) * 1000)})
+                </button>
+              </div>
+            </div>
+          )}
 
           {tieneHospedaje && (
             <>
