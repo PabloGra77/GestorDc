@@ -821,56 +821,54 @@ export function ViaticosPanel({ onCreada }: { onCreada?: (info: { id: number; nu
 
           {/* Buscar en plataformas reales */}
           {ciudadOrigen && ciudadDestino && fechaIda && (() => {
-            const iO = IATA_MAP[ciudadOrigen] || ciudadOrigen.slice(0, 3).toUpperCase();
-            const iD = IATA_MAP[ciudadDestino] || ciudadDestino.slice(0, 3).toUpperCase();
-            const comp = fechaIda.replace(/-/g, '');
-            const compR = (esIdaVuelta && fechaRegreso) ? fechaRegreso.replace(/-/g, '') : '';
-            const rt = esIdaVuelta && !!fechaRegreso;
-            const ddmmIda = fechaIda.split('-').reverse().join('/');
-            const ddmmReg = fechaRegreso ? fechaRegreso.split('-').reverse().join('/') : '';
+            const fechaFmt = new Date(fechaIda).toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' });
+            const q = `vuelos de ${ciudadOrigen} a ${ciudadDestino} el ${fechaFmt}`;
             const plataformas = [
               {
-                nombre: 'Despegar', icono: '✈', color: '#0066cc',
-                url: `https://www.despegar.com.co/vuelos/resultado/${rt ? 'RT' : 'OW'}-${iO}-${iD}-${comp}${rt ? `-${compR}` : ''}/1/0/0/PP/-/-/-/1/`,
+                nombre: 'Google Vuelos', icono: '✈', color: '#4285f4',
+                url: `https://www.google.com/travel/flights?q=${encodeURIComponent(q)}&hl=es-419&gl=co&curr=COP`,
+                desc: 'Busca en todas las aerolíneas',
               },
               {
-                nombre: 'LATAM', icono: '✈', color: '#d8001f',
-                url: `https://www.latam.com/es_co/apps/personas/booking?fecha1=${fechaIda}&from=${iO}&to=${iD}&adult=1&child=0&infant=0&trip=${rt ? 'RT' : 'OW'}${rt ? `&fecha2=${fechaRegreso}` : ''}`,
+                nombre: 'Despegar', icono: '✈', color: '#6c00e0',
+                url: `https://www.despegar.com.co/vuelos/?q=${encodeURIComponent(`${ciudadOrigen} a ${ciudadDestino}`)}`,
+                desc: 'Paquetes y vuelos',
               },
               {
                 nombre: 'Avianca', icono: '✈', color: '#e5001a',
-                url: `https://www.avianca.com/co/es/booking/search/?from=${iO}&to=${iD}&departure=${ddmmIda}&adults=1${rt ? `&return=${ddmmReg}` : ''}`,
+                url: `https://www.avianca.com/co/es/`,
+                desc: 'Aerolínea principal',
               },
               {
-                nombre: 'Wingo', icono: '✈', color: '#ff6600',
-                url: `https://www.wingo.com/es-co/#/booking/vuelos/${rt ? 'RT' : 'OW'}/${iO}/${iD}/${comp}/1/0/0/N`,
+                nombre: 'LATAM', icono: '✈', color: '#1b0088',
+                url: `https://www.latam.com/es_co/`,
+                desc: 'LATAM Colombia',
               },
               {
-                nombre: 'JetSMART', icono: '✈', color: '#ffe000',
-                url: `https://jetsmart.com/co/es/vuelos-baratos/${iO.toLowerCase()}-${iD.toLowerCase()}/?date=${comp}`,
+                nombre: 'Buses (Redbus)', icono: '🚌', color: '#d84315',
+                url: `https://www.redbus.co/bus-tickets/${encodeURIComponent(ciudadOrigen.toLowerCase())}-to-${encodeURIComponent(ciudadDestino.toLowerCase())}`,
+                desc: 'Pasajes de bus inter-municipal',
               },
               {
-                nombre: 'Bolivariano', icono: '🚌', color: '#008000',
-                url: `https://www.bolivariano.com.co/rutas`,
-              },
-              {
-                nombre: 'Expreso Brasilia', icono: '🚌', color: '#006633',
-                url: `https://www.expresobrasilia.com`,
+                nombre: 'Bolivariano', icono: '🚌', color: '#1b5e20',
+                url: `https://www.bolivariano.com.co/`,
+                desc: 'Empresa de buses',
               },
             ];
             return (
               <div className="viatico-plataformas">
                 <div className="viatico-plataformas-titulo">
-                  🌐 Consultar precios reales en plataformas · {ciudadOrigen} → {ciudadDestino}
+                  🌐 Ver precios reales en plataformas · {ciudadOrigen} → {ciudadDestino}
                 </div>
-                <p className="leg-nota" style={{ margin: '4px 0 10px' }}>
-                  Se abre una pestaña nueva con la búsqueda pre-llenada para esta ruta y fecha.
+                <p className="leg-nota" style={{ margin: '4px 0 8px' }}>
+                  Abre una pestaña nueva. Busca tu opción, copia el precio y regresa a llenar el formulario — o usa las tarjetas estimadas de arriba.
                 </p>
                 <div className="viatico-plataformas-grid">
                   {plataformas.map((p) => (
                     <a key={p.nombre} href={p.url} target="_blank" rel="noopener noreferrer"
                       className="viatico-plataforma-btn"
-                      style={{ '--plat-color': p.color } as React.CSSProperties}>
+                      style={{ '--plat-color': p.color } as React.CSSProperties}
+                      title={p.desc}>
                       <span className="viatico-plataforma-icono">{p.icono}</span>
                       <span className="viatico-plataforma-nombre">{p.nombre}</span>
                       <span className="viatico-plataforma-arrow">↗</span>
@@ -1027,12 +1025,12 @@ export function ViaticosPanel({ onCreada }: { onCreada?: (info: { id: number; nu
             const city = encodeURIComponent(ciudadDestino + ' Colombia');
             const hoteles = [
               {
-                nombre: 'Booking.com', icono: '🏨', color: '#003580',
-                url: `https://www.booking.com/searchresults.es.html?ss=${city}&checkin=${checkin}&checkout=${checkout}&group_adults=1`,
+                nombre: 'Google Hoteles', icono: '🔍', color: '#4285f4',
+                url: `https://www.google.com/travel/hotels?q=hoteles+en+${encodeURIComponent(ciudadDestino)}&hl=es-419&gl=co&curr=COP${checkin ? `&dates=${checkin},${checkout}` : ''}`,
               },
               {
-                nombre: 'Hotels.com', icono: '🏨', color: '#cc0000',
-                url: `https://es.hotels.com/search.do?q-destination=${encodeURIComponent(ciudadDestino)}&q-check-in=${checkin}&q-check-out=${checkout}&q-rooms=1&q-room-0-adults=1`,
+                nombre: 'Booking.com', icono: '🏨', color: '#003580',
+                url: `https://www.booking.com/searchresults.es.html?ss=${city}${checkin ? `&checkin=${checkin}&checkout=${checkout}` : ''}&group_adults=1`,
               },
               {
                 nombre: 'Airbnb', icono: '🏠', color: '#ff5a5f',

@@ -101,6 +101,36 @@ $RUTAS = [
     'MDE-BGA' => ['vuelo' => [200000, 240000, 295000], 'bus' => 55000,  'durVuelo' => '45m',    'durBus' => '6h'],
     'CLO-CTG' => ['vuelo' => [260000, 315000, 380000], 'bus' => 120000, 'durVuelo' => '1h 15m', 'durBus' => '16h'],
     'CTG-BAQ' => ['vuelo' => [200000, 240000, 295000], 'bus' => 50000,  'durVuelo' => '40m',    'durBus' => '5h'],
+    /* ── Rutas bus corto/mediano (solo bus, sin vuelo comercial) ── */
+    'CLO-IBE' => ['vuelo' => null,                     'bus' => 55000,  'durVuelo' => null,      'durBus' => '3h 30m'],
+    'CLO-PEI' => ['vuelo' => [200000, 240000, 290000], 'bus' => 35000,  'durVuelo' => '45m',     'durBus' => '3h'],
+    'CLO-MZL' => ['vuelo' => [200000, 240000, 290000], 'bus' => 42000,  'durVuelo' => '50m',     'durBus' => '4h'],
+    'CLO-AXM' => ['vuelo' => null,                     'bus' => 38000,  'durVuelo' => null,      'durBus' => '2h 30m'],
+    'CLO-BGA' => ['vuelo' => [240000, 285000, 345000], 'bus' => 85000,  'durVuelo' => '1h 10m',  'durBus' => '9h'],
+    'CLO-BAQ' => ['vuelo' => [255000, 305000, 370000], 'bus' => 140000, 'durVuelo' => '1h 15m',  'durBus' => '20h'],
+    'CLO-PPN' => ['vuelo' => null,                     'bus' => 38000,  'durVuelo' => null,      'durBus' => '2h'],
+    'CLO-HEI' => ['vuelo' => [220000, 265000, 320000], 'bus' => 75000,  'durVuelo' => '55m',     'durBus' => '8h'],
+    'MDE-MZL' => ['vuelo' => [195000, 235000, 285000], 'bus' => 40000,  'durVuelo' => '45m',     'durBus' => '4h'],
+    'MDE-PEI' => ['vuelo' => [195000, 235000, 285000], 'bus' => 45000,  'durVuelo' => '40m',     'durBus' => '4h 30m'],
+    'MDE-AXM' => ['vuelo' => [195000, 235000, 285000], 'bus' => 42000,  'durVuelo' => '45m',     'durBus' => '5h'],
+    'MDE-IBE' => ['vuelo' => [210000, 255000, 310000], 'bus' => 60000,  'durVuelo' => '50m',     'durBus' => '6h'],
+    'MDE-CUC' => ['vuelo' => [220000, 265000, 320000], 'bus' => 75000,  'durVuelo' => '1h',      'durBus' => '9h'],
+    'MDE-SMR' => ['vuelo' => [235000, 280000, 340000], 'bus' => 90000,  'durVuelo' => '1h 05m',  'durBus' => '12h'],
+    'MDE-HEI' => ['vuelo' => [225000, 270000, 330000], 'bus' => 75000,  'durVuelo' => '55m',     'durBus' => '8h'],
+    'MDE-VVC' => ['vuelo' => [210000, 255000, 310000], 'bus' => 80000,  'durVuelo' => '50m',     'durBus' => '9h'],
+    'MDE-PSO' => ['vuelo' => [250000, 300000, 365000], 'bus' => 95000,  'durVuelo' => '1h 15m',  'durBus' => '12h'],
+    'BGA-CUC' => ['vuelo' => [185000, 225000, 275000], 'bus' => 45000,  'durVuelo' => '45m',     'durBus' => '5h'],
+    'BGA-BOG' => ['vuelo' => [220000, 260000, 310000], 'bus' => 55000,  'durVuelo' => '50m',     'durBus' => '6h'],
+    'PEI-MZL' => ['vuelo' => null,                     'bus' => 15000,  'durVuelo' => null,      'durBus' => '1h'],
+    'PEI-AXM' => ['vuelo' => null,                     'bus' => 18000,  'durVuelo' => null,      'durBus' => '1h 30m'],
+    'IBE-PEI' => ['vuelo' => null,                     'bus' => 28000,  'durVuelo' => null,      'durBus' => '2h'],
+    'IBE-AXM' => ['vuelo' => null,                     'bus' => 32000,  'durVuelo' => null,      'durBus' => '2h 30m'],
+    'IBE-MZL' => ['vuelo' => null,                     'bus' => 35000,  'durVuelo' => null,      'durBus' => '3h'],
+    'IBE-CLO' => ['vuelo' => null,                     'bus' => 55000,  'durVuelo' => null,      'durBus' => '3h 30m'],
+    'CTG-SMR' => ['vuelo' => [190000, 230000, 280000], 'bus' => 40000,  'durVuelo' => '40m',     'durBus' => '4h'],
+    'BAQ-SMR' => ['vuelo' => null,                     'bus' => 25000,  'durVuelo' => null,      'durBus' => '2h'],
+    'BAQ-CUC' => ['vuelo' => [195000, 235000, 285000], 'bus' => 55000,  'durVuelo' => '45m',     'durBus' => '6h'],
+    'CLO-VVC' => ['vuelo' => [230000, 275000, 335000], 'bus' => 90000,  'durVuelo' => '1h',      'durBus' => '10h'],
 ];
 
 function obtenerRuta(string $a, string $b, array &$RUTAS): ?array
@@ -124,40 +154,67 @@ $AEROLINEAS = [
 function generarOpcionesEstimadas(array $ruta, string $fechaIda, bool $esRegreso, array $aerols): array
 {
     $opciones = [];
-    $precios  = $ruta['vuelo'];
-    sort($precios);
-    $prefijos = ['opt_ida_', 'opt_reg_'];
-    $prefix   = $prefijos[$esRegreso ? 1 : 0];
+    $prefix   = $esRegreso ? 'opt_reg_' : 'opt_ida_';
+    $precios  = $ruta['vuelo'] ?? null;
 
-    // Vuelos
-    foreach ($aerols as $i => [$empresa, $salida, $llegada]) {
-        // Variar ligeramente el precio por aerolínea
-        $precio = (int) round($precios[min($i, count($precios) - 1)] * (0.9 + ($i * 0.12)));
-        $opciones[] = [
-            'id'          => $prefix . 'v' . $i,
-            'tipo'        => 'vuelo',
-            'empresa'     => $empresa,
-            'salida'      => $salida,
-            'llegada'     => $llegada,
-            'duracion'    => $ruta['durVuelo'],
-            'precio'      => $precio,
-            'esEstimado'  => true,
-        ];
+    // Vuelos (solo si la ruta tiene servicio aéreo)
+    if (is_array($precios) && count($precios) >= 2) {
+        sort($precios);
+        // Máximo 3 aerolíneas con variación de precio
+        $aerolsVuelo = array_slice($aerols, 0, 3);
+        foreach ($aerolsVuelo as $i => [$empresa, $salida, $llegada]) {
+            $base   = $precios[min($i, count($precios) - 1)];
+            $precio = (int) round($base * (0.92 + ($i * 0.10)));
+            $opciones[] = [
+                'id'         => $prefix . 'v' . $i,
+                'tipo'       => 'vuelo',
+                'empresa'    => $empresa,
+                'salida'     => $salida,
+                'llegada'    => $llegada,
+                'duracion'   => $ruta['durVuelo'] ?? '—',
+                'precio'     => $precio,
+                'esEstimado' => true,
+            ];
+        }
     }
+
     // Bus (si aplica)
-    if (!is_null($ruta['bus']) && $ruta['durBus']) {
-        $opciones[] = [
-            'id'         => $prefix . 'bus',
-            'tipo'       => 'bus',
-            'empresa'    => 'Pullman / Bolivariano',
-            'salida'     => '07:00',
-            'llegada'    => '—',
-            'duracion'   => $ruta['durBus'],
-            'precio'     => $ruta['bus'],
-            'esEstimado' => true,
-        ];
+    if (!empty($ruta['bus']) && !empty($ruta['durBus'])) {
+        $busPrecio = (int) $ruta['bus'];
+        $busEmpresas = ['Expreso Bolivariano', 'Expreso Brasilia', 'Copetran', 'Flota Magdalena'];
+        foreach ($busEmpresas as $idx => $busEmpresa) {
+            if ($idx >= 2) break;
+            $variacion = $idx === 0 ? 1.0 : 1.12;
+            $opciones[] = [
+                'id'         => $prefix . 'bus' . $idx,
+                'tipo'       => 'bus',
+                'empresa'    => $busEmpresa,
+                'salida'     => $idx === 0 ? '06:00' : '10:00',
+                'llegada'    => '—',
+                'duracion'   => $ruta['durBus'],
+                'precio'     => (int) round($busPrecio * $variacion),
+                'esEstimado' => true,
+            ];
+        }
     }
+
     // Ordenar por precio
+    usort($opciones, fn($a, $b) => $a['precio'] - $b['precio']);
+    return $opciones;
+}
+
+/* ─── Fallback universal para rutas no registradas ──────────── */
+function generarOpcionesGenericas(string $origen, string $destino, bool $esRegreso): array
+{
+    $prefix = $esRegreso ? 'gen_reg_' : 'gen_ida_';
+    // Estimados genéricos inter-ciudades Colombia (vuelo + bus)
+    $opciones = [
+        ['id' => $prefix.'v0', 'tipo' => 'vuelo',  'empresa' => 'Avianca',         'salida' => '06:10', 'llegada' => '07:30', 'duracion' => '1h 20m', 'precio' => 280000, 'esEstimado' => true],
+        ['id' => $prefix.'v1', 'tipo' => 'vuelo',  'empresa' => 'LATAM Colombia',  'salida' => '08:30', 'llegada' => '09:50', 'duracion' => '1h 20m', 'precio' => 310000, 'esEstimado' => true],
+        ['id' => $prefix.'v2', 'tipo' => 'vuelo',  'empresa' => 'JetSmart',        'salida' => '11:15', 'llegada' => '12:35', 'duracion' => '1h 20m', 'precio' => 245000, 'esEstimado' => true],
+        ['id' => $prefix.'b0', 'tipo' => 'bus',    'empresa' => 'Expreso Bolivariano', 'salida' => '06:00', 'llegada' => '—', 'duracion' => '8h',   'precio' => 75000,  'esEstimado' => true],
+        ['id' => $prefix.'b1', 'tipo' => 'bus',    'empresa' => 'Expreso Brasilia', 'salida' => '10:00', 'llegada' => '—', 'duracion' => '8h',   'precio' => 82000,  'esEstimado' => true],
+    ];
     usort($opciones, fn($a, $b) => $a['precio'] - $b['precio']);
     return $opciones;
 }
@@ -275,9 +332,11 @@ if (empty($opcionesIda)) {
             $opcionesRegreso = generarOpcionesEstimadas($ruta, $fechaRegreso, true, $AEROLINEAS);
         }
     } else {
-        // Sin datos para esta ruta: devolvemos lista vacía (frontend muestra mensaje)
-        $opcionesIda     = [];
-        $opcionesRegreso = [];
+        // Ruta no registrada: usar estimados genéricos
+        $opcionesIda     = generarOpcionesGenericas($origenIata, $destinoIata, false);
+        $opcionesRegreso = $fechaRegreso
+            ? generarOpcionesGenericas($destinoIata, $origenIata, true)
+            : [];
     }
 }
 
