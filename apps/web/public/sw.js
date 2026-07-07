@@ -1,5 +1,5 @@
 // Payops Service Worker v13 — network-first para HTML, cache-first para assets
-const CACHE_NAME = 'payops-v14';
+const CACHE_NAME = 'payops-v15';
 
 // Pre-cachear solo assets estáticos inmutables (imágenes, manifest)
 const STATIC_ASSETS = [

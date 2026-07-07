@@ -458,7 +458,10 @@ export function BandejaPanel() {
                         📥 Descargar PDF
                       </button>
                     </div>
-                    {(detalle.plantillaPdf?.bloques?.length || typeof detalle.datosFormulario['gastos'] === 'string') ? (
+                    {(detalle.plantillaPdf?.bloques?.length
+                      || typeof detalle.datosFormulario['gastos'] === 'string'
+                      || typeof detalle.datosFormulario['tiqueteIda'] === 'string'
+                      || typeof detalle.datosFormulario['items'] === 'string') ? (
                       generandoPdf ? (
                         <p className="admin-help-text">Generando el PDF del formato…</p>
                       ) : pdfUrl ? (
@@ -550,6 +553,173 @@ export function BandejaPanel() {
                           {String(detalle.datosFormulario['banco'] || '') && (
                             <p className="bandeja-leg-concepto" style={{ marginTop: 8 }}>
                               <strong>Cuenta:</strong> {String(detalle.datosFormulario['banco'])} {String(detalle.datosFormulario['tipoCuenta'] || '')} — {String(detalle.datosFormulario['numeroCuenta'] || '')} ({String(detalle.datosFormulario['titularCuenta'] || '')})
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })()}
+
+                    {/* ── Bloque viáticos ── */}
+                    {(() => {
+                      const rawIda = detalle.datosFormulario['tiqueteIda'];
+                      if (!rawIda || typeof rawIda !== 'string') return null;
+                      let tIda: Record<string, string> | null = null;
+                      try { tIda = JSON.parse(rawIda); } catch { return null; }
+                      if (!tIda) return null;
+                      const rawVuelta = String(detalle.datosFormulario['tiqueteVuelta'] || '');
+                      let tVuelta: Record<string, string> | null = null;
+                      if (rawVuelta) { try { tVuelta = JSON.parse(rawVuelta); } catch { /* */ } }
+                      const fmt = (v: string) => { const n = Number(String(v || '0').replace(/[^0-9]/g, '')); return n ? `$ ${n.toLocaleString('es-CO')}` : '—'; };
+                      const ciudadOrigen = String(detalle.datosFormulario['ciudadOrigen'] || '');
+                      const ciudadDestino = String(detalle.datosFormulario['ciudadDestino'] || '');
+                      const fechaIda = String(detalle.datosFormulario['fechaIda'] || '');
+                      const fechaRegreso = String(detalle.datosFormulario['fechaRegreso'] || '');
+                      const motivoViaje = String(detalle.datosFormulario['motivoViaje'] || '');
+                      const tipoViatico = String(detalle.datosFormulario['tipoViatico'] || '');
+                      const autorizadorNombre = String(detalle.datosFormulario['autorizadorNombre'] || '');
+                      const tieneHospedaje = String(detalle.datosFormulario['tieneHospedaje'] || '') === 'true';
+                      const hotelNombre = String(detalle.datosFormulario['hotelNombre'] || '');
+                      const hotelEntrada = String(detalle.datosFormulario['hotelEntrada'] || '');
+                      const hotelSalida = String(detalle.datosFormulario['hotelSalida'] || '');
+                      const hotelValorNoche = String(detalle.datosFormulario['hotelValorNoche'] || '');
+                      const hotelNoches = String(detalle.datosFormulario['hotelNoches'] || '0');
+                      const totalHospedaje = String(detalle.datosFormulario['totalHospedaje'] || '');
+                      const diasDesayuno = String(detalle.datosFormulario['diasDesayuno'] || '0');
+                      const valorDesayuno = String(detalle.datosFormulario['valorDesayuno'] || '0');
+                      const diasAlmuerzo = String(detalle.datosFormulario['diasAlmuerzo'] || '0');
+                      const valorAlmuerzo = String(detalle.datosFormulario['valorAlmuerzo'] || '0');
+                      const diasCena = String(detalle.datosFormulario['diasCena'] || '0');
+                      const valorCena = String(detalle.datosFormulario['valorCena'] || '0');
+                      const totalComidas = String(detalle.datosFormulario['totalComidas'] || '');
+                      const totalTransporte = String(detalle.datosFormulario['totalTransporte'] || '');
+                      const totalGeneral = String(detalle.datosFormulario['totalGeneral'] || '');
+                      const docTiquete = (detalle.documentos as Record<string, unknown>)?.['tiquete'] as { archivoId?: string; nombre?: string; ocrAlertas?: string[] } | undefined;
+                      const docHotel = (detalle.documentos as Record<string, unknown>)?.['hotel'] as { archivoId?: string; nombre?: string; ocrAlertas?: string[] } | undefined;
+                      const docComidas = (detalle.documentos as Record<string, unknown>)?.['comidas'] as { archivoId?: string; nombre?: string; ocrAlertas?: string[] } | undefined;
+                      return (
+                        <div className="bandeja-leg-gastos">
+                          <h4>Viáticos solicitados</h4>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
+                            {ciudadOrigen && ciudadDestino && <span className="leg-ocr-badge">✈ {ciudadOrigen} → {ciudadDestino}</span>}
+                            {fechaIda && <span className="leg-ocr-badge">📅 Ida: {fechaIda}</span>}
+                            {fechaRegreso && <span className="leg-ocr-badge">📅 Regreso: {fechaRegreso}</span>}
+                            {tipoViatico && <span className="leg-ocr-badge">{tipoViatico === 'anticipo' ? '⏩ Anticipo' : '🔄 Legalización'}</span>}
+                            {autorizadorNombre && <span className="leg-ocr-badge">👤 Autoriza: {autorizadorNombre}</span>}
+                          </div>
+                          {motivoViaje && <p className="bandeja-leg-concepto"><strong>Motivo:</strong> {motivoViaje}</p>}
+                          {/* Tiquetes */}
+                          <table className="bandeja-items-table bandeja-leg-table">
+                            <thead><tr><th>Trayecto</th><th>Tipo</th><th>Empresa</th><th>N° vuelo/tiquete</th><th>Salida</th><th>Llegada</th><th>Valor</th><th>Soporte</th></tr></thead>
+                            <tbody>
+                              {tIda && (
+                                <tr>
+                                  <td>Ida</td>
+                                  <td>{tIda.tipo === 'aereo' ? '✈ Aéreo' : '🚌 Terrestre'}</td>
+                                  <td>{tIda.empresa || '—'}</td>
+                                  <td>{tIda.numDoc || '—'}{tIda.codReserva ? <span className="leg-ocr-badge" style={{ marginLeft: 4 }}>Res: {tIda.codReserva}</span> : null}</td>
+                                  <td>{tIda.horaSalida || '—'}</td>
+                                  <td>{tIda.horaLlegada || '—'}</td>
+                                  <td>{fmt(tIda.valor)}</td>
+                                  <td rowSpan={tVuelta ? 2 : 1}>
+                                    {docTiquete?.archivoId ? (
+                                      <button type="button" className="bandeja-abrir-adjunto" onClick={() => abrirArchivo(docTiquete.archivoId!)}>📎 {docTiquete.nombre || 'Ver tiquete'}</button>
+                                    ) : <span className="factura-falta">⚠ sin soporte</span>}
+                                    {docTiquete?.ocrAlertas && docTiquete.ocrAlertas.length > 0 && (
+                                      <ul className="bandeja-factura-alertas">{docTiquete.ocrAlertas.map((a, ai) => <li key={ai}>⚠ {a}</li>)}</ul>
+                                    )}
+                                  </td>
+                                </tr>
+                              )}
+                              {tVuelta && (
+                                <tr>
+                                  <td>Vuelta</td>
+                                  <td>{tVuelta.tipo === 'aereo' ? '✈ Aéreo' : '🚌 Terrestre'}</td>
+                                  <td>{tVuelta.empresa || '—'}</td>
+                                  <td>{tVuelta.numDoc || '—'}{tVuelta.codReserva ? <span className="leg-ocr-badge" style={{ marginLeft: 4 }}>Res: {tVuelta.codReserva}</span> : null}</td>
+                                  <td>{tVuelta.horaSalida || '—'}</td>
+                                  <td>{tVuelta.horaLlegada || '—'}</td>
+                                  <td>{fmt(tVuelta.valor)}</td>
+                                </tr>
+                              )}
+                            </tbody>
+                            {Number(totalTransporte) > 0 && <tfoot><tr><td colSpan={6}><strong>Total transporte</strong></td><td colSpan={2}><strong>{fmt(totalTransporte)}</strong></td></tr></tfoot>}
+                          </table>
+                          {/* Hospedaje */}
+                          {tieneHospedaje && (
+                            <div style={{ marginTop: 12 }}>
+                              <h5 style={{ color: 'var(--gold)', marginBottom: 6 }}>Alojamiento</h5>
+                              <table className="bandeja-items-table bandeja-leg-table">
+                                <thead><tr><th>Hotel</th><th>Entrada</th><th>Salida</th><th>Noches</th><th>Valor/noche</th><th>Total</th><th>Soporte</th></tr></thead>
+                                <tbody>
+                                  <tr>
+                                    <td>{hotelNombre || '—'}</td><td>{hotelEntrada || '—'}</td><td>{hotelSalida || '—'}</td>
+                                    <td>{hotelNoches}</td><td>{fmt(hotelValorNoche)}</td><td>{fmt(totalHospedaje)}</td>
+                                    <td>
+                                      {docHotel?.archivoId ? <button type="button" className="bandeja-abrir-adjunto" onClick={() => abrirArchivo(docHotel.archivoId!)}>📎 {docHotel.nombre || 'Ver factura'}</button> : <span className="factura-falta">⚠ sin soporte</span>}
+                                      {docHotel?.ocrAlertas && docHotel.ocrAlertas.length > 0 && <ul className="bandeja-factura-alertas">{docHotel.ocrAlertas.map((a, ai) => <li key={ai}>⚠ {a}</li>)}</ul>}
+                                    </td>
+                                  </tr>
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
+                          {/* Alimentación */}
+                          {(parseInt(diasDesayuno) + parseInt(diasAlmuerzo) + parseInt(diasCena)) > 0 && (
+                            <div style={{ marginTop: 12 }}>
+                              <h5 style={{ color: 'var(--gold)', marginBottom: 6 }}>Alimentación</h5>
+                              <table className="bandeja-items-table bandeja-leg-table">
+                                <thead><tr><th>Tipo</th><th>Días</th><th>Valor/día</th><th>Total</th></tr></thead>
+                                <tbody>
+                                  {parseInt(diasDesayuno) > 0 && <tr><td>Desayuno</td><td>{diasDesayuno}</td><td>{fmt(valorDesayuno)}</td><td>{fmt(String(parseInt(diasDesayuno) * parseInt(valorDesayuno)))}</td></tr>}
+                                  {parseInt(diasAlmuerzo) > 0 && <tr><td>Almuerzo</td><td>{diasAlmuerzo}</td><td>{fmt(valorAlmuerzo)}</td><td>{fmt(String(parseInt(diasAlmuerzo) * parseInt(valorAlmuerzo)))}</td></tr>}
+                                  {parseInt(diasCena) > 0 && <tr><td>Cena</td><td>{diasCena}</td><td>{fmt(valorCena)}</td><td>{fmt(String(parseInt(diasCena) * parseInt(valorCena)))}</td></tr>}
+                                </tbody>
+                                {Number(totalComidas) > 0 && <tfoot><tr><td colSpan={3}><strong>Total alimentación</strong></td><td><strong>{fmt(totalComidas)}</strong></td></tr></tfoot>}
+                              </table>
+                              {docComidas?.archivoId && <div style={{ marginTop: 4 }}><button type="button" className="bandeja-abrir-adjunto" onClick={() => abrirArchivo(docComidas.archivoId!)}>📎 {docComidas.nombre || 'Ver soporte comidas'}</button>{docComidas?.ocrAlertas && docComidas.ocrAlertas.length > 0 && <ul className="bandeja-factura-alertas">{docComidas.ocrAlertas.map((a, ai) => <li key={ai}>⚠ {a}</li>)}</ul>}</div>}
+                            </div>
+                          )}
+                          {Number(totalGeneral) > 0 && <div style={{ marginTop: 12, textAlign: 'right' }}><strong style={{ fontSize: 15 }}>Total general: {fmt(totalGeneral)}</strong></div>}
+                        </div>
+                      );
+                    })()}
+
+                    {/* ── Bloque anticipo ── */}
+                    {(() => {
+                      const rawItems = detalle.datosFormulario['items'];
+                      if (!rawItems || typeof rawItems !== 'string') return null;
+                      let items: Record<string, string>[] = [];
+                      try { const p = JSON.parse(rawItems); if (Array.isArray(p)) items = p; } catch { return null; }
+                      if (!items.length) return null;
+                      const fmt = (v: string) => { const n = Number(String(v || '0').replace(/[^0-9]/g, '')); return n ? `$ ${n.toLocaleString('es-CO')}` : v || '—'; };
+                      const totalStr = String(detalle.datosFormulario['valorPesos'] || '');
+                      const total = Number(totalStr.replace(/[^0-9]/g, ''));
+                      const descripcion = String(detalle.datosFormulario['descripcionGasto'] || '');
+                      const destino = String(detalle.datosFormulario['destino'] || '');
+                      const fechaEvento = String(detalle.datosFormulario['fechaEvento'] || '');
+                      return (
+                        <div className="bandeja-leg-gastos">
+                          <h4>Anticipo de gastos</h4>
+                          {descripcion && <p className="bandeja-leg-concepto"><strong>Propósito:</strong> {descripcion}</p>}
+                          {destino && <p className="bandeja-leg-concepto"><strong>Destino/lugar:</strong> {destino}</p>}
+                          {fechaEvento && <p className="bandeja-leg-concepto"><strong>Fecha evento:</strong> {fechaEvento}</p>}
+                          <table className="bandeja-items-table bandeja-leg-table">
+                            <thead><tr><th>#</th><th>Concepto</th><th>Descripción</th><th>Valor</th></tr></thead>
+                            <tbody>
+                              {items.map((it, i) => (
+                                <tr key={i}>
+                                  <td>{i + 1}</td>
+                                  <td>{it.concepto || '—'}</td>
+                                  <td>{it.descripcion || '—'}</td>
+                                  <td>{fmt(it.valor)}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                            {total > 0 && <tfoot><tr><td colSpan={3}><strong>Total</strong></td><td><strong>{fmt(totalStr)}</strong></td></tr></tfoot>}
+                          </table>
+                          {String(detalle.datosFormulario['banco'] || '') && (
+                            <p className="bandeja-leg-concepto" style={{ marginTop: 8 }}>
+                              <strong>Cuenta:</strong> {String(detalle.datosFormulario['banco'])} {String(detalle.datosFormulario['tipoCuenta'] || '')} — {String(detalle.datosFormulario['numeroCuenta'] || '')}
                             </p>
                           )}
                         </div>

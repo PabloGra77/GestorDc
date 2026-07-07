@@ -535,7 +535,11 @@ async function generarPdfPlantilla(s: SolicitudParaPdf, pl: PlantillaPdf, filena
 export async function generarFormatoBlobUrl(s: SolicitudParaPdf): Promise<string | null> {
   const esLegalizacion = s.tipoSlug === 'legalizacion'
     || typeof s.datosFormulario['gastos'] === 'string';
-  if (esLegalizacion) {
+  const esViaticos = s.tipoSlug === 'viaticos'
+    || typeof s.datosFormulario['tiqueteIda'] === 'string';
+  const esAnticipo = s.tipoSlug === 'anticipo'
+    || typeof s.datosFormulario['items'] === 'string';
+  if (esLegalizacion || esViaticos || esAnticipo) {
     const url = _generarPdfEspecial(s, { bloburl: true });
     return typeof url === 'string' ? url : null;
   }
@@ -597,6 +601,8 @@ export async function descargarPreviewPlantilla(
 function _generarPdfEspecial(s: SolicitudParaPdf, opts?: { bloburl?: boolean }): string | void {
   const esLegalizacion = s.tipoSlug === 'legalizacion'
     || typeof s.datosFormulario['gastos'] === 'string';
+  const esViaticos = s.tipoSlug === 'viaticos'
+    || typeof s.datosFormulario['tiqueteIda'] === 'string';
 
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -665,8 +671,8 @@ function _generarPdfEspecial(s: SolicitudParaPdf, opts?: { bloburl?: boolean }):
   }
   y += 8;
 
-  // Título principal centrado (para legalizaciones, usa encabezado propio)
-  if (esLegalizacion) {
+  // Título principal centrado (para legalizaciones y viáticos, usa encabezado propio)
+  if (esLegalizacion || esViaticos) {
     doc.setDrawColor(212, 175, 55);
     doc.setLineWidth(0.8);
     doc.line(margin, y, pageWidth - margin, y);
@@ -674,7 +680,10 @@ function _generarPdfEspecial(s: SolicitudParaPdf, opts?: { bloburl?: boolean }):
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(14);
     doc.setTextColor(7, 11, 29);
-    doc.text('SOLICITUD DE LEGALIZACIÓN DE GASTOS', pageWidth / 2, y, { align: 'center' });
+    doc.text(
+      esLegalizacion ? 'SOLICITUD DE LEGALIZACIÓN DE GASTOS' : 'SOLICITUD DE VIÁTICOS',
+      pageWidth / 2, y, { align: 'center' },
+    );
     y += 5;
     doc.setLineWidth(0.5);
     doc.line(margin, y, pageWidth - margin, y);
@@ -731,6 +740,37 @@ function _generarPdfEspecial(s: SolicitudParaPdf, opts?: { bloburl?: boolean }):
         : '',
     ].filter(Boolean).join(' ');
 
+    if (y > 240) { doc.addPage(); y = margin; }
+    doc.setFontSize(10);
+    doc.setTextColor(15, 23, 42);
+    doc.setFont('helvetica', 'normal');
+    const split = doc.splitTextToSize(narrativa, pageWidth - margin * 2);
+    doc.text(split, margin, y);
+    y += split.length * 5 + 6;
+  }
+
+  // Narrativa de viáticos
+  if (esViaticos) {
+    const motivoViaje = String(s.datosFormulario['motivoViaje'] || '');
+    const ciudadOrigen = String(s.datosFormulario['ciudadOrigen'] || '');
+    const ciudadDestino = String(s.datosFormulario['ciudadDestino'] || '');
+    const fechaIda = String(s.datosFormulario['fechaIda'] || '');
+    const fechaRegreso = String(s.datosFormulario['fechaRegreso'] || '');
+    const tipoViatico = String(s.datosFormulario['tipoViatico'] || '');
+    const autorizador = String(s.datosFormulario['autorizadorNombre'] || '');
+    const totalGeneral = String(s.datosFormulario['totalGeneral'] || '');
+    const totalFmt = totalGeneral
+      ? `$${Number(totalGeneral.replace(/[^0-9]/g, '')).toLocaleString('es-CO')}`
+      : '';
+    const tipoDoc = s.solicitanteDocumento ? 'identificado(a) con documento N°' : '';
+    const accion = tipoViatico === 'anticipo' ? 'solicito anticipo de viáticos' : 'solicito legalización de viáticos';
+    const ruta = ciudadOrigen && ciudadDestino ? ` para viajar de ${ciudadOrigen} a ${ciudadDestino}` : '';
+    const fechas = fechaIda ? ` el ${fechaIda}${fechaRegreso ? ` con regreso el ${fechaRegreso}` : ''}` : '';
+    const narrativa = [
+      `Yo, ${s.solicitanteNombre || 'el(la) suscrito(a)'}${tipoDoc ? ', ' + tipoDoc + ' ' + (s.solicitanteDocumento || '') : ''},`,
+      `${accion}${ruta}${fechas}${motivoViaje ? ` por motivo de: ${motivoViaje}` : ''}${totalFmt ? `, por un valor total de ${totalFmt}` : ''}.`,
+      autorizador ? `Viaje autorizado por: ${autorizador}.` : '',
+    ].filter(Boolean).join(' ');
     if (y > 240) { doc.addPage(); y = margin; }
     doc.setFontSize(10);
     doc.setTextColor(15, 23, 42);
@@ -838,6 +878,268 @@ function _generarPdfEspecial(s: SolicitudParaPdf, opts?: { bloburl?: boolean }):
     } catch { /* no era gastos válidos */ }
   }
 
+  // Bloque especial: viáticos (tiquetes, hospedaje, alimentación)
+  const rawTiqueteIda = s.datosFormulario['tiqueteIda'];
+  if (esViaticos && rawTiqueteIda && typeof rawTiqueteIda === 'string') {
+    try {
+      const tIda = JSON.parse(rawTiqueteIda) as Record<string, string>;
+      const rawVuelta = String(s.datosFormulario['tiqueteVuelta'] || '');
+      const tVuelta: Record<string, string> | null = rawVuelta ? JSON.parse(rawVuelta) : null;
+      const fmt = (v: string) => { const n = Number(String(v || '0').replace(/[^0-9]/g, '')); return n ? `$${n.toLocaleString('es-CO')}` : '—'; };
+
+      if (y > 240) { doc.addPage(); y = margin; }
+      doc.setDrawColor(212, 175, 55);
+      doc.line(margin, y, pageWidth - margin, y);
+      y += 5;
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(184, 144, 31);
+      doc.setFontSize(11);
+      doc.text('DETALLES DEL VIAJE', margin, y);
+      y += 5;
+
+      const ciudadOrigen = String(s.datosFormulario['ciudadOrigen'] || '');
+      const ciudadDestino = String(s.datosFormulario['ciudadDestino'] || '');
+      const fechaIda = String(s.datosFormulario['fechaIda'] || '');
+      const fechaRegreso = String(s.datosFormulario['fechaRegreso'] || '');
+      const autorizador = String(s.datosFormulario['autorizadorNombre'] || '');
+      doc.setFontSize(9);
+      doc.setTextColor(15, 23, 42);
+      doc.setFont('helvetica', 'normal');
+      if (ciudadOrigen && ciudadDestino) { doc.text(`Ruta: ${ciudadOrigen} → ${ciudadDestino}`, margin, y); y += 4; }
+      if (fechaIda) { doc.text(`Fecha ida: ${fechaIda}${fechaRegreso ? '   ·   Regreso: ' + fechaRegreso : ''}`, margin, y); y += 4; }
+      if (autorizador) { doc.text(`Autorizó: ${autorizador}`, margin, y); y += 4; }
+      y += 2;
+
+      // Tabla de tiquetes
+      const tCols = ['Trayecto', 'Tipo', 'Empresa', 'N° vuelo/tiquete', 'Salida', 'Llegada', 'Valor'];
+      const tW = [0.10, 0.10, 0.16, 0.18, 0.10, 0.10, 0.14].map((r) => (pageWidth - margin * 2) * r);
+      if (y > 265) { doc.addPage(); y = margin; }
+      doc.setFillColor(212, 175, 55);
+      doc.rect(margin, y, pageWidth - margin * 2, 5, 'F');
+      doc.setTextColor(7, 11, 29);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(7);
+      let cx = margin;
+      tCols.forEach((col, i) => { doc.text(col, cx + 1, y + 3.5); cx += tW[i]; });
+      y += 5;
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(15, 23, 42);
+      const tRows = [['Ida', tIda], ...(tVuelta ? [['Vuelta', tVuelta]] : [])] as [string, Record<string, string>][];
+      tRows.forEach(([label, t], idx) => {
+        if (y > 275) { doc.addPage(); y = margin; }
+        const vals = [
+          label,
+          t.tipo === 'aereo' ? 'Aéreo' : 'Terrestre',
+          t.empresa || '',
+          t.numDoc || '',
+          t.horaSalida || '',
+          t.horaLlegada || '',
+          fmt(t.valor),
+        ];
+        const bg = idx % 2 === 0 ? [245, 245, 248] : [255, 255, 255];
+        doc.setFillColor(bg[0], bg[1], bg[2]);
+        doc.rect(margin, y, pageWidth - margin * 2, 4.5, 'F');
+        cx = margin;
+        vals.forEach((v, i) => { doc.text(doc.splitTextToSize(v, tW[i] - 1)[0] || '', cx + 1, y + 3.2); cx += tW[i]; });
+        y += 4.5;
+      });
+      const totalTransporte = String(s.datosFormulario['totalTransporte'] || '');
+      if (Number(totalTransporte) > 0) {
+        doc.setFillColor(7, 11, 29);
+        doc.rect(margin, y, pageWidth - margin * 2, 5, 'F');
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(212, 175, 55);
+        doc.text('TOTAL TRANSPORTE', margin + 1, y + 3.5);
+        doc.text(fmt(totalTransporte), pageWidth - margin - 1, y + 3.5, { align: 'right' });
+        y += 7;
+      }
+
+      // Hospedaje
+      const tieneHospedaje = String(s.datosFormulario['tieneHospedaje'] || '') === 'true';
+      if (tieneHospedaje) {
+        const hotelNombre = String(s.datosFormulario['hotelNombre'] || '');
+        const hotelEntrada = String(s.datosFormulario['hotelEntrada'] || '');
+        const hotelSalida = String(s.datosFormulario['hotelSalida'] || '');
+        const hotelNoches = String(s.datosFormulario['hotelNoches'] || '');
+        const hotelValorNoche = String(s.datosFormulario['hotelValorNoche'] || '');
+        const totalHospedaje = String(s.datosFormulario['totalHospedaje'] || '');
+        if (y > 240) { doc.addPage(); y = margin; }
+        doc.setDrawColor(212, 175, 55);
+        doc.line(margin, y, pageWidth - margin, y);
+        y += 5;
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(184, 144, 31);
+        doc.setFontSize(11);
+        doc.text('ALOJAMIENTO', margin, y);
+        y += 5;
+        doc.setFontSize(9);
+        doc.setTextColor(15, 23, 42);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`Hotel / Alojamiento: ${hotelNombre}`, margin, y); y += 4;
+        doc.text(`Entrada: ${hotelEntrada}   ·   Salida: ${hotelSalida}   ·   Noches: ${hotelNoches}`, margin, y); y += 4;
+        doc.text(`Valor por noche: ${fmt(hotelValorNoche)}   ·   Total hospedaje: ${fmt(totalHospedaje)}`, margin, y); y += 6;
+      }
+
+      // Alimentación
+      const diasD = parseInt(String(s.datosFormulario['diasDesayuno'] || '0')) || 0;
+      const valD = parseInt(String(s.datosFormulario['valorDesayuno'] || '0')) || 0;
+      const diasA = parseInt(String(s.datosFormulario['diasAlmuerzo'] || '0')) || 0;
+      const valA = parseInt(String(s.datosFormulario['valorAlmuerzo'] || '0')) || 0;
+      const diasC = parseInt(String(s.datosFormulario['diasCena'] || '0')) || 0;
+      const valC = parseInt(String(s.datosFormulario['valorCena'] || '0')) || 0;
+      if (diasD + diasA + diasC > 0) {
+        if (y > 240) { doc.addPage(); y = margin; }
+        doc.setDrawColor(212, 175, 55);
+        doc.line(margin, y, pageWidth - margin, y);
+        y += 5;
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(184, 144, 31);
+        doc.setFontSize(11);
+        doc.text('ALIMENTACIÓN', margin, y);
+        y += 5;
+        const aCols = ['Tipo', 'Días', 'Valor/día', 'Total'];
+        const aW = [0.30, 0.20, 0.25, 0.25].map((r) => (pageWidth - margin * 2) * r);
+        doc.setFillColor(212, 175, 55);
+        doc.rect(margin, y, pageWidth - margin * 2, 5, 'F');
+        doc.setTextColor(7, 11, 29);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(7);
+        cx = margin;
+        aCols.forEach((col, i) => { doc.text(col, cx + 1, y + 3.5); cx += aW[i]; });
+        y += 5;
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(15, 23, 42);
+        const comidas = [
+          ...(diasD > 0 ? [['Desayuno', String(diasD), fmt(String(valD)), fmt(String(diasD * valD))]] : []),
+          ...(diasA > 0 ? [['Almuerzo', String(diasA), fmt(String(valA)), fmt(String(diasA * valA))]] : []),
+          ...(diasC > 0 ? [['Cena', String(diasC), fmt(String(valC)), fmt(String(diasC * valC))]] : []),
+        ];
+        comidas.forEach((row, idx) => {
+          if (y > 275) { doc.addPage(); y = margin; }
+          const bg = idx % 2 === 0 ? [245, 245, 248] : [255, 255, 255];
+          doc.setFillColor(bg[0], bg[1], bg[2]);
+          doc.rect(margin, y, pageWidth - margin * 2, 4.5, 'F');
+          cx = margin;
+          row.forEach((v, i) => { doc.text(v, cx + 1, y + 3.2); cx += aW[i]; });
+          y += 4.5;
+        });
+        const totalComidas = String(s.datosFormulario['totalComidas'] || '');
+        if (Number(totalComidas) > 0) {
+          doc.setFillColor(7, 11, 29);
+          doc.rect(margin, y, pageWidth - margin * 2, 5, 'F');
+          doc.setFont('helvetica', 'bold');
+          doc.setTextColor(212, 175, 55);
+          doc.text('TOTAL ALIMENTACIÓN', margin + 1, y + 3.5);
+          doc.text(fmt(totalComidas), pageWidth - margin - 1, y + 3.5, { align: 'right' });
+          y += 7;
+        }
+      }
+
+      // Total general
+      const totalGeneral = String(s.datosFormulario['totalGeneral'] || '');
+      if (Number(totalGeneral) > 0) {
+        if (y > 260) { doc.addPage(); y = margin; }
+        doc.setFillColor(7, 11, 29);
+        doc.rect(margin, y, pageWidth - margin * 2, 7, 'F');
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(10);
+        doc.setTextColor(212, 175, 55);
+        doc.text('TOTAL GENERAL VIÁTICOS', margin + 2, y + 5);
+        doc.text(fmt(totalGeneral), pageWidth - margin - 2, y + 5, { align: 'right' });
+        y += 10;
+      }
+    } catch { /* datos de viáticos no válidos */ }
+  }
+
+  // Bloque especial: anticipo de gastos (datosFormulario.items = JSON string)
+  const esAnticipo = s.tipoSlug === 'anticipo'
+    || typeof s.datosFormulario['items'] === 'string';
+  const rawItems = s.datosFormulario['items'];
+  if (esAnticipo && rawItems && typeof rawItems === 'string') {
+    try {
+      const itemsArr = JSON.parse(rawItems) as Record<string, string>[];
+      if (Array.isArray(itemsArr) && itemsArr.length > 0) {
+        // Narrativa anticipo
+        const descripcionGasto = String(s.datosFormulario['descripcionGasto'] || '');
+        const fechaEvento = String(s.datosFormulario['fechaEvento'] || '');
+        const destino = String(s.datosFormulario['destino'] || '');
+        const valorPesos = String(s.datosFormulario['valorPesos'] || '');
+        const totalFmt = valorPesos
+          ? `$${Number(valorPesos.replace(/[^0-9]/g, '')).toLocaleString('es-CO')}`
+          : '';
+        const narrativa = [
+          `Yo, ${s.solicitanteNombre || 'el(la) suscrito(a)'},`,
+          `solicito anticipo de gastos${descripcionGasto ? ` para: ${descripcionGasto}` : ''}` +
+            (destino ? ` en ${destino}` : '') +
+            (fechaEvento ? ` el ${fechaEvento}` : '') +
+            (totalFmt ? `, por un valor total de ${totalFmt}` : '') + '.',
+        ].filter(Boolean).join(' ');
+        if (y > 240) { doc.addPage(); y = margin; }
+        doc.setFontSize(10);
+        doc.setTextColor(15, 23, 42);
+        doc.setFont('helvetica', 'normal');
+        const splitNarr = doc.splitTextToSize(narrativa, pageWidth - margin * 2);
+        doc.text(splitNarr, margin, y);
+        y += splitNarr.length * 5 + 6;
+
+        // Tabla de ítems
+        if (y > 240) { doc.addPage(); y = margin; }
+        doc.setDrawColor(212, 175, 55);
+        doc.line(margin, y, pageWidth - margin, y);
+        y += 5;
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(184, 144, 31);
+        doc.setFontSize(11);
+        doc.text('DESGLOSE DEL ANTICIPO', margin, y);
+        y += 5;
+        const iCols = ['#', 'Concepto', 'Descripción', 'Valor'];
+        const iW = [0.05, 0.20, 0.50, 0.20].map((r) => (pageWidth - margin * 2) * r);
+        doc.setFillColor(212, 175, 55);
+        doc.rect(margin, y, pageWidth - margin * 2, 5, 'F');
+        doc.setTextColor(7, 11, 29);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(7);
+        let cxA = margin;
+        iCols.forEach((col, i) => { doc.text(col, cxA + 1, y + 3.5); cxA += iW[i]; });
+        y += 5;
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(15, 23, 42);
+        let totalAnticipo = 0;
+        itemsArr.forEach((it, idx) => {
+          if (y > 275) { doc.addPage(); y = margin; }
+          const valor = Number(String(it.valor || '0').replace(/[^0-9]/g, ''));
+          totalAnticipo += valor;
+          const bg = idx % 2 === 0 ? [245, 245, 248] : [255, 255, 255];
+          doc.setFillColor(bg[0], bg[1], bg[2]);
+          doc.rect(margin, y, pageWidth - margin * 2, 4.5, 'F');
+          cxA = margin;
+          [String(idx + 1), it.concepto || '', it.descripcion || '', `$${valor.toLocaleString('es-CO')}`]
+            .forEach((v, i) => { doc.text(doc.splitTextToSize(v, iW[i] - 1)[0] || '', cxA + 1, y + 3.2); cxA += iW[i]; });
+          y += 4.5;
+        });
+        // Total row
+        doc.setFillColor(7, 11, 29);
+        doc.rect(margin, y, pageWidth - margin * 2, 5, 'F');
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(212, 175, 55);
+        doc.text('TOTAL ANTICIPO', margin + 1, y + 3.5);
+        doc.text(`$${totalAnticipo.toLocaleString('es-CO')}`, pageWidth - margin - 1, y + 3.5, { align: 'right' });
+        y += 7;
+        // Cuenta bancaria
+        const bancoA = String(s.datosFormulario['banco'] || '');
+        const cuentaA = String(s.datosFormulario['numeroCuenta'] || '');
+        const tipoCtaA = String(s.datosFormulario['tipoCuenta'] || '');
+        if (bancoA || cuentaA) {
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(9);
+          doc.setTextColor(15, 23, 42);
+          doc.text(`Cuenta para desembolso: ${bancoA} ${tipoCtaA} — ${cuentaA}`, margin, y);
+          y += 6;
+        }
+      }
+    } catch { /* datos inválidos */ }
+  }
+
   // Datos por grupo
   const grupos = new Map<string, CampoPlantilla[]>();
   s.camposPlantilla.forEach((c) => {
@@ -928,9 +1230,8 @@ function _generarPdfEspecial(s: SolicitudParaPdf, opts?: { bloburl?: boolean }):
   if (y > 230) { doc.addPage(); y = margin; }
   const firmasY = Math.max(y + 6, 235);
 
-  // Para legalizaciones: 4 firmas (solicitante, autorizador, analista/coordinador, contabilidad)
-  // Para otros: 3 firmas (profesional, coordinador, contabilidad)
-  const numCols = esLegalizacion ? 4 : 3;
+  // Para legalizaciones y viáticos: 4 firmas; para otros: 3
+  const numCols = (esLegalizacion || esViaticos) ? 4 : 3;
   const colWidth = (pageWidth - margin * 2) / numCols;
   const firmaImgH = 18;
   const firmaImgW = colWidth - 6;
@@ -965,10 +1266,11 @@ function _generarPdfEspecial(s: SolicitudParaPdf, opts?: { bloburl?: boolean }):
     }
   };
 
-  if (esLegalizacion) {
+  if (esLegalizacion || esViaticos) {
     const autorizadorNombre = String(s.datosFormulario['autorizadorNombre'] || '');
+    const autorizadorLabel = esViaticos ? 'Quien autorizó el viaje' : 'Quien autoriza el gasto';
     drawFirma(firmas.profesional || '', s.solicitanteNombre || 'Solicitante', 'Solicita', 0);
-    drawFirma('', autorizadorNombre || 'Quien autoriza el gasto', 'Autorizó el gasto', 1);
+    drawFirma('', autorizadorNombre || autorizadorLabel, autorizadorLabel, 1);
     drawFirma(firmas.analista || firmas.coordinador || '', aprobacionPorPaso['analista'] || aprobacionPorPaso['coordinador'] || 'Analista / Coordinador', 'Validó', 2);
     drawFirma(firmas.contabilidad || '', aprobacionPorPaso['contabilidad'] || aprobacionPorPaso['director'] || 'Área final', 'Aprobó', 3);
   } else {
@@ -1000,7 +1302,11 @@ function _generarPdfEspecial(s: SolicitudParaPdf, opts?: { bloburl?: boolean }):
 export function generarPdfFormato(s: SolicitudParaPdf): void {
   const esLegalizacion = s.tipoSlug === 'legalizacion'
     || typeof s.datosFormulario['gastos'] === 'string';
-  if (s.plantillaPdf && !esLegalizacion) {
+  const esViaticos = s.tipoSlug === 'viaticos'
+    || typeof s.datosFormulario['tiqueteIda'] === 'string';
+  const esAnticipo = s.tipoSlug === 'anticipo'
+    || typeof s.datosFormulario['items'] === 'string';
+  if (s.plantillaPdf && !esLegalizacion && !esViaticos && !esAnticipo) {
     void generarPdfPlantilla(s, s.plantillaPdf);
     return;
   }

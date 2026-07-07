@@ -758,9 +758,10 @@ export function TiposSolicitudPanel() {
         });
         setPlantillaPdf({ bloques: bloquesMig });
       } else {
-        setUsaPlantillaPdf(false);
-        // Inferir plantilla por nombre del tipo (ADRES, EPS, RUT, etc.)
-        setPlantillaPdf({ bloques: inferirPlantillaPorNombre(t.nombre) });
+        const bloquesSugeridos = inferirPlantillaPorNombre(t.nombre);
+        // Si existe plantilla inferida (viáticos, anticipo, cuenta cobro, etc.) mostrar el editor ya activo
+        setUsaPlantillaPdf(bloquesSugeridos.length > 0);
+        setPlantillaPdf({ bloques: bloquesSugeridos });
       }
     } else {
       setEditingId(null);

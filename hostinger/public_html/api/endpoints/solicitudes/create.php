@@ -281,12 +281,14 @@ if (!empty($usuario['correo'])) {
         "Te avisaremos por este medio cuando avance."
     );
 }
-// Para legalizacion: si el primer paso es 'autorizador_visto_bueno', notificar al autorizador
+// Notificar autorizador si la solicitud lo referencia en los datos
+$autorizadorIdDatos = (int)($datosFormulario['autorizadorId'] ?? 0);
+
+// Para legalizacion: si el primer paso es 'autorizador_visto_bueno', notificar al autorizador (él ES el validador)
 if ($esLegalizacion && ($primerPaso['rol'] ?? '') === 'autorizador_visto_bueno') {
-    $autorizadorId = (int)($datosFormulario['autorizadorId'] ?? 0);
-    if ($autorizadorId > 0) {
+    if ($autorizadorIdDatos > 0) {
         $aCorStmt = $pdo->prepare("SELECT correo, nombre_completo FROM usuarios WHERE id = :id AND activo = 1 LIMIT 1");
-        $aCorStmt->execute([':id' => $autorizadorId]);
+        $aCorStmt->execute([':id' => $autorizadorIdDatos]);
         $autorizador = $aCorStmt->fetch();
         if ($autorizador && $autorizador['correo']) {
             try {
@@ -313,6 +315,36 @@ if ($esLegalizacion && ($primerPaso['rol'] ?? '') === 'autorizador_visto_bueno')
     }
 } else {
     FlujoHelpers::notificarValidadores($pdo, $solNotif, $primerPaso['rol'] ?? null, $areaSolicitud);
+
+    // Para viáticos, anticipo u otros tipos con autorizador en datos: notificar informacionalmente
+    if ($autorizadorIdDatos > 0) {
+        $aStmt = $pdo->prepare("SELECT correo, nombre_completo FROM usuarios WHERE id = :id AND activo = 1 LIMIT 1");
+        $aStmt->execute([':id' => $autorizadorIdDatos]);
+        $autorizadorRow = $aStmt->fetch();
+        if ($autorizadorRow && $autorizadorRow['correo']) {
+            try {
+                $tipoNombreStr = $tipo['nombre'] ?? 'solicitud';
+                Mailer::send([
+                    'to'      => [$autorizadorRow['correo']],
+                    'subject' => "Has sido referenciado como autorizador: {$numero}",
+                    'text'    => "Hola {$autorizadorRow['nombre_completo']},\n\n" .
+                        "{$usuario['nombre_completo']} registró una solicitud de {$tipoNombreStr} ({$numero}) " .
+                        "en la que indicó que tú autorizaste la actividad o gasto.\n\n" .
+                        "La solicitud está en proceso de validación. Si no autorizaste esta actividad, contacta al administrador del sistema.",
+                    'html'    => FlujoHelpers::emailHtml(
+                        "Fuiste referenciado como autorizador",
+                        "Hola {$autorizadorRow['nombre_completo']}:\n\n" .
+                        "{$usuario['nombre_completo']} registró una solicitud de {$tipoNombreStr} ({$numero}) " .
+                        "en la que indicó que tú autorizaste la actividad o gasto.\n\n" .
+                        "La solicitud está en proceso de validación. Si no autorizaste esta actividad, contacta al administrador.",
+                        ['numero_radicado' => $numero, 'solicitante_nombre' => $autorizadorRow['nombre_completo']]
+                    ),
+                ]);
+            } catch (Throwable $eM) {
+                error_log('[create/autorizador] notif: ' . $eM->getMessage());
+            }
+        }
+    }
 }
 
 Response::json([
