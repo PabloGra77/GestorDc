@@ -186,7 +186,9 @@ export function BandejaPanel() {
   useEffect(() => {
     let cancel = false;
     setPdfUrl(null);
-    if (!detalle || !detalle.plantillaPdf?.bloques?.length) return;
+    if (!detalle) return;
+    const esLeg = typeof detalle.datosFormulario['gastos'] === 'string';
+    if (!esLeg && !detalle.plantillaPdf?.bloques?.length) return;
     setGenerandoPdf(true);
     generarFormatoBlobUrl(detalle as unknown as Parameters<typeof generarFormatoBlobUrl>[0])
       .then((url) => { if (!cancel) setPdfUrl(url); })
@@ -456,7 +458,7 @@ export function BandejaPanel() {
                         📥 Descargar PDF
                       </button>
                     </div>
-                    {detalle.plantillaPdf?.bloques?.length ? (
+                    {(detalle.plantillaPdf?.bloques?.length || typeof detalle.datosFormulario['gastos'] === 'string') ? (
                       generandoPdf ? (
                         <p className="admin-help-text">Generando el PDF del formato…</p>
                       ) : pdfUrl ? (
@@ -521,9 +523,17 @@ export function BandejaPanel() {
                                       <span className="factura-falta">⚠ sin factura</span>
                                     )}
                                     {g.numeroFactura ? <span className="leg-ocr-badge" style={{ marginLeft: 4 }}>N° {g.numeroFactura}</span> : null}
-                                    {(g._facturaAlertas && g._facturaAlertas !== '[]') ? (
-                                      <span title={(() => { try { return (JSON.parse(g._facturaAlertas) as string[]).join(' | '); } catch { return g._facturaAlertas; } })()}>⚠</span>
-                                    ) : null}
+                                    {(g._facturaAlertas && g._facturaAlertas !== '[]') ? (() => {
+                                      try {
+                                        const al = JSON.parse(g._facturaAlertas) as string[];
+                                        if (!al.length) return null;
+                                        return (
+                                          <ul className="bandeja-factura-alertas">
+                                            {al.map((a, ai) => <li key={ai}>⚠ {a}</li>)}
+                                          </ul>
+                                        );
+                                      } catch { return <span className="bandeja-factura-alerta-item">⚠ {g._facturaAlertas}</span>; }
+                                    })() : null}
                                   </td>
                                 </tr>
                               ))}

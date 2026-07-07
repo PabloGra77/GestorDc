@@ -41,6 +41,7 @@ interface LegalizacionConfig {
 interface LegalizacionPanelProps {
   onCreada?: (info: { id: number; numeroRadicado: string }) => void;
   tipoSolicitudId?: number;
+  areaId?: number;
 }
 
 const TIPOS_CUENTA = ['Ahorros', 'Corriente'];
@@ -295,7 +296,7 @@ function FilaGasto({
 }
 
 /* ─── Panel principal ───────────────────────────────────────── */
-export function LegalizacionPanel({ onCreada, tipoSolicitudId }: LegalizacionPanelProps) {
+export function LegalizacionPanel({ onCreada, tipoSolicitudId, areaId }: LegalizacionPanelProps) {
   const [paso, setPaso] = useState<1 | 2 | 3 | 4>(1);
   const [config, setConfig] = useState<LegalizacionConfig>({
     categorias: ['Alimentación', 'Viajes', 'Transporte', 'Papelería / Útiles', 'Representación', 'Otros'],
@@ -321,6 +322,9 @@ export function LegalizacionPanel({ onCreada, tipoSolicitudId }: LegalizacionPan
   const [numeroCuenta, setNumeroCuenta] = useState('');
   const [titularCuenta, setTitularCuenta] = useState('');
 
+  // Datos personales del perfil (para incluir en la solicitud)
+  const [perfilPersonal, setPerfilPersonal] = useState<Record<string, string>>({});
+
   // Paso 4: firma
   const [firma, setFirma] = useState('');
 
@@ -335,6 +339,14 @@ export function LegalizacionPanel({ onCreada, tipoSolicitudId }: LegalizacionPan
   useEffect(() => {
     api.get<LegalizacionConfig>('/config/legalizacion').then((r) => setConfig(r.data)).catch(() => {});
     api.get<UsuarioSugerido[]>('/usuarios/nombres').then((r) => setUsuarios(r.data)).catch(() => {});
+    // Pre-llenar datos bancarios y personales desde el perfil guardado
+    api.get<Record<string, string>>('/usuarios/perfil').then((r) => {
+      if (r.data.banco) setBanco(r.data.banco);
+      if (r.data.tipoCuenta) setTipoCuenta(r.data.tipoCuenta === 'corriente' ? 'Corriente' : 'Ahorros');
+      if (r.data.numeroCuenta) setNumeroCuenta(r.data.numeroCuenta);
+      if (r.data.titularCuenta) setTitularCuenta(r.data.titularCuenta);
+      setPerfilPersonal(r.data);
+    }).catch(() => {});
   }, []);
 
   const sugeridos = useMemo(() => {
@@ -406,9 +418,17 @@ export function LegalizacionPanel({ onCreada, tipoSolicitudId }: LegalizacionPan
 
     // 2. Hash para duplicados
     const hash = await hashFile(file);
+    const alertas: string[] = [];
+
+    // Verificar si este mismo archivo ya fue adjuntado en otro gasto de este formulario
+    if (hash) {
+      const duplicadoLocal = gastosRef.current.some((g, i) => i !== idx && g._facturaHash && g._facturaHash === hash);
+      if (duplicadoLocal) {
+        alertas.push('Este archivo ya fue adjuntado en otro gasto. No se permite la misma factura dos veces en una misma legalización.');
+      }
+    }
 
     // 3. OCR — no bloquea el registro si falla
-    const alertas: string[] = [];
     let nitExtraido = '';
     let numFacturaExtraido = '';
     try {
@@ -432,7 +452,11 @@ export function LegalizacionPanel({ onCreada, tipoSolicitudId }: LegalizacionPan
           alertas.push(`Lectura de baja calidad (${Math.round(ocr.confidence)}%). Verifica que la imagen sea legible.`);
         }
         const t = textoOcr.toLowerCase();
-        const marcadores = ['total', 'nit', 'valor', 'fecha'].filter((k) => t.includes(k)).length;
+        const marcadores = [
+          'total', 'nit', 'n.i.t', 'valor', 'fecha', 'factura',
+          'subtotal', 'pago', 'cufe', 'impo', 'dian', 'neto',
+          'resolucion', 'efectivo', 'recib', 'precio', 'cobr', 'fac.',
+        ].filter((k) => t.includes(k)).length;
         if (marcadores < 2) {
           alertas.push('El archivo no parece ser una factura válida. Verifica que sea el documento correcto.');
         }
@@ -519,8 +543,9 @@ export function LegalizacionPanel({ onCreada, tipoSolicitudId }: LegalizacionPan
       const sesion = getAuthSession();
       const usr = sesion?.usuario;
 
-      const payload = {
+      const payload: Record<string, unknown> = {
         tipoSolicitudId: tipoId,
+        ...(areaId ? { areaId } : {}),
         datos: {
           concepto,
           fechaPeriodo,
@@ -532,13 +557,20 @@ export function LegalizacionPanel({ onCreada, tipoSolicitudId }: LegalizacionPan
           tipoCuenta,
           numeroCuenta,
           titularCuenta,
-          // Datos personales del solicitante (auto-llenados desde el perfil)
+          // Datos personales del solicitante (desde perfil + sesión)
           ...(usr ? {
-            primerNombre: usr.primerNombre ?? usr.nombreCompleto.split(' ')[0] ?? '',
+            primerNombre: perfilPersonal.primerNombre || usr.primerNombre || usr.nombreCompleto.split(' ')[0] || '',
+            segundoNombre: perfilPersonal.segundoNombre || '',
+            primerApellido: perfilPersonal.primerApellido || usr.primerApellido || '',
+            segundoApellido: perfilPersonal.segundoApellido || '',
             nombreCompleto: usr.nombreCompleto ?? '',
             correoElectronico: usr.correo ?? '',
-            numeroDocumento: usr.numeroDocumento ?? '',
-            tipoDocumento: usr.tipoDocumento ?? '',
+            numeroDocumento: perfilPersonal.numeroDocumento || usr.numeroDocumento || '',
+            tipoDocumento: perfilPersonal.tipoDocumento || usr.tipoDocumento || '',
+            telefono: perfilPersonal.telefono || '',
+            fechaNacimiento: perfilPersonal.fechaNacimiento || '',
+            fechaExpedicion: perfilPersonal.fechaExpedicion || '',
+            lugarExpedicion: perfilPersonal.lugarExpedicion || '',
           } : {}),
         },
         documentos: {},

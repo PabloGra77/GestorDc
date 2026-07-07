@@ -15,7 +15,7 @@ $REMOTE_ROOT = "/home/u315763484/websites/LqhlHlMdz/public_html"
 if (-not (Test-Path $SSH_KEY)) { Write-Error "Clave SSH no encontrada. Ejecuta setup-ssh.ps1 primero."; exit 1 }
 
 $testAuth = & ssh -p $SSH_PORT -i $SSH_KEY -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=8 "${SSH_USER}@${SSH_HOST}" "echo OK" 2>&1
-if ($testAuth -ne "OK") { Write-Error "SSH key auth fallo. Verifica la clave en el panel de Hostinger."; exit 1 }
+if (-not ($testAuth -match "OK")) { Write-Error "SSH key auth fallo. Verifica la clave en el panel de Hostinger."; exit 1 }
 
 $SCP_OPTS = @("-P", $SSH_PORT, "-i", $SSH_KEY, "-o", "StrictHostKeyChecking=accept-new", "-o", "BatchMode=yes")
 $SSH_OPTS = @("-p", $SSH_PORT, "-i", $SSH_KEY, "-o", "StrictHostKeyChecking=accept-new", "-o", "BatchMode=yes")
@@ -73,6 +73,9 @@ if ($frontendChanged.Count -gt 0) {
         Write-Host "  assets/$($_.Name)"
         SCP-Put $_.FullName "assets/$($_.Name)"
     }
+
+    # Garantizar permisos correctos (SCP desde Windows puede crear directorios con 700)
+    SSH-Run "chmod 755 $REMOTE_ROOT/assets"
 
     Write-Host "Frontend subido OK" -ForegroundColor Green
     $step++

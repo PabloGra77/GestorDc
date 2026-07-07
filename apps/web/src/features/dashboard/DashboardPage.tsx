@@ -12,6 +12,7 @@ import { BulkCreatePanel } from '../admin/BulkCreatePanel';
 import { PersonalAutorizadoPanel } from '../admin/PersonalAutorizadoPanel';
 import { ConfiguracionSmtpPanel } from '../admin/ConfiguracionSmtpPanel';
 import { LegalizacionConfigPanel } from '../admin/LegalizacionConfigPanel';
+import { ProfilePanel } from '../admin/ProfilePanel';
 import { InicioStats, InicioRecientes, SeguimientoRadicado } from './InicioStats';
 import type { Role } from '../../types/role';
 import type { Radicado, VerificarRadicadoResponse } from '../../types/radicado';
@@ -85,6 +86,9 @@ export function DashboardPage() {
 	const session = getAuthSession();
 	const [activeSection, setActiveSection] = useState('Inicio');
 	const [activeAdminModule, setActiveAdminModule] = useState<AdminModule>('Usuarios');
+	const [perfilBannerDismissed, setPerfilBannerDismissed] = useState(() => {
+		try { return localStorage.getItem('payops:perfil:banner:' + (session?.usuario.correo ?? '')) === '1'; } catch { return false; }
+	});
 	const [isLoadingAdminData, setIsLoadingAdminData] = useState(false);
 	const [roles, setRoles] = useState<Role[]>([]);
 	const [usuarios, setUsuarios] = useState<Usuario[]>([]);
@@ -830,6 +834,20 @@ export function DashboardPage() {
 		>
 			{activeSection === 'Inicio' ? (
 				<section className="inicio-layout">
+					{!perfilBannerDismissed && (
+						<div className="profile-verify-banner">
+							<span>👤 <strong>Completa tu perfil:</strong> verifica tus datos personales y cuenta bancaria para agilizar futuras solicitudes.</span>
+							<div className="pv-actions">
+								<button type="button" className="admin-primary-button" style={{ fontSize: 12, padding: '6px 14px' }}
+									onClick={() => setActiveSection('Mi perfil')}>Ir a Mi perfil</button>
+								<button type="button" className="admin-ghost-button" style={{ fontSize: 12, padding: '6px 10px' }}
+									onClick={() => {
+										setPerfilBannerDismissed(true);
+										try { localStorage.setItem('payops:perfil:banner:' + (session?.usuario.correo ?? ''), '1'); } catch { /* ok */ }
+									}}>✕</button>
+							</div>
+						</div>
+					)}
 					<SeguimientoRadicado />
 
 					<div className="inicio-grid">
@@ -1520,6 +1538,8 @@ export function DashboardPage() {
 
 			{activeSection === 'Radicaciones' ? <RadicacionesModule /> : null}
 
+			{activeSection === 'Mi perfil' ? <ProfilePanel /> : null}
+
 			{isUserPermisosOpen && usuarioPermisosObjetivo ? (
 				<div className="admin-permissions-overlay" role="dialog" aria-modal="true" aria-label="Permisos de usuario">
 					<div className="admin-permissions-modal card-surface">
@@ -1568,7 +1588,7 @@ export function DashboardPage() {
 				</div>
 			) : null}
 
-			{activeSection !== 'Inicio' && activeSection !== 'Panel administrador' && activeSection !== 'Radicaciones' ? (
+			{activeSection !== 'Inicio' && activeSection !== 'Panel administrador' && activeSection !== 'Radicaciones' && activeSection !== 'Mi perfil' ? (
 				<section className="card-surface module-card">
 					<h3>{activeSection}</h3>
 					<p>Vista en construcción. Este módulo se conectará en el siguiente paso.</p>

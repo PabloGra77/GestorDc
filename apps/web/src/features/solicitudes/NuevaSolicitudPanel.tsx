@@ -828,7 +828,7 @@ export function NuevaSolicitudPanel({ onCreada }: NuevaSolicitudPanelProps) {
             const esLegal     = norm(tipoSel.slug) === 'legalizacion' || norm(tipoSel.nombre) === 'legalizacion';
             const esViat      = norm(tipoSel.slug) === 'viaticos'    || norm(tipoSel.nombre) === 'viaticos';
             const esAnticipo  = norm(tipoSel.slug) === 'anticipo'    || norm(tipoSel.nombre) === 'anticipo';
-            if (esLegal)    return <LegalizacionPanel tipoSolicitudId={tipoSel.id} onCreada={onCreada} />;
+            if (esLegal)    return <LegalizacionPanel tipoSolicitudId={tipoSel.id} areaId={areaSel?.id} onCreada={onCreada} />;
             if (esViat)     return <ViaticosPanel     onCreada={onCreada} />;
             if (esAnticipo) return <AnticipOPanel     onCreada={onCreada} />;
             return (

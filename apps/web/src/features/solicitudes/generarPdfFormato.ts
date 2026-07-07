@@ -80,6 +80,7 @@ interface SolicitudParaPdf {
   movimientos: Movimiento[];
   firmas?: Record<string, string> | null;
   plantillaPdf?: PlantillaPdf | null;
+  tipoSlug?: string;
 }
 
 // Fecha de la solicitud (creación) en formato largo; cae a hoy solo si no hay dato.
@@ -532,6 +533,12 @@ async function generarPdfPlantilla(s: SolicitudParaPdf, pl: PlantillaPdf, filena
  * embebido (iframe), sin descargarlo. Solo aplica si el tipo tiene plantilla PDF.
  */
 export async function generarFormatoBlobUrl(s: SolicitudParaPdf): Promise<string | null> {
+  const esLegalizacion = s.tipoSlug === 'legalizacion'
+    || typeof s.datosFormulario['gastos'] === 'string';
+  if (esLegalizacion) {
+    const url = _generarPdfEspecial(s, { bloburl: true });
+    return typeof url === 'string' ? url : null;
+  }
   if (!s.plantillaPdf) return null;
   const url = await generarPdfPlantilla(s, s.plantillaPdf, undefined, { bloburl: true });
   return typeof url === 'string' ? url : null;
@@ -587,11 +594,10 @@ export async function descargarPreviewPlantilla(
   await generarPdfPlantilla(sintetica, plantilla, filename);
 }
 
-export function generarPdfFormato(s: SolicitudParaPdf): void {
-  if (s.plantillaPdf) {
-    void generarPdfPlantilla(s, s.plantillaPdf);
-    return;
-  }
+function _generarPdfEspecial(s: SolicitudParaPdf, opts?: { bloburl?: boolean }): string | void {
+  const esLegalizacion = s.tipoSlug === 'legalizacion'
+    || typeof s.datosFormulario['gastos'] === 'string';
+
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   const pageWidth = doc.internal.pageSize.getWidth();
   const margin = 18;
@@ -659,6 +665,22 @@ export function generarPdfFormato(s: SolicitudParaPdf): void {
   }
   y += 8;
 
+  // Título principal centrado (para legalizaciones, usa encabezado propio)
+  if (esLegalizacion) {
+    doc.setDrawColor(212, 175, 55);
+    doc.setLineWidth(0.8);
+    doc.line(margin, y, pageWidth - margin, y);
+    y += 6;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(14);
+    doc.setTextColor(7, 11, 29);
+    doc.text('SOLICITUD DE LEGALIZACIÓN DE GASTOS', pageWidth / 2, y, { align: 'center' });
+    y += 5;
+    doc.setLineWidth(0.5);
+    doc.line(margin, y, pageWidth - margin, y);
+    y += 8;
+  }
+
   // Solicitante
   doc.setDrawColor(212, 175, 55);
   doc.setLineWidth(0.5);
@@ -682,6 +704,139 @@ export function generarPdfFormato(s: SolicitudParaPdf): void {
     doc.text(`Documento: ${s.solicitanteDocumento}`, margin, y); y += 5;
   }
   y += 4;
+
+  // Párrafo narrativo de legalización
+  if (esLegalizacion) {
+    const concepto = String(s.datosFormulario['concepto'] || '');
+    const periodo = String(s.datosFormulario['fechaPeriodo'] || '');
+    const autorizador = String(s.datosFormulario['autorizadorNombre'] || '');
+    const banco = String(s.datosFormulario['banco'] || '');
+    const tipoCuenta = String(s.datosFormulario['tipoCuenta'] || '');
+    const numCuenta = String(s.datosFormulario['numeroCuenta'] || '');
+    const titular = String(s.datosFormulario['titularCuenta'] || '');
+    const totalGastosRaw = String(s.datosFormulario['totalGastos'] || '');
+    const totalFmt = totalGastosRaw
+      ? `$${Number(totalGastosRaw.replace(/[^0-9.]/g, '')).toLocaleString('es-CO')}`
+      : '';
+    const tipoDoc = s.solicitanteDocumento ? 'identificado(a) con documento N°' : '';
+    const narrativa = [
+      `Yo, ${s.solicitanteNombre || 'el(la) suscrito(a)'}${tipoDoc ? ', ' + tipoDoc + ' ' + (s.solicitanteDocumento || '') : ''},`,
+      `por medio del presente documento solicito la legalización de gastos` +
+        (concepto ? ` por concepto de "${concepto}"` : '') +
+        (totalFmt ? ` por un valor total de ${totalFmt}` : '') +
+        (periodo ? `, correspondiente al período ${periodo}` : '') + '.',
+      autorizador ? `Gastos autorizados por: ${autorizador}.` : '',
+      (banco && numCuenta)
+        ? `Solicito el desembolso a cuenta ${tipoCuenta || 'bancaria'} N° ${numCuenta} del banco ${banco}${titular ? ', a nombre de ' + titular : ''}.`
+        : '',
+    ].filter(Boolean).join(' ');
+
+    if (y > 240) { doc.addPage(); y = margin; }
+    doc.setFontSize(10);
+    doc.setTextColor(15, 23, 42);
+    doc.setFont('helvetica', 'normal');
+    const split = doc.splitTextToSize(narrativa, pageWidth - margin * 2);
+    doc.text(split, margin, y);
+    y += split.length * 5 + 6;
+  }
+
+  // Bloque especial: gastos de legalización (datosFormulario.gastos = JSON array)
+  const rawGastos = s.datosFormulario['gastos'];
+  if (rawGastos && typeof rawGastos === 'string') {
+    try {
+      const gastosArr = JSON.parse(rawGastos) as Record<string, string>[];
+      if (Array.isArray(gastosArr) && gastosArr.length > 0) {
+        if (y > 240) { doc.addPage(); y = margin; }
+        doc.setDrawColor(212, 175, 55);
+        doc.line(margin, y, pageWidth - margin, y);
+        y += 5;
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(184, 144, 31);
+        doc.setFontSize(11);
+        doc.text('LEGALIZACIÓN DE GASTOS', margin, y);
+        y += 5;
+        const concepto = String(s.datosFormulario['concepto'] || '');
+        const periodo = String(s.datosFormulario['fechaPeriodo'] || '');
+        const autorizador = String(s.datosFormulario['autorizadorNombre'] || '');
+        doc.setFontSize(9);
+        doc.setTextColor(15, 23, 42);
+        doc.setFont('helvetica', 'normal');
+        if (concepto) { doc.text(`Concepto: ${concepto}`, margin, y); y += 4; }
+        if (periodo) { doc.text(`Período: ${periodo}`, margin, y); y += 4; }
+        if (autorizador) { doc.text(`Autorizó: ${autorizador}`, margin, y); y += 4; }
+        y += 2;
+        // Tabla de gastos
+        const cols = ['#', 'Categoría', 'Descripción', 'Fecha', 'Valor', 'Proveedor'];
+        const colW = [(pageWidth - margin * 2) * 0.04, 0.14, 0.22, 0.10, 0.12, 0.16];
+        const absW = colW.map((r) => (pageWidth - margin * 2) * r);
+        // Header row
+        doc.setFillColor(212, 175, 55);
+        doc.rect(margin, y, pageWidth - margin * 2, 5, 'F');
+        doc.setTextColor(7, 11, 29);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(7);
+        let cx = margin;
+        cols.forEach((col, i) => {
+          doc.text(col, cx + 1, y + 3.5);
+          cx += absW[i];
+        });
+        y += 5;
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(15, 23, 42);
+        let total = 0;
+        gastosArr.forEach((g, idx) => {
+          if (y > 275) { doc.addPage(); y = margin; }
+          const valor = Number(String(g.valor || '0').replace(/[^0-9]/g, ''));
+          total += valor;
+          const vals = [
+            String(idx + 1),
+            g.categoria || '',
+            g.descripcion || '',
+            g.fechaGasto || '',
+            `$${valor.toLocaleString('es-CO')}`,
+            g.nombreProveedor || '',
+          ];
+          const bg = idx % 2 === 0 ? [245, 245, 248] : [255, 255, 255];
+          doc.setFillColor(bg[0], bg[1], bg[2]);
+          doc.rect(margin, y, pageWidth - margin * 2, 4.5, 'F');
+          cx = margin;
+          vals.forEach((v, i) => {
+            const txt = doc.splitTextToSize(v, absW[i] - 1);
+            doc.text(txt[0] || '', cx + 1, y + 3.2);
+            cx += absW[i];
+          });
+          y += 4.5;
+          if (g._factura) {
+            doc.setTextColor(100, 100, 100);
+            doc.setFontSize(6.5);
+            doc.text(`  Factura: ${g._factura}${g.numeroFactura ? ' · N°' + g.numeroFactura : ''}${g.nitProveedor ? ' · NIT ' + g.nitProveedor : ''}`, margin + 6, y + 1.5);
+            doc.setFontSize(7);
+            doc.setTextColor(15, 23, 42);
+            y += 3;
+          }
+        });
+        // Total row
+        doc.setFillColor(7, 11, 29);
+        doc.rect(margin, y, pageWidth - margin * 2, 5, 'F');
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(212, 175, 55);
+        doc.text('TOTAL', margin + 1, y + 3.5);
+        doc.text(`$${total.toLocaleString('es-CO')}`, margin + absW[0] + absW[1] + absW[2] + absW[3] + 1, y + 3.5);
+        y += 7;
+        // Cuenta bancaria
+        const banco = String(s.datosFormulario['banco'] || '');
+        const nroCuenta = String(s.datosFormulario['numeroCuenta'] || '');
+        const titular = String(s.datosFormulario['titularCuenta'] || '');
+        if (banco || nroCuenta) {
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(9);
+          doc.setTextColor(15, 23, 42);
+          doc.text(`Cuenta para pago: ${banco} ${String(s.datosFormulario['tipoCuenta'] || '')} — ${nroCuenta} (${titular})`, margin, y);
+          y += 6;
+        }
+      }
+    } catch { /* no era gastos válidos */ }
+  }
 
   // Datos por grupo
   const grupos = new Map<string, CampoPlantilla[]>();
@@ -768,48 +923,59 @@ export function generarPdfFormato(s: SolicitudParaPdf): void {
     });
   }
 
-  // Firmas: profesional (izq), coordinador (centro), contabilidad (der)
+  // Firmas
   const firmas = s.firmas || {};
-  const firmaProfesional = firmas.profesional || firmas.analista || '';
-  const firmaCoordinador = firmas.coordinador || '';
-  const firmaContabilidad = firmas.contabilidad || '';
-  // Reservar espacio para firmas (40mm). Si no cabe, nueva pagina.
   if (y > 230) { doc.addPage(); y = margin; }
   const firmasY = Math.max(y + 6, 235);
-  const colWidth = (pageWidth - margin * 2) / 3;
-  const firmaImgH = 22;
-  const firmaImgW = colWidth - 8;
+
+  // Para legalizaciones: 4 firmas (solicitante, autorizador, analista/coordinador, contabilidad)
+  // Para otros: 3 firmas (profesional, coordinador, contabilidad)
+  const numCols = esLegalizacion ? 4 : 3;
+  const colWidth = (pageWidth - margin * 2) / numCols;
+  const firmaImgH = 18;
+  const firmaImgW = colWidth - 6;
+
+  // Extraer nombres de validadores desde movimientos
+  const aprobacionPorPaso: Record<string, string> = {};
+  s.movimientos.forEach((m) => {
+    if ((m.accion === 'validada' || m.accion === 'reenviada' || m.accion === 'aprobada') && m.paso && m.usuarioNombre) {
+      aprobacionPorPaso[m.paso] = m.usuarioNombre;
+    }
+  });
 
   const drawFirma = (dataUrl: string, label: string, nota: string, colIndex: number) => {
-    const cx = margin + colWidth * colIndex + 4;
+    const cx = margin + colWidth * colIndex + 3;
     const lineY = firmasY + firmaImgH + 2;
     if (dataUrl && dataUrl.startsWith('data:image')) {
-      try {
-        doc.addImage(dataUrl, 'PNG', cx, firmasY, firmaImgW, firmaImgH);
-      } catch {
-        // ignorar errores de imagen
-      }
+      try { doc.addImage(dataUrl, 'PNG', cx, firmasY, firmaImgW, firmaImgH); } catch { /* ok */ }
     }
-    // Linea de firma
     doc.setDrawColor(15, 23, 42);
     doc.setLineWidth(0.3);
     doc.line(cx, lineY, cx + firmaImgW, lineY);
-    // Etiqueta
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(9);
+    doc.setFontSize(8);
     doc.setTextColor(15, 23, 42);
-    doc.text(label, cx + firmaImgW / 2, lineY + 4, { align: 'center' });
+    const labelLines = doc.splitTextToSize(label, firmaImgW);
+    doc.text(labelLines[0], cx + firmaImgW / 2, lineY + 4, { align: 'center' });
     if (nota) {
       doc.setFont('helvetica', 'normal');
-      doc.setFontSize(7);
+      doc.setFontSize(6.5);
       doc.setTextColor(120, 120, 120);
       doc.text(nota, cx + firmaImgW / 2, lineY + 8, { align: 'center' });
     }
   };
 
-  drawFirma(firmaProfesional, 'Profesional solicitante', 'Diligenciamiento', 0);
-  drawFirma(firmaCoordinador, 'Coordinador', 'Validación', 1);
-  drawFirma(firmaContabilidad, 'Contabilidad', 'Finalización', 2);
+  if (esLegalizacion) {
+    const autorizadorNombre = String(s.datosFormulario['autorizadorNombre'] || '');
+    drawFirma(firmas.profesional || '', s.solicitanteNombre || 'Solicitante', 'Solicita', 0);
+    drawFirma('', autorizadorNombre || 'Quien autoriza el gasto', 'Autorizó el gasto', 1);
+    drawFirma(firmas.analista || firmas.coordinador || '', aprobacionPorPaso['analista'] || aprobacionPorPaso['coordinador'] || 'Analista / Coordinador', 'Validó', 2);
+    drawFirma(firmas.contabilidad || '', aprobacionPorPaso['contabilidad'] || aprobacionPorPaso['director'] || 'Área final', 'Aprobó', 3);
+  } else {
+    drawFirma(firmas.profesional || firmas.analista || '', 'Profesional solicitante', 'Diligenciamiento', 0);
+    drawFirma(firmas.coordinador || '', 'Coordinador', 'Validación', 1);
+    drawFirma(firmas.contabilidad || '', 'Contabilidad', 'Finalización', 2);
+  }
 
   // Footer en cada pagina
   const totalPages = doc.getNumberOfPages();
@@ -825,5 +991,19 @@ export function generarPdfFormato(s: SolicitudParaPdf): void {
     );
   }
 
+  if (opts?.bloburl) {
+    return doc.output('bloburl') as unknown as string;
+  }
   doc.save(`Payops_${s.numeroRadicado}.pdf`);
 }
+
+export function generarPdfFormato(s: SolicitudParaPdf): void {
+  const esLegalizacion = s.tipoSlug === 'legalizacion'
+    || typeof s.datosFormulario['gastos'] === 'string';
+  if (s.plantillaPdf && !esLegalizacion) {
+    void generarPdfPlantilla(s, s.plantillaPdf);
+    return;
+  }
+  _generarPdfEspecial(s);
+}
+

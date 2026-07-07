@@ -35,14 +35,10 @@ function labelPaso(paso: string | null): string {
 
 function labelEstado(s: Pick<SolicitudResumen, 'estado' | 'pasoActual' | 'ultimoComentario'>): string {
   if (s.estado === 'en_validacion') {
-    return `En revisión · validando por ${labelPaso(s.pasoActual)}`;
+    return s.pasoActual ? `En revisión — ${labelPaso(s.pasoActual)}` : 'En revisión';
   }
-  if (s.estado === 'devuelto') {
-    return s.ultimoComentario ? `Devuelto: ${s.ultimoComentario}` : 'Devuelto';
-  }
-  if (s.estado === 'rechazado') {
-    return s.ultimoComentario ? `Solicitud denegada: ${s.ultimoComentario}` : 'Solicitud denegada';
-  }
+  if (s.estado === 'devuelto') return 'Devuelto';
+  if (s.estado === 'rechazado') return 'Rechazado';
   return ESTADO_LABEL[s.estado] || s.estado;
 }
 
@@ -200,12 +196,129 @@ function LegalizarModal({ solicitud, onClose, onDone }: {
   );
 }
 
+interface Movimiento {
+  id: number;
+  accion: string;
+  paso: string | null;
+  estadoResultado: string | null;
+  usuarioNombre: string | null;
+  comentario: string | null;
+  creadoEn: string;
+}
+
+interface DetalleCompleto {
+  id: number;
+  numeroRadicado: string;
+  estado: string;
+  movimientos: Movimiento[];
+}
+
+function DetalleDevueltoModal({ solicitud, onClose, onRenviada }: {
+  solicitud: SolicitudResumen;
+  onClose: () => void;
+  onRenviada: () => void;
+}) {
+  const [detalle, setDetalle] = useState<DetalleCompleto | null>(null);
+  const [loadingDetalle, setLoadingDetalle] = useState(true);
+  const [comentario, setComentario] = useState('');
+  const [reenviando, setRenviando] = useState(false);
+  const [err, setErr] = useState('');
+  const [msg, setMsg] = useState('');
+
+  useEffect(() => {
+    api.get(`/solicitudes/${solicitud.id}`).then((r) => {
+      setDetalle(r.data as DetalleCompleto);
+    }).catch(() => {
+      setErr('No se pudo cargar el detalle.');
+    }).finally(() => setLoadingDetalle(false));
+  }, [solicitud.id]);
+
+  async function reenviar() {
+    setRenviando(true);
+    setErr('');
+    try {
+      const body: Record<string, unknown> = {};
+      if (comentario.trim()) body.comentario = comentario.trim();
+      await api.post(`/solicitudes/${solicitud.id}/reenviar`, body);
+      setMsg('Solicitud reenviada. Los validadores serán notificados.');
+      setTimeout(() => { onRenviada(); }, 1500);
+    } catch (e: unknown) {
+      const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      setErr(msg || 'No se pudo reenviar la solicitud.');
+    } finally {
+      setRenviando(false);
+    }
+  }
+
+  return (
+    <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="modal-box" style={{ maxWidth: 600, width: '95%' }}>
+        <div className="modal-head">
+          <h3>{solicitud.numeroRadicado} — {solicitud.estado === 'devuelto' ? 'Solicitud devuelta' : 'Solicitud rechazada'}</h3>
+          <button type="button" className="modal-close" onClick={onClose}>✕</button>
+        </div>
+
+        {loadingDetalle ? <p className="admin-help-text">Cargando historial…</p> : null}
+        {err ? <div className="admin-error">{err}</div> : null}
+        {msg ? <div className="admin-success">{msg}</div> : null}
+
+        {detalle ? (
+          <>
+            <h4 style={{ marginBottom: 8, marginTop: 12 }}>Historial de acciones</h4>
+            <ul className="bandeja-movimientos" style={{ marginBottom: 16 }}>
+              {detalle.movimientos.map((m) => (
+                <li key={m.id} className={`mov-accion-${m.accion}`}>
+                  <span className="bandeja-mov-accion">{m.accion}</span>
+                  {m.usuarioNombre ? <span> · {m.usuarioNombre}</span> : null}
+                  {m.comentario ? <p className="admin-help-text" style={{ marginTop: 2 }}>"{m.comentario}"</p> : null}
+                  <span className="admin-help-text" style={{ display: 'block' }}>{m.creadoEn}</span>
+                </li>
+              ))}
+            </ul>
+
+            {solicitud.estado === 'devuelto' && !msg ? (
+              <div style={{ borderTop: '1px solid var(--border)', paddingTop: 14 }}>
+                <p className="admin-help-text" style={{ marginBottom: 8 }}>
+                  Corrije los problemas mencionados arriba y haz clic en <strong>Reenviar</strong> para volver a someter la solicitud al flujo de validación.
+                </p>
+                <textarea
+                  className="admin-input"
+                  placeholder="Comentario sobre las correcciones realizadas (opcional)"
+                  value={comentario}
+                  onChange={(e) => setComentario(e.target.value)}
+                  rows={3}
+                  style={{ marginBottom: 10, width: '100%' }}
+                />
+                <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                  <button type="button" className="admin-ghost-button" onClick={onClose} disabled={reenviando}>
+                    Cancelar
+                  </button>
+                  <button type="button" className="admin-primary-button" onClick={reenviar} disabled={reenviando}>
+                    {reenviando ? 'Reenviando…' : 'Reenviar solicitud'}
+                  </button>
+                </div>
+              </div>
+            ) : null}
+
+            {solicitud.estado === 'rechazado' ? (
+              <p className="admin-help-text" style={{ marginTop: 8, color: '#c0392b' }}>
+                Esta solicitud fue rechazada de forma definitiva y no puede reenviarse.
+              </p>
+            ) : null}
+          </>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 export function MisSolicitudesPanel({ refresco }: { refresco?: number }) {
   const [items, setItems] = useState<SolicitudResumen[]>([]);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState('');
   const [descargando, setDescargando] = useState<number | null>(null);
   const [legalizar, setLegalizar] = useState<SolicitudResumen | null>(null);
+  const [verDetalle, setVerDetalle] = useState<SolicitudResumen | null>(null);
   const [msg, setMsg] = useState('');
 
   async function descargarPdf(id: number) {
@@ -269,43 +382,59 @@ export function MisSolicitudesPanel({ refresco }: { refresco?: number }) {
         ) : null}
         {items.map((s) => (
           <div key={s.id} className="mis-sol-item card-surface">
-            <div>
-              <strong>{s.numeroRadicado}</strong>
-              <p className="admin-help-text">
-                {s.areaNombre} · {s.tipoNombre}
-              </p>
-              <p className="admin-help-text">
-                Creado: {formatFecha(s.creadoEn)}
-              </p>
+            {/* Cabecera: radicado + fecha */}
+            <div className="mis-sol-head">
+              <div>
+                <strong>{s.numeroRadicado}</strong>
+                <span className="mis-sol-tipo">{s.areaNombre} · {s.tipoNombre}</span>
+              </div>
+              <span className="mis-sol-fecha">{formatFecha(s.creadoEn)}</span>
             </div>
-            <div className="mis-sol-meta">
-              <span className={`mis-sol-estado mis-sol-${s.estado}`}>
-                {labelEstado(s)}
-              </span>
-              {s.alertasCount > 0 ? (
-                <span className="mis-sol-alertas">⚠ {s.alertasCount} alerta(s)</span>
+
+            {/* Pie: estado + acciones */}
+            <div className="mis-sol-foot">
+              <div className="mis-sol-estado-row">
+                <span className={`mis-sol-estado mis-sol-${s.estado}`}>
+                  {labelEstado(s)}
+                </span>
+                {s.alertasCount > 0 ? (
+                  <span className="mis-sol-alertas">⚠ {s.alertasCount}</span>
+                ) : null}
+              </div>
+              {/* Comentario resumido para devuelto/rechazado */}
+              {(s.estado === 'devuelto' || s.estado === 'rechazado') && s.ultimoComentario ? (
+                <p className="mis-sol-comentario-dev">"{s.ultimoComentario}"</p>
               ) : null}
-              {(s.estado === 'por_legalizar' || s.estado === 'en_legalizacion') ? (
-                <button
-                  type="button"
-                  className="admin-primary-button"
-                  onClick={() => setLegalizar(s)}
-                  style={{ fontSize: 11, padding: '6px 12px' }}
-                >
-                  {s.estado === 'en_legalizacion' ? '↻ Re-enviar legalización' : '💸 Legalizar (subir facturas)'}
-                </button>
-              ) : null}
-              {(s.estado === 'aprobado' || s.estado === 'legalizado' || s.estado === 'por_legalizar' || s.estado === 'en_legalizacion') ? (
-                <button
-                  type="button"
-                  className="admin-ghost-button"
-                  onClick={() => descargarPdf(s.id)}
-                  disabled={descargando === s.id}
-                  style={{ fontSize: 11, padding: '6px 12px' }}
-                >
-                  {descargando === s.id ? 'Generando…' : '⬇ Descargar PDF'}
-                </button>
-              ) : null}
+              <div className="mis-sol-actions">
+                {(s.estado === 'devuelto' || s.estado === 'rechazado') ? (
+                  <button
+                    type="button"
+                    className={s.estado === 'devuelto' ? 'admin-primary-button' : 'admin-ghost-button'}
+                    onClick={() => setVerDetalle(s)}
+                  >
+                    {s.estado === 'devuelto' ? 'Ver motivo / Corregir' : 'Ver motivo'}
+                  </button>
+                ) : null}
+                {(s.estado === 'por_legalizar' || s.estado === 'en_legalizacion') ? (
+                  <button
+                    type="button"
+                    className="admin-primary-button"
+                    onClick={() => setLegalizar(s)}
+                  >
+                    {s.estado === 'en_legalizacion' ? '↻ Re-enviar legalización' : '💸 Legalizar'}
+                  </button>
+                ) : null}
+                {(s.estado === 'aprobado' || s.estado === 'legalizado' || s.estado === 'por_legalizar' || s.estado === 'en_legalizacion') ? (
+                  <button
+                    type="button"
+                    className="admin-ghost-button"
+                    onClick={() => descargarPdf(s.id)}
+                    disabled={descargando === s.id}
+                  >
+                    {descargando === s.id ? 'Generando…' : '⬇ PDF'}
+                  </button>
+                ) : null}
+              </div>
             </div>
           </div>
         ))}
@@ -316,6 +445,14 @@ export function MisSolicitudesPanel({ refresco }: { refresco?: number }) {
           solicitud={legalizar}
           onClose={() => setLegalizar(null)}
           onDone={() => { setLegalizar(null); setMsg('Legalización enviada. El área final la revisará.'); cargar(); }}
+        />
+      ) : null}
+
+      {verDetalle ? (
+        <DetalleDevueltoModal
+          solicitud={verDetalle}
+          onClose={() => setVerDetalle(null)}
+          onRenviada={() => { setVerDetalle(null); setMsg('Solicitud reenviada. Los validadores han sido notificados.'); cargar(); }}
         />
       ) : null}
     </section>
