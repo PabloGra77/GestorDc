@@ -548,6 +548,51 @@ export async function generarFormatoBlobUrl(s: SolicitudParaPdf): Promise<string
   return typeof url === 'string' ? url : null;
 }
 
+export async function previewPlantillaBlobUrl(
+  plantilla: PlantillaPdf,
+  campos: CampoPlantilla[],
+): Promise<string | null> {
+  const datos: Record<string, unknown> = {};
+  for (const c of campos) {
+    if (c.type === 'valor-pesos' || c.type === 'number') datos[c.key] = '1500000';
+    else if (c.type === 'email') datos[c.key] = 'ejemplo@correo.com';
+    else if (c.type === 'date') datos[c.key] = new Date().toISOString().slice(0, 10);
+    else if (c.type === 'mes-anio') datos[c.key] = '05/2026';
+    else if (c.type === 'cc' || c.type === 'nit') datos[c.key] = '1.020.456.789';
+    else if (c.type === 'tipo-doc') datos[c.key] = 'CC';
+    else if (c.type === 'banco-select') datos[c.key] = 'Bancolombia';
+    else if (c.type === 'cuenta-bancaria') datos[c.key] = '0123456789';
+    else if (c.type === 'direccion') datos[c.key] = 'Carrera 7 #74-21, Bogotá, Colombia';
+    else if (c.type === 'select') datos[c.key] = 'Opción ejemplo';
+    else if (c.type === 'textarea') datos[c.key] = 'Texto de ejemplo para verificar el diligenciamiento.';
+    else if (c.type === 'file') datos[c.key] = '(archivo cargado)';
+    else if (c.type === 'texto-fijo') datos[c.key] = c.label;
+    else datos[c.key] = c.label;
+  }
+  datos['valorPesos__letras'] = 'UN MILLÓN QUINIENTOS MIL PESOS M/CTE';
+  datos['ciudad'] = 'Bogotá D.C.';
+  const sintetica: SolicitudParaPdf = {
+    numeroRadicado: 'EJ-2026-00001',
+    tipoNombre: 'Vista previa',
+    areaNombre: '',
+    solicitanteNombre: 'Juan Pérez García',
+    solicitanteCorreo: 'juan.perez@ejemplo.com',
+    solicitanteDocumento: '1.020.456.789',
+    datosFormulario: datos,
+    documentos: {},
+    alertas: [],
+    estado: 'borrador',
+    creadoEn: new Date().toISOString(),
+    aprobadoEn: null,
+    camposPlantilla: campos,
+    movimientos: [],
+    firmas: null,
+    plantillaPdf: plantilla,
+  };
+  const url = await generarPdfPlantilla(sintetica, plantilla, undefined, { bloburl: true });
+  return typeof url === 'string' ? url : null;
+}
+
 export async function descargarPreviewPlantilla(
   plantilla: PlantillaPdf,
   campos: CampoPlantilla[],

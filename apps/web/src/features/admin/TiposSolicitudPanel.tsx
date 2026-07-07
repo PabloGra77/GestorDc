@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { api } from '../../services/http/api';
-import { descargarPreviewPlantilla } from '../solicitudes/generarPdfFormato';
+import { descargarPreviewPlantilla, previewPlantillaBlobUrl } from '../solicitudes/generarPdfFormato';
 import { PreviewFormularioModal, PreviewFormularioContenido } from '../../components/PreviewFormularioModal';
 import '../../styles/modulos-editor.css';
 
@@ -1395,6 +1395,8 @@ function PlantillaPdfEditor({ plantilla, onChange, campos, onCamposChange, onIns
   const [pantallaCompleta, setPantallaCompleta] = useState(false);
   const [ocultarOverlap, setOcultarOverlap] = useState(false);
   const [previewFormOpen, setPreviewFormOpen] = useState(false);
+  const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
+  const [cargandoPdfPreview, setCargandoPdfPreview] = useState(false);
   const [zoomDoc, setZoomDoc] = useState(1);
   const [vistaPreviaDatos, setVistaPreviaDatos] = useState(false);
   const [vistaCentro, setVistaCentro] = useState<'hoja' | 'formulario'>('hoja');
@@ -1893,10 +1895,19 @@ function PlantillaPdfEditor({ plantilla, onChange, campos, onCamposChange, onIns
         <button
           type="button"
           className="bloque-rapido-btn plantilla-preview-btn"
-          title="Descarga el PDF con los datos rellenados con valores de ejemplo"
-          onClick={() => descargarPreviewPlantilla(plantilla, campos, 'ejemplo')}
+          title="Muestra el PDF real generado con datos de ejemplo — igual a lo que verá el solicitante"
+          onClick={async () => {
+            if (pdfPreviewUrl) { setPdfPreviewUrl(null); return; }
+            setCargandoPdfPreview(true);
+            try {
+              const url = await previewPlantillaBlobUrl(plantilla, campos);
+              setPdfPreviewUrl(url);
+            } finally {
+              setCargandoPdfPreview(false);
+            }
+          }}
         >
-          👁️ Ver ejemplo con datos
+          {cargandoPdfPreview ? '⏳ Generando…' : pdfPreviewUrl ? '✕ Cerrar PDF' : '👁️ Ver PDF real'}
         </button>
         <button
           type="button"
@@ -2213,6 +2224,16 @@ function PlantillaPdfEditor({ plantilla, onChange, campos, onCamposChange, onIns
             ))}
           </div>
         ) : null}
+        {pdfPreviewUrl && (
+          <div className="plantilla-pdf-preview-panel">
+            <div className="plantilla-pdf-preview-header">
+              <span>📄 PDF real generado — así lo verá el solicitante</span>
+              <a href={pdfPreviewUrl} download="Vista_previa_plantilla.pdf" className="plantilla-pdf-preview-dl">⬇ Descargar</a>
+              <button type="button" onClick={() => setPdfPreviewUrl(null)} className="plantilla-pdf-preview-close">✕</button>
+            </div>
+            <iframe src={pdfPreviewUrl} className="plantilla-pdf-preview-iframe" title="Vista previa PDF" />
+          </div>
+        )}
         <div className="plantilla-hojas-canvas">
         {vistaCentro === 'formulario' ? (
           <div className="plantilla-form-live"><PreviewFormularioContenido campos={camposDelFormulario()} plantillaPdf={plantilla} /></div>

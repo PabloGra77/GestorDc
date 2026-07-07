@@ -819,6 +819,68 @@ export function ViaticosPanel({ onCreada }: { onCreada?: (info: { id: number; nu
             ) : null}
           </div>
 
+          {/* Buscar en plataformas reales */}
+          {ciudadOrigen && ciudadDestino && fechaIda && (() => {
+            const iO = IATA_MAP[ciudadOrigen] || ciudadOrigen.slice(0, 3).toUpperCase();
+            const iD = IATA_MAP[ciudadDestino] || ciudadDestino.slice(0, 3).toUpperCase();
+            const comp = fechaIda.replace(/-/g, '');
+            const compR = (esIdaVuelta && fechaRegreso) ? fechaRegreso.replace(/-/g, '') : '';
+            const rt = esIdaVuelta && !!fechaRegreso;
+            const ddmmIda = fechaIda.split('-').reverse().join('/');
+            const ddmmReg = fechaRegreso ? fechaRegreso.split('-').reverse().join('/') : '';
+            const plataformas = [
+              {
+                nombre: 'Despegar', icono: '✈', color: '#0066cc',
+                url: `https://www.despegar.com.co/vuelos/resultado/${rt ? 'RT' : 'OW'}-${iO}-${iD}-${comp}${rt ? `-${compR}` : ''}/1/0/0/PP/-/-/-/1/`,
+              },
+              {
+                nombre: 'LATAM', icono: '✈', color: '#d8001f',
+                url: `https://www.latam.com/es_co/apps/personas/booking?fecha1=${fechaIda}&from=${iO}&to=${iD}&adult=1&child=0&infant=0&trip=${rt ? 'RT' : 'OW'}${rt ? `&fecha2=${fechaRegreso}` : ''}`,
+              },
+              {
+                nombre: 'Avianca', icono: '✈', color: '#e5001a',
+                url: `https://www.avianca.com/co/es/booking/search/?from=${iO}&to=${iD}&departure=${ddmmIda}&adults=1${rt ? `&return=${ddmmReg}` : ''}`,
+              },
+              {
+                nombre: 'Wingo', icono: '✈', color: '#ff6600',
+                url: `https://www.wingo.com/es-co/#/booking/vuelos/${rt ? 'RT' : 'OW'}/${iO}/${iD}/${comp}/1/0/0/N`,
+              },
+              {
+                nombre: 'JetSMART', icono: '✈', color: '#ffe000',
+                url: `https://jetsmart.com/co/es/vuelos-baratos/${iO.toLowerCase()}-${iD.toLowerCase()}/?date=${comp}`,
+              },
+              {
+                nombre: 'Bolivariano', icono: '🚌', color: '#008000',
+                url: `https://www.bolivariano.com.co/rutas`,
+              },
+              {
+                nombre: 'Expreso Brasilia', icono: '🚌', color: '#006633',
+                url: `https://www.expresobrasilia.com`,
+              },
+            ];
+            return (
+              <div className="viatico-plataformas">
+                <div className="viatico-plataformas-titulo">
+                  🌐 Consultar precios reales en plataformas · {ciudadOrigen} → {ciudadDestino}
+                </div>
+                <p className="leg-nota" style={{ margin: '4px 0 10px' }}>
+                  Se abre una pestaña nueva con la búsqueda pre-llenada para esta ruta y fecha.
+                </p>
+                <div className="viatico-plataformas-grid">
+                  {plataformas.map((p) => (
+                    <a key={p.nombre} href={p.url} target="_blank" rel="noopener noreferrer"
+                      className="viatico-plataforma-btn"
+                      style={{ '--plat-color': p.color } as React.CSSProperties}>
+                      <span className="viatico-plataforma-icono">{p.icono}</span>
+                      <span className="viatico-plataforma-nombre">{p.nombre}</span>
+                      <span className="viatico-plataforma-arrow">↗</span>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+
           <TiqueteForm
             titulo={esIdaVuelta ? '🛫 Tiquete de ida' : '🛫 Tiquete'}
             ciudadOrigen={ciudadOrigen} ciudadDestino={ciudadDestino} fecha={fechaIda}
@@ -957,6 +1019,47 @@ export function ViaticosPanel({ onCreada }: { onCreada?: (info: { id: number; nu
               </div>
             </div>
           )}
+
+          {/* Links de plataformas de hospedaje */}
+          {tieneHospedaje && ciudadDestino && (() => {
+            const checkin = hotelEntrada || fechaIda;
+            const checkout = hotelSalida || (esIdaVuelta && fechaRegreso ? fechaRegreso : '');
+            const city = encodeURIComponent(ciudadDestino + ' Colombia');
+            const hoteles = [
+              {
+                nombre: 'Booking.com', icono: '🏨', color: '#003580',
+                url: `https://www.booking.com/searchresults.es.html?ss=${city}&checkin=${checkin}&checkout=${checkout}&group_adults=1`,
+              },
+              {
+                nombre: 'Hotels.com', icono: '🏨', color: '#cc0000',
+                url: `https://es.hotels.com/search.do?q-destination=${encodeURIComponent(ciudadDestino)}&q-check-in=${checkin}&q-check-out=${checkout}&q-rooms=1&q-room-0-adults=1`,
+              },
+              {
+                nombre: 'Airbnb', icono: '🏠', color: '#ff5a5f',
+                url: `https://www.airbnb.com.co/s/${encodeURIComponent(ciudadDestino)}--Colombia/homes${checkin ? `?checkin=${checkin}&checkout=${checkout}&adults=1` : ''}`,
+              },
+              {
+                nombre: 'Trivago', icono: '🔍', color: '#007fc8',
+                url: `https://www.trivago.com.co/es-ES/srl?search=Hotel+${encodeURIComponent(ciudadDestino)}`,
+              },
+            ];
+            return (
+              <div className="viatico-plataformas viatico-plataformas-hotel">
+                <div className="viatico-plataformas-titulo">🌐 Buscar hospedaje en {ciudadDestino}</div>
+                <div className="viatico-plataformas-grid">
+                  {hoteles.map((h) => (
+                    <a key={h.nombre} href={h.url} target="_blank" rel="noopener noreferrer"
+                      className="viatico-plataforma-btn"
+                      style={{ '--plat-color': h.color } as React.CSSProperties}>
+                      <span className="viatico-plataforma-icono">{h.icono}</span>
+                      <span className="viatico-plataforma-nombre">{h.nombre}</span>
+                      <span className="viatico-plataforma-arrow">↗</span>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
 
           {tieneHospedaje && (
             <>

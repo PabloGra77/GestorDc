@@ -9509,6 +9509,105 @@ textarea {
   border-color: var(--gold);
 }
 
+/* Sección de plataformas externas */
+.viatico-plataformas {
+  margin: 14px 0;
+  padding: 14px 16px;
+  background: rgba(255,255,255,0.03);
+  border: 1.5px solid var(--gold-line);
+  border-radius: 10px;
+}
+.viatico-plataformas-hotel {
+  border-color: rgba(61,90,254,0.3);
+  background: rgba(61,90,254,0.04);
+}
+.viatico-plataformas-titulo {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-gold);
+  margin-bottom: 4px;
+}
+.viatico-plataformas-hotel .viatico-plataformas-titulo {
+  color: var(--sky-blue);
+}
+.viatico-plataformas-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+.viatico-plataforma-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: 8px;
+  border: 1.5px solid color-mix(in srgb, var(--plat-color, #888) 40%, transparent);
+  background: color-mix(in srgb, var(--plat-color, #888) 10%, transparent);
+  color: color-mix(in srgb, var(--plat-color, #ccc) 80%, white);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background 0.15s, border-color 0.15s, transform 0.1s;
+}
+.viatico-plataforma-btn:hover {
+  background: color-mix(in srgb, var(--plat-color, #888) 22%, transparent);
+  border-color: var(--plat-color, #888);
+  transform: translateY(-1px);
+  text-decoration: none;
+  color: #fff;
+}
+.viatico-plataforma-icono { font-size: 15px; }
+.viatico-plataforma-nombre { white-space: nowrap; }
+.viatico-plataforma-arrow { font-size: 11px; opacity: 0.7; }
+
+/* Panel de PDF real inline en el editor */
+.plantilla-pdf-preview-panel {
+  position: relative;
+  margin: 0 0 12px;
+  border: 2px solid var(--gold);
+  border-radius: 10px;
+  overflow: hidden;
+  background: #fff;
+}
+.plantilla-pdf-preview-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  background: var(--dark-navy);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--gold-bright);
+  border-bottom: 1.5px solid var(--gold-line);
+}
+.plantilla-pdf-preview-dl {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--sky-blue);
+  text-decoration: none;
+  padding: 3px 10px;
+  border: 1px solid rgba(158,219,255,0.3);
+  border-radius: 6px;
+}
+.plantilla-pdf-preview-dl:hover { background: rgba(158,219,255,0.1); }
+.plantilla-pdf-preview-close {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 16px;
+  padding: 0 4px;
+  line-height: 1;
+}
+.plantilla-pdf-preview-close:hover { color: #fff; }
+.plantilla-pdf-preview-iframe {
+  display: block;
+  width: 100%;
+  height: 680px;
+  border: none;
+}
+
 /* Bloque de tiquete (ida / vuelta) */
 .viatico-tiquete-bloque {
   border: 1.5px solid var(--gold-line);
