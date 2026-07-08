@@ -36,6 +36,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         }
     } catch (Throwable) { /* columnas aún no existen */ }
 
+    // Campos OPS (EPS + documentos adjuntos en perfil)
+    try {
+        $chkOps = $pdo->query("SELECT eps, archivo_eps_id, archivo_eps_nombre, archivo_documento_id, archivo_documento_nombre, archivo_cuenta_id, archivo_cuenta_nombre FROM usuarios WHERE id = {$usuarioId} LIMIT 1");
+        $exOps = $chkOps->fetch();
+        if ($exOps !== false) {
+            $extra['eps'] = $exOps['eps'] ?? null;
+            $extra['archivoEpsId'] = $exOps['archivo_eps_id'] ?? null;
+            $extra['archivoEpsNombre'] = $exOps['archivo_eps_nombre'] ?? null;
+            $extra['archivoDocumentoId'] = $exOps['archivo_documento_id'] ?? null;
+            $extra['archivoDocumentoNombre'] = $exOps['archivo_documento_nombre'] ?? null;
+            $extra['archivoCuentaId'] = $exOps['archivo_cuenta_id'] ?? null;
+            $extra['archivoCuentaNombre'] = $exOps['archivo_cuenta_nombre'] ?? null;
+        }
+    } catch (Throwable) { /* columnas OPS aún no existen */ }
+
     Response::json(array_merge(Shapes::usuario($row), $extra));
     exit;
 }
@@ -119,6 +134,14 @@ if (array_key_exists('lugarExpedicion', $body)) {
     $le = trim((string)($body['lugarExpedicion'] ?? ''));
     $camposExtra['lugar_expedicion'] = $le ?: null;
 }
+// Campos OPS
+if (array_key_exists('eps', $body)) $camposExtra['eps'] = trim((string)($body['eps'] ?? '')) ?: null;
+if (array_key_exists('archivoEpsId', $body)) $camposExtra['archivo_eps_id'] = $body['archivoEpsId'] ?: null;
+if (array_key_exists('archivoEpsNombre', $body)) $camposExtra['archivo_eps_nombre'] = $body['archivoEpsNombre'] ?: null;
+if (array_key_exists('archivoDocumentoId', $body)) $camposExtra['archivo_documento_id'] = $body['archivoDocumentoId'] ?: null;
+if (array_key_exists('archivoDocumentoNombre', $body)) $camposExtra['archivo_documento_nombre'] = $body['archivoDocumentoNombre'] ?: null;
+if (array_key_exists('archivoCuentaId', $body)) $camposExtra['archivo_cuenta_id'] = $body['archivoCuentaId'] ?: null;
+if (array_key_exists('archivoCuentaNombre', $body)) $camposExtra['archivo_cuenta_nombre'] = $body['archivoCuentaNombre'] ?: null;
 if (!empty($camposExtra)) {
     try {
         $sets = implode(', ', array_map(fn($k) => "$k = :$k", array_keys($camposExtra)));
@@ -157,5 +180,19 @@ try {
         $extra['lugarExpedicion'] = $ex['lugar_expedicion'] ?? null;
     }
 } catch (Throwable) { /* columnas aún no existen */ }
+
+try {
+    $chkOps2 = $pdo->query("SELECT eps, archivo_eps_id, archivo_eps_nombre, archivo_documento_id, archivo_documento_nombre, archivo_cuenta_id, archivo_cuenta_nombre FROM usuarios WHERE id = {$usuarioId} LIMIT 1");
+    $exOps2 = $chkOps2->fetch();
+    if ($exOps2 !== false) {
+        $extra['eps'] = $exOps2['eps'] ?? null;
+        $extra['archivoEpsId'] = $exOps2['archivo_eps_id'] ?? null;
+        $extra['archivoEpsNombre'] = $exOps2['archivo_eps_nombre'] ?? null;
+        $extra['archivoDocumentoId'] = $exOps2['archivo_documento_id'] ?? null;
+        $extra['archivoDocumentoNombre'] = $exOps2['archivo_documento_nombre'] ?? null;
+        $extra['archivoCuentaId'] = $exOps2['archivo_cuenta_id'] ?? null;
+        $extra['archivoCuentaNombre'] = $exOps2['archivo_cuenta_nombre'] ?? null;
+    }
+} catch (Throwable) { /* columnas OPS aún no existen */ }
 
 Response::json(array_merge(Shapes::usuario($updated), $extra));

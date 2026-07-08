@@ -807,6 +807,27 @@ export function NuevaSolicitudPanel({ onCreada }: NuevaSolicitudPanelProps) {
                 <small>{t.camposPlantilla.length} campo(s)</small>
               </button>
             ))}
+            {/* Tarjeta fija para Cuenta de Cobro OPS — siempre visible */}
+            {!tiposDelArea.some((t) => t.slug === 'cuenta-cobro-ops') && (
+              <button
+                type="button"
+                className="nueva-sol-card"
+                onClick={() => elegirTipo({
+                  id: 0,
+                  areaId: areaSel?.id ?? 0,
+                  areaNombre: areaSel?.nombre ?? '',
+                  nombre: 'Cuenta de Cobro OPS',
+                  descripcion: 'Cobra los honorarios de tu contrato OPS. El tipo se crea automáticamente.',
+                  slug: 'cuenta-cobro-ops',
+                  activo: true,
+                  camposPlantilla: [],
+                })}
+              >
+                <strong>Cuenta de Cobro OPS</strong>
+                <p>Cobra los honorarios de tu contrato OPS.</p>
+                <small>Cobro de honorarios</small>
+              </button>
+            )}
           </div>
         </>
       ) : null}

@@ -53,11 +53,18 @@ export function CuentaCobroOpsPanel({ onCreada, tipoSolicitudId, areaId }: Cuent
   const [numeroCuenta, setNumeroCuenta] = useState('');
   const [titularCuenta, setTitularCuenta] = useState('');
 
+  // Paso 3 – EPS
+  const [eps, setEps] = useState('');
+
   // Paso 4 – Documentos adjuntos
   const [docInformeId, setDocInformeId] = useState('');
   const [docInformeNombre, setDocInformeNombre] = useState('');
   const [docAfiliacionesId, setDocAfiliacionesId] = useState('');
   const [docAfiliacionesNombre, setDocAfiliacionesNombre] = useState('');
+  const [docDocumentoId, setDocDocumentoId] = useState('');
+  const [docDocumentoNombre, setDocDocumentoNombre] = useState('');
+  const [docCuentaId, setDocCuentaId] = useState('');
+  const [docCuentaNombre, setDocCuentaNombre] = useState('');
   const [subiendoDoc, setSubiendoDoc] = useState<string | null>(null);
 
   // Paso 5 – Firma
@@ -102,6 +109,11 @@ export function CuentaCobroOpsPanel({ onCreada, tipoSolicitudId, areaId }: Cuent
       if (r.data.tipoCuenta) setTipoCuenta(r.data.tipoCuenta === 'corriente' ? 'Corriente' : 'Ahorros');
       if (r.data.numeroCuenta) setNumeroCuenta(r.data.numeroCuenta);
       if (r.data.titularCuenta) setTitularCuenta(r.data.titularCuenta);
+      // EPS y documentos pre-guardados en perfil
+      if (r.data.eps) setEps(r.data.eps);
+      if (r.data.archivoEpsId) { setDocAfiliacionesId(r.data.archivoEpsId); setDocAfiliacionesNombre(r.data.archivoEpsNombre || 'Certificado EPS (perfil)'); }
+      if (r.data.archivoDocumentoId) { setDocDocumentoId(r.data.archivoDocumentoId); setDocDocumentoNombre(r.data.archivoDocumentoNombre || 'Doc. identidad (perfil)'); }
+      if (r.data.archivoCuentaId) { setDocCuentaId(r.data.archivoCuentaId); setDocCuentaNombre(r.data.archivoCuentaNombre || 'Cert. bancario (perfil)'); }
     }).catch(() => {});
   }, []);
 
@@ -112,7 +124,9 @@ export function CuentaCobroOpsPanel({ onCreada, tipoSolicitudId, areaId }: Cuent
       fd.append('archivo', file);
       const r = await api.post<{ id: string }>('/archivos', fd, { headers: { 'Content-Type': undefined } });
       if (campo === 'informe') { setDocInformeId(r.data.id); setDocInformeNombre(file.name); }
-      else { setDocAfiliacionesId(r.data.id); setDocAfiliacionesNombre(file.name); }
+      else if (campo === 'afiliaciones') { setDocAfiliacionesId(r.data.id); setDocAfiliacionesNombre(file.name); }
+      else if (campo === 'documento') { setDocDocumentoId(r.data.id); setDocDocumentoNombre(file.name); }
+      else { setDocCuentaId(r.data.id); setDocCuentaNombre(file.name); }
     } catch {
       setErr('No se pudo subir el archivo. Máx 10 MB, formatos: PDF, JPG, PNG.');
     } finally {
@@ -192,10 +206,14 @@ export function CuentaCobroOpsPanel({ onCreada, tipoSolicitudId, areaId }: Cuent
           correoElectronico: usr?.correo ?? '',
           // Bancarios
           banco, tipoCuenta, numeroCuenta, titularCuenta,
+          // EPS
+          eps, entidadSalud: eps,
         },
         documentos: {
           ...(docInformeId ? { informeActividades: { nombre: docInformeNombre, archivoId: docInformeId } } : {}),
           ...(docAfiliacionesId ? { certificadoAfiliaciones: { nombre: docAfiliacionesNombre, archivoId: docAfiliacionesId } } : {}),
+          ...(docDocumentoId ? { copiaDocumentoIdentidad: { nombre: docDocumentoNombre, archivoId: docDocumentoId } } : {}),
+          ...(docCuentaId ? { certificadoCuentaBancaria: { nombre: docCuentaNombre, archivoId: docCuentaId } } : {}),
         },
         firmas: { profesional: firma },
       };
@@ -416,6 +434,12 @@ export function CuentaCobroOpsPanel({ onCreada, tipoSolicitudId, areaId }: Cuent
                   placeholder="Celular o fijo" />
               </div>
             </div>
+            <div className="leg-field" style={{ marginTop: 10 }}>
+              <label>EPS a la que está afiliado</label>
+              <input type="text" value={eps}
+                onChange={(e) => setEps(e.target.value)}
+                placeholder="Ej: Sura, Nueva EPS, Sanitas…" />
+            </div>
           </div>
 
           <div className="leg-seccion-personal">
@@ -492,6 +516,7 @@ export function CuentaCobroOpsPanel({ onCreada, tipoSolicitudId, areaId }: Cuent
             <label>Certificación de afiliaciones (EPS / ARL / Pensión)</label>
             <p className="leg-nota" style={{ marginBottom: 6 }}>
               Certificado actualizado que acredite las afiliaciones al sistema de seguridad social.
+              {docAfiliacionesId && docAfiliacionesNombre.includes('perfil') ? ' (cargado desde tu perfil)' : ''}
             </p>
             <div className="leg-factura-actions" style={{ display: 'flex', gap: 8 }}>
               {subiendoDoc === 'afiliaciones' ? (
@@ -503,6 +528,47 @@ export function CuentaCobroOpsPanel({ onCreada, tipoSolicitudId, areaId }: Cuent
                     onChange={(e) => { const f = e.target.files?.[0]; if (f) subirDoc(f, 'afiliaciones'); e.target.value = ''; }} />
                 </label>
               )}
+              {docAfiliacionesNombre && <button type="button" className="admin-ghost-button" style={{ fontSize: 12 }} onClick={() => { setDocAfiliacionesId(''); setDocAfiliacionesNombre(''); }}>✕</button>}
+            </div>
+          </div>
+
+          <div className="leg-field" style={{ marginTop: 16 }}>
+            <label>Copia del documento de identidad</label>
+            <p className="leg-nota" style={{ marginBottom: 6 }}>
+              Copia legible de la cédula u otro documento de identidad.
+              {docDocumentoId && docDocumentoNombre.includes('perfil') ? ' (cargado desde tu perfil)' : ''}
+            </p>
+            <div className="leg-factura-actions" style={{ display: 'flex', gap: 8 }}>
+              {subiendoDoc === 'documento' ? (
+                <span className="leg-validando">Subiendo…</span>
+              ) : (
+                <label className="admin-ghost-button" style={{ cursor: 'pointer' }}>
+                  {docDocumentoNombre ? `✓ ${docDocumentoNombre}` : '+ Adjuntar copia del documento'}
+                  <input type="file" accept="application/pdf,image/*" style={{ display: 'none' }}
+                    onChange={(e) => { const f = e.target.files?.[0]; if (f) subirDoc(f, 'documento'); e.target.value = ''; }} />
+                </label>
+              )}
+              {docDocumentoNombre && <button type="button" className="admin-ghost-button" style={{ fontSize: 12 }} onClick={() => { setDocDocumentoId(''); setDocDocumentoNombre(''); }}>✕</button>}
+            </div>
+          </div>
+
+          <div className="leg-field" style={{ marginTop: 16 }}>
+            <label>Certificado de cuenta bancaria</label>
+            <p className="leg-nota" style={{ marginBottom: 6 }}>
+              Certificado del banco que acredite la cuenta para el pago.
+              {docCuentaId && docCuentaNombre.includes('perfil') ? ' (cargado desde tu perfil)' : ''}
+            </p>
+            <div className="leg-factura-actions" style={{ display: 'flex', gap: 8 }}>
+              {subiendoDoc === 'cuenta' ? (
+                <span className="leg-validando">Subiendo…</span>
+              ) : (
+                <label className="admin-ghost-button" style={{ cursor: 'pointer' }}>
+                  {docCuentaNombre ? `✓ ${docCuentaNombre}` : '+ Adjuntar certificado bancario'}
+                  <input type="file" accept="application/pdf,image/*" style={{ display: 'none' }}
+                    onChange={(e) => { const f = e.target.files?.[0]; if (f) subirDoc(f, 'cuenta'); e.target.value = ''; }} />
+                </label>
+              )}
+              {docCuentaNombre && <button type="button" className="admin-ghost-button" style={{ fontSize: 12 }} onClick={() => { setDocCuentaId(''); setDocCuentaNombre(''); }}>✕</button>}
             </div>
           </div>
 
