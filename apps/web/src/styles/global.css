@@ -8254,6 +8254,14 @@ textarea {
 }
 
 .leg-nota { font-size: 12px; color: var(--text-muted); margin: 0; }
+.leg-field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.leg-seccion-personal {
+  margin-top: 24px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+}
+.leg-seccion-personal h4 { font-size: 14px; font-weight: 600; color: var(--text-primary); margin: 0 0 4px; }
+.leg-seccion-personal .leg-nota { margin-bottom: 12px; }
 .leg-actions {
   display: flex;
   gap: 10px;
@@ -9066,6 +9074,7 @@ textarea {
   .leg-form textarea {
     width: 100%;
   }
+  .leg-field-row { grid-template-columns: 1fr; }
 
   /* Resumen de legalización: 1 columna */
   .leg-resumen-grid {

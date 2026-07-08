@@ -322,8 +322,17 @@ export function LegalizacionPanel({ onCreada, tipoSolicitudId, areaId }: Legaliz
   const [numeroCuenta, setNumeroCuenta] = useState('');
   const [titularCuenta, setTitularCuenta] = useState('');
 
-  // Datos personales del perfil (para incluir en la solicitud)
-  const [perfilPersonal, setPerfilPersonal] = useState<Record<string, string>>({});
+  // Datos personales (pre-llenados desde perfil, editables antes de enviar)
+  const [formTipoDoc, setFormTipoDoc] = useState('CC');
+  const [formNumDoc, setFormNumDoc] = useState('');
+  const [formPrimerNombre, setFormPrimerNombre] = useState('');
+  const [formSegundoNombre, setFormSegundoNombre] = useState('');
+  const [formPrimerApellido, setFormPrimerApellido] = useState('');
+  const [formSegundoApellido, setFormSegundoApellido] = useState('');
+  const [formFechaNac, setFormFechaNac] = useState('');
+  const [formFechaExp, setFormFechaExp] = useState('');
+  const [formLugarExp, setFormLugarExp] = useState('');
+  const [formTelefono, setFormTelefono] = useState('');
 
   // Paso 4: firma
   const [firma, setFirma] = useState('');
@@ -345,7 +354,22 @@ export function LegalizacionPanel({ onCreada, tipoSolicitudId, areaId }: Legaliz
       if (r.data.tipoCuenta) setTipoCuenta(r.data.tipoCuenta === 'corriente' ? 'Corriente' : 'Ahorros');
       if (r.data.numeroCuenta) setNumeroCuenta(r.data.numeroCuenta);
       if (r.data.titularCuenta) setTitularCuenta(r.data.titularCuenta);
-      setPerfilPersonal(r.data);
+      // Pre-llenar datos personales (editables por el usuario en el paso 3)
+      const s = getAuthSession();
+      const u = s?.usuario;
+      if (r.data.tipoDocumento) setFormTipoDoc(r.data.tipoDocumento);
+      if (r.data.numeroDocumento) setFormNumDoc(r.data.numeroDocumento);
+      else if (u?.numeroDocumento) setFormNumDoc(u.numeroDocumento as string);
+      const pn = r.data.primerNombre || (u?.primerNombre as string | undefined) || u?.nombreCompleto?.split(' ')[0] || '';
+      setFormPrimerNombre(pn);
+      setFormSegundoNombre(r.data.segundoNombre || '');
+      const pa = r.data.primerApellido || (u?.primerApellido as string | undefined) || '';
+      setFormPrimerApellido(pa);
+      setFormSegundoApellido(r.data.segundoApellido || '');
+      setFormFechaNac(r.data.fechaNacimiento || '');
+      setFormFechaExp(r.data.fechaExpedicion || '');
+      setFormLugarExp(r.data.lugarExpedicion || '');
+      setFormTelefono(r.data.telefono || '');
     }).catch(() => {});
   }, []);
 
@@ -499,6 +523,12 @@ export function LegalizacionPanel({ onCreada, tipoSolicitudId, areaId }: Legaliz
       if (!banco) return 'Selecciona el banco';
       if (!numeroCuenta.trim()) return 'Ingresa el número de cuenta';
       if (!titularCuenta.trim()) return 'Ingresa el nombre del titular de la cuenta';
+      if (!formTipoDoc) return 'Selecciona el tipo de documento de identidad';
+      if (!formNumDoc.trim()) return 'Ingresa tu número de documento de identidad';
+      if (!formPrimerNombre.trim()) return 'Ingresa tu primer nombre';
+      if (!formPrimerApellido.trim()) return 'Ingresa tu primer apellido';
+      if (!formFechaNac) return 'Ingresa tu fecha de nacimiento';
+      if (!formFechaExp) return 'Ingresa la fecha de expedición del documento';
     }
     if (paso === 4) {
       if (!firma) return 'La firma digital es obligatoria';
@@ -557,38 +587,31 @@ export function LegalizacionPanel({ onCreada, tipoSolicitudId, areaId }: Legaliz
           tipoCuenta,
           numeroCuenta,
           titularCuenta,
-          // Datos personales del solicitante (desde perfil + sesión)
-          // Se envían en camelCase Y snake_case para compatibilidad con cualquier
-          // configuración de campos en la plantilla del tipo de solicitud.
-          ...(usr ? (() => {
-            const usrAny    = usr as unknown as Record<string, string | null | undefined>;
-            const pNombre   = perfilPersonal.primerNombre   || usrAny.primerNombre   || usr.nombreCompleto.split(' ')[0] || '';
-            const sNombre   = perfilPersonal.segundoNombre  || '';
-            const pApellido = perfilPersonal.primerApellido  || usrAny.primerApellido  || '';
-            const sApellido = perfilPersonal.segundoApellido || '';
-            const tipDoc    = perfilPersonal.tipoDocumento   || usrAny.tipoDocumento   || '';
-            const numDoc    = perfilPersonal.numeroDocumento  || usrAny.numeroDocumento  || '';
-            const telefono  = perfilPersonal.telefono  || '';
-            const fNac      = perfilPersonal.fechaNacimiento || '';
-            const fExp      = perfilPersonal.fechaExpedicion || '';
-            const lExp      = perfilPersonal.lugarExpedicion || '';
-            const nomComp   = usr.nombreCompleto ?? '';
-            const correo    = usr.correo ?? '';
-            return {
-              // camelCase
-              primerNombre: pNombre, segundoNombre: sNombre,
-              primerApellido: pApellido, segundoApellido: sApellido,
-              nombreCompleto: nomComp, correoElectronico: correo,
-              numeroDocumento: numDoc, tipoDocumento: tipDoc,
-              telefono, fechaNacimiento: fNac, fechaExpedicion: fExp, lugarExpedicion: lExp,
-              // snake_case (por si la plantilla usa esas claves)
-              primer_nombre: pNombre, segundo_nombre: sNombre,
-              primer_apellido: pApellido, segundo_apellido: sApellido,
-              nombre_completo: nomComp, correo_electronico: correo,
-              numero_documento: numDoc, tipo_documento: tipDoc,
-              fecha_nacimiento: fNac, fecha_expedicion: fExp, lugar_expedicion: lExp,
-            };
-          })() : {}),
+          // Datos personales — tomados de los campos editables del paso 3
+          tipoDocumento: formTipoDoc,
+          numeroDocumento: formNumDoc,
+          primerNombre: formPrimerNombre,
+          segundoNombre: formSegundoNombre,
+          primerApellido: formPrimerApellido,
+          segundoApellido: formSegundoApellido,
+          fechaNacimiento: formFechaNac,
+          fechaExpedicion: formFechaExp,
+          lugarExpedicion: formLugarExp,
+          telefono: formTelefono,
+          nombreCompleto: usr?.nombreCompleto ?? '',
+          correoElectronico: usr?.correo ?? '',
+          // snake_case aliases para cubrir cualquier clave en la plantilla
+          tipo_documento: formTipoDoc,
+          numero_documento: formNumDoc,
+          primer_nombre: formPrimerNombre,
+          segundo_nombre: formSegundoNombre,
+          primer_apellido: formPrimerApellido,
+          segundo_apellido: formSegundoApellido,
+          fecha_nacimiento: formFechaNac,
+          fecha_expedicion: formFechaExp,
+          lugar_expedicion: formLugarExp,
+          nombre_completo: usr?.nombreCompleto ?? '',
+          correo_electronico: usr?.correo ?? '',
         },
         documentos: {},
         firmas: { profesional: firma },
@@ -795,6 +818,75 @@ export function LegalizacionPanel({ onCreada, tipoSolicitudId, areaId }: Legaliz
             <input type="text" value={titularCuenta}
               onChange={(e) => setTitularCuenta(e.target.value)}
               placeholder="Nombre completo del titular tal como aparece en el banco" required />
+          </div>
+
+          <div className="leg-seccion-personal">
+            <h4>Datos personales de identificación</h4>
+            <p className="leg-nota">Verifica o completa tus datos — quedarán registrados en la solicitud.</p>
+            <div className="leg-field-row">
+              <div className="leg-field">
+                <label>Tipo de documento *</label>
+                <select value={formTipoDoc} onChange={(e) => setFormTipoDoc(e.target.value)}>
+                  {['CC','CE','TI','PA','NIT'].map((t) => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </div>
+              <div className="leg-field">
+                <label>Número de documento *</label>
+                <input type="text" inputMode="numeric" value={formNumDoc}
+                  onChange={(e) => setFormNumDoc(e.target.value)}
+                  placeholder="Sin puntos ni guiones" />
+              </div>
+            </div>
+            <div className="leg-field-row">
+              <div className="leg-field">
+                <label>Primer nombre *</label>
+                <input type="text" value={formPrimerNombre}
+                  onChange={(e) => setFormPrimerNombre(e.target.value)} />
+              </div>
+              <div className="leg-field">
+                <label>Segundo nombre</label>
+                <input type="text" value={formSegundoNombre}
+                  onChange={(e) => setFormSegundoNombre(e.target.value)} placeholder="(opcional)" />
+              </div>
+            </div>
+            <div className="leg-field-row">
+              <div className="leg-field">
+                <label>Primer apellido *</label>
+                <input type="text" value={formPrimerApellido}
+                  onChange={(e) => setFormPrimerApellido(e.target.value)} />
+              </div>
+              <div className="leg-field">
+                <label>Segundo apellido</label>
+                <input type="text" value={formSegundoApellido}
+                  onChange={(e) => setFormSegundoApellido(e.target.value)} placeholder="(opcional)" />
+              </div>
+            </div>
+            <div className="leg-field-row">
+              <div className="leg-field">
+                <label>Fecha de nacimiento *</label>
+                <input type="date" value={formFechaNac}
+                  onChange={(e) => setFormFechaNac(e.target.value)} />
+              </div>
+              <div className="leg-field">
+                <label>Fecha de expedición del documento *</label>
+                <input type="date" value={formFechaExp}
+                  onChange={(e) => setFormFechaExp(e.target.value)} />
+              </div>
+            </div>
+            <div className="leg-field-row">
+              <div className="leg-field">
+                <label>Lugar de expedición</label>
+                <input type="text" value={formLugarExp}
+                  onChange={(e) => setFormLugarExp(e.target.value)}
+                  placeholder="Ciudad donde se expidió el documento" />
+              </div>
+              <div className="leg-field">
+                <label>Teléfono de contacto</label>
+                <input type="tel" value={formTelefono}
+                  onChange={(e) => setFormTelefono(e.target.value)}
+                  placeholder="Número celular o fijo" />
+              </div>
+            </div>
           </div>
 
           <div className="leg-actions">

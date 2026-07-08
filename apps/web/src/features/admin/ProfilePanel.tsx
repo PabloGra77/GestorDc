@@ -60,7 +60,7 @@ export function ProfilePanel() {
       const partes = p.nombreCompleto.split(' ');
       setPrimerNombre(p.primerNombre || partes[0] || '');
       setSegundoNombre(p.segundoNombre || '');
-      setPrimerApellido(p.primerApellido || (partes.length >= 3 ? partes[2] : partes[1]) || '');
+      setPrimerApellido(p.primerApellido || partes[1] || '');
       setSegundoApellido(p.segundoApellido || '');
       setTipoDocumento(p.tipoDocumento || 'CC');
       setNumeroDocumento(p.numeroDocumento || '');
