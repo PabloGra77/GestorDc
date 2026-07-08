@@ -20,7 +20,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     // Agregar teléfono y dirección si la columna existe (migración gradual)
     $extra = [];
     try {
-        $chk = $pdo->query("SELECT telefono, direccion, banco, tipo_cuenta, numero_cuenta, titular_cuenta, correo_personal, fecha_nacimiento, fecha_expedicion, lugar_expedicion FROM usuarios WHERE id = {$usuarioId} LIMIT 1");
+        $chk = $pdo->prepare("SELECT telefono, direccion, banco, tipo_cuenta, numero_cuenta, titular_cuenta, correo_personal, fecha_nacimiento, fecha_expedicion, lugar_expedicion FROM usuarios WHERE id = :id LIMIT 1");
+        $chk->execute([':id' => $usuarioId]);
         $ex = $chk->fetch();
         if ($ex !== false) {
             $extra['telefono'] = $ex['telefono'] ?? null;
@@ -38,7 +39,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 
     // Campos OPS (EPS + documentos adjuntos en perfil)
     try {
-        $chkOps = $pdo->query("SELECT eps, archivo_eps_id, archivo_eps_nombre, archivo_documento_id, archivo_documento_nombre, archivo_cuenta_id, archivo_cuenta_nombre FROM usuarios WHERE id = {$usuarioId} LIMIT 1");
+        $chkOps = $pdo->prepare("SELECT eps, archivo_eps_id, archivo_eps_nombre, archivo_documento_id, archivo_documento_nombre, archivo_cuenta_id, archivo_cuenta_nombre FROM usuarios WHERE id = :id LIMIT 1");
+        $chkOps->execute([':id' => $usuarioId]);
         $exOps = $chkOps->fetch();
         if ($exOps !== false) {
             $extra['eps'] = $exOps['eps'] ?? null;
@@ -165,7 +167,8 @@ $updated = $sel->fetch();
 
 $extra = [];
 try {
-    $chk = $pdo->query("SELECT telefono, direccion, banco, tipo_cuenta, numero_cuenta, titular_cuenta, correo_personal, fecha_nacimiento, fecha_expedicion, lugar_expedicion FROM usuarios WHERE id = {$usuarioId} LIMIT 1");
+    $chk = $pdo->prepare("SELECT telefono, direccion, banco, tipo_cuenta, numero_cuenta, titular_cuenta, correo_personal, fecha_nacimiento, fecha_expedicion, lugar_expedicion FROM usuarios WHERE id = :id LIMIT 1");
+    $chk->execute([':id' => $usuarioId]);
     $ex = $chk->fetch();
     if ($ex !== false) {
         $extra['telefono'] = $ex['telefono'] ?? null;
@@ -182,7 +185,8 @@ try {
 } catch (Throwable) { /* columnas aún no existen */ }
 
 try {
-    $chkOps2 = $pdo->query("SELECT eps, archivo_eps_id, archivo_eps_nombre, archivo_documento_id, archivo_documento_nombre, archivo_cuenta_id, archivo_cuenta_nombre FROM usuarios WHERE id = {$usuarioId} LIMIT 1");
+    $chkOps2 = $pdo->prepare("SELECT eps, archivo_eps_id, archivo_eps_nombre, archivo_documento_id, archivo_documento_nombre, archivo_cuenta_id, archivo_cuenta_nombre FROM usuarios WHERE id = :id LIMIT 1");
+    $chkOps2->execute([':id' => $usuarioId]);
     $exOps2 = $chkOps2->fetch();
     if ($exOps2 !== false) {
         $extra['eps'] = $exOps2['eps'] ?? null;

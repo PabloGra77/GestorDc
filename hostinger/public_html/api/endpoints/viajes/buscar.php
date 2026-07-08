@@ -8,12 +8,8 @@ declare(strict_types=1);
  * Params: origen (IATA|nombre), destino (IATA|nombre), fecha_ida (YYYY-MM-DD), fecha_regreso? (YYYY-MM-DD)
  */
 
-require_auth();
-throttle('viajes_buscar', 30, 60);
-
-if ($method !== 'GET') {
-    Response::error('Método no permitido', 405);
-}
+Auth::requireUser();
+Throttle::hit('viajes:' . Throttle::clientIp(), 30, 60);
 
 /* ─── Parámetros ─────────────────────────────────────────────── */
 $origen       = strtoupper(trim($_GET['origen']   ?? ''));

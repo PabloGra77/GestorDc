@@ -2,15 +2,7 @@
 declare(strict_types=1);
 
 // PUT /config/legalizacion — actualiza configuración de legalizaciones. Solo admins.
-$jwt = Auth::requireUser();
-
-$pdo = Db::pdo();
-$uStmt = $pdo->prepare("SELECT r.nombre AS rol FROM usuarios u INNER JOIN roles r ON r.id = u.rol_id WHERE u.id = :id LIMIT 1");
-$uStmt->execute([':id' => (int)$jwt['sub']]);
-$user = $uStmt->fetch();
-if (!$user || strtolower(trim($user['rol'] ?? '')) !== 'administrador') {
-    Response::error('Solo administradores pueden modificar esta configuración', 403);
-}
+Auth::requireAdmin();
 
 $body = Request::body();
 
