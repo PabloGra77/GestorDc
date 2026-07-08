@@ -3,17 +3,8 @@ import { api } from '../../services/http/api';
 import { formatearMiles } from '../../utils/numeroALetras';
 import { SignaturePad } from '../../components/SignaturePad';
 import { useOcrDocument, validarOcrContraDato } from '../../hooks/useOcrDocument';
-
-/* ─── Ciudades Colombia ──────────────────────────────────────── */
-const CIUDADES_CO = [
-  'Bogotá', 'Medellín', 'Cali', 'Cartagena', 'Barranquilla', 'Bucaramanga',
-  'Pereira', 'Santa Marta', 'Cúcuta', 'Manizales', 'Armenia', 'Ibagué',
-  'Montería', 'Villavicencio', 'Pasto', 'Neiva', 'Valledupar', 'San Andrés',
-  'Popayán', 'Leticia', 'Florencia', 'Yopal', 'Riohacha', 'Tunja',
-  'Duitama', 'Sogamoso', 'Santa Rosa de Viterbo', 'Chiquinquirá', 'Zipaquirá',
-  'Facatativá', 'Girardot', 'Espinal', 'Honda', 'Barrancabermeja', 'Sincelejo',
-  'Rionegro', 'Envigado', 'Bello', 'Palmira', 'Buenaventura',
-];
+import { DEPTOS, TODAS_CIUDADES } from './colombiaData';
+import { MapaRuta } from './MapaRuta';
 
 /* ─── Precios de referencia por ruta ────────────────────────── */
 const IATA_MAP: Record<string, string> = {
@@ -280,6 +271,8 @@ export function ViaticosPanel({ onCreada }: { onCreada?: (info: { id: number; nu
   /* Paso 2 */
   const [ciudadOrigen, setCiudadOrigen] = useState('');
   const [ciudadDestino, setCiudadDestino] = useState('');
+  const [deptoOrigen, setDeptoOrigen] = useState('');
+  const [deptoDestino, setDeptoDestino] = useState('');
   const [esIdaVuelta, setEsIdaVuelta] = useState(true);
   const [fechaIda, setFechaIda] = useState('');
   const [fechaRegreso, setFechaRegreso] = useState('');
@@ -698,28 +691,53 @@ export function ViaticosPanel({ onCreada }: { onCreada?: (info: { id: number; nu
             </div>
           </div>
 
-          <div className="leg-gasto-fields">
-            <div className="leg-field">
-              <label>Ciudad de origen *</label>
-              <select value={ciudadOrigen} onChange={(e) => setCiudadOrigen(e.target.value)} required>
-                <option value="">— Selecciona —</option>
-                {CIUDADES_CO.map((c) => <option key={c} value={c}>{c}</option>)}
-              </select>
+          {/* Selectores departamento → ciudad */}
+          <div className="viaje-ciudad-grid">
+            {/* Origen */}
+            <div className="viaje-ciudad-bloque">
+              <div className="leg-field">
+                <label>Departamento de origen *</label>
+                <select value={deptoOrigen} onChange={(e) => { setDeptoOrigen(e.target.value); setCiudadOrigen(''); }} required>
+                  <option value="">— Departamento —</option>
+                  {DEPTOS.map((d) => <option key={d.id} value={d.id}>{d.nombre}</option>)}
+                </select>
+              </div>
+              <div className="leg-field">
+                <label>Ciudad de origen *</label>
+                <select value={ciudadOrigen} onChange={(e) => setCiudadOrigen(e.target.value)} required disabled={!deptoOrigen}>
+                  <option value="">— Ciudad —</option>
+                  {(DEPTOS.find((d) => d.id === deptoOrigen)?.ciudades ?? []).map((c) => (
+                    <option key={c.nombre} value={c.nombre}>{c.nombre}{c.iata ? ` (${c.iata})` : ''}</option>
+                  ))}
+                </select>
+              </div>
             </div>
 
-            <div className="leg-field">
-              <label>Ciudad de destino *</label>
-              <select value={ciudadDestino} onChange={(e) => setCiudadDestino(e.target.value)} required>
-                <option value="">— Selecciona —</option>
-                {CIUDADES_CO.map((c) => <option key={c} value={c}>{c}</option>)}
-              </select>
+            {/* Destino */}
+            <div className="viaje-ciudad-bloque">
+              <div className="leg-field">
+                <label>Departamento de destino *</label>
+                <select value={deptoDestino} onChange={(e) => { setDeptoDestino(e.target.value); setCiudadDestino(''); }} required>
+                  <option value="">— Departamento —</option>
+                  {DEPTOS.map((d) => <option key={d.id} value={d.id}>{d.nombre}</option>)}
+                </select>
+              </div>
+              <div className="leg-field">
+                <label>Ciudad de destino *</label>
+                <select value={ciudadDestino} onChange={(e) => setCiudadDestino(e.target.value)} required disabled={!deptoDestino}>
+                  <option value="">— Ciudad —</option>
+                  {(DEPTOS.find((d) => d.id === deptoDestino)?.ciudades ?? []).map((c) => (
+                    <option key={c.nombre} value={c.nombre}>{c.nombre}{c.iata ? ` (${c.iata})` : ''}</option>
+                  ))}
+                </select>
+              </div>
             </div>
 
+            {/* Fechas */}
             <div className="leg-field">
               <label>Fecha de ida *</label>
               <input type="date" value={fechaIda} onChange={(e) => setFechaIda(e.target.value)} required />
             </div>
-
             {esIdaVuelta && (
               <div className="leg-field">
                 <label>Fecha de regreso *</label>
@@ -728,6 +746,11 @@ export function ViaticosPanel({ onCreada }: { onCreada?: (info: { id: number; nu
               </div>
             )}
           </div>
+
+          {/* Mapa + clima (se muestra apenas hay origen o destino seleccionado) */}
+          {(ciudadOrigen || ciudadDestino) && (
+            <MapaRuta origen={ciudadOrigen} destino={ciudadDestino} fecha={fechaIda || new Date().toISOString().slice(0, 10)} />
+          )}
 
           <div className="leg-actions">
             <button type="button" className="admin-ghost-button" onClick={anterior}>← Atrás</button>

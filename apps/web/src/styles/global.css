@@ -10283,3 +10283,202 @@ textarea {
   margin-top: 3px;
   font-weight: 600;
 }
+
+/* ============================================================
+   SELECTOR DEPARTAMENTO → CIUDAD
+   ============================================================ */
+.viaje-ciudad-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px 20px;
+  margin-bottom: 20px;
+}
+.viaje-ciudad-bloque {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  background: var(--bg-card-alt, rgba(255,255,255,0.04));
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+}
+.viaje-ciudad-bloque select:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+@media (max-width: 640px) {
+  .viaje-ciudad-grid { grid-template-columns: 1fr; }
+}
+
+/* ============================================================
+   MAPA DE RUTA — Colombia con clima
+   ============================================================ */
+.mapa-ruta-wrapper {
+  margin: 16px 0;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid var(--border-soft);
+  background: #1a2a3a;
+  transition: background 0.6s ease;
+}
+
+/* Fondos según clima */
+.mapa-bg-soleado              { background: linear-gradient(160deg, #0b3d8c 0%, #1565c0 40%, #0d47a1 100%); }
+.mapa-bg-parcialmente_nublado { background: linear-gradient(160deg, #1a3a5c 0%, #263850 100%); }
+.mapa-bg-nublado              { background: linear-gradient(160deg, #1c2a35 0%, #263238 100%); }
+.mapa-bg-lluvioso             { background: linear-gradient(160deg, #0d1b22 0%, #1a2e3a 100%); }
+.mapa-bg-tormenta             { background: linear-gradient(160deg, #050e14 0%, #0a1929 100%); }
+
+/* Tarjetas de clima */
+.mapa-clima-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px 10px;
+  flex-wrap: wrap;
+}
+.mapa-clima-sep {
+  font-size: 20px;
+  color: rgba(255,255,255,0.4);
+  flex-shrink: 0;
+}
+.mapa-clima-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  flex: 1;
+  min-width: 160px;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.12);
+  backdrop-filter: blur(4px);
+  transition: background 0.4s;
+}
+.mapa-clima-card.clima-soleado              { background: rgba(255,200,0,0.12);  border-color: rgba(255,200,0,0.3); }
+.mapa-clima-card.clima-parcialmente_nublado { background: rgba(100,160,220,0.1); border-color: rgba(100,160,220,0.25); }
+.mapa-clima-card.clima-nublado              { background: rgba(80,100,110,0.18); border-color: rgba(120,140,150,0.3); }
+.mapa-clima-card.clima-lluvioso             { background: rgba(30,80,120,0.25);  border-color: rgba(80,160,220,0.35); }
+.mapa-clima-card.clima-tormenta             { background: rgba(10,20,40,0.5);    border-color: rgba(80,120,200,0.45); }
+.mapa-clima-emoji { font-size: 32px; flex-shrink: 0; }
+.mapa-clima-body { min-width: 0; }
+.mapa-clima-label { font-size: 11px; color: rgba(255,255,255,0.6); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+.mapa-clima-temp  { font-size: 26px; font-weight: 800; color: #fff; line-height: 1; }
+.mapa-clima-desc  { font-size: 12px; color: rgba(255,255,255,0.75); margin-top: 2px; }
+.mapa-clima-meta  { font-size: 11px; color: rgba(255,255,255,0.5); margin-top: 3px; }
+
+/* SVG container */
+.mapa-svg-container {
+  width: 100%;
+  max-height: 360px;
+  overflow: hidden;
+  position: relative;
+}
+.mapa-svg {
+  width: 100%;
+  height: auto;
+  max-height: 360px;
+  display: block;
+}
+
+/* Animaciones lluvia */
+@keyframes rainFall {
+  0%   { transform: translateY(-20px); opacity: 0; }
+  10%  { opacity: 0.8; }
+  85%  { opacity: 0.7; }
+  100% { transform: translateY(500px); opacity: 0; }
+}
+.mapa-gota {
+  animation: rainFall linear infinite;
+  animation-duration: 0.8s;
+}
+
+/* Animación sol */
+@keyframes sunPulse {
+  0%, 100% { transform: scale(1); opacity: 0.9; }
+  50%       { transform: scale(1.08); opacity: 1; }
+}
+@keyframes rayRotate {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+.mapa-sol-centro { animation: sunPulse 3s ease-in-out infinite; transform-origin: center; }
+.mapa-sol-layer  { animation: rayRotate 18s linear infinite; transform-origin: 310px 55px; }
+
+/* Animación nubes */
+@keyframes cloudDrift1 { 0%,100% { transform: translateX(0); } 50% { transform: translateX(12px); } }
+@keyframes cloudDrift2 { 0%,100% { transform: translateX(0); } 50% { transform: translateX(-10px); } }
+@keyframes cloudDrift3 { 0%,100% { transform: translateX(0); } 50% { transform: translateX(8px); } }
+.mapa-nube.nube-1 { animation: cloudDrift1 8s ease-in-out infinite; }
+.mapa-nube.nube-2 { animation: cloudDrift2 11s ease-in-out infinite; }
+.mapa-nube.nube-3 { animation: cloudDrift3 9s ease-in-out infinite; }
+
+/* Relámpago */
+@keyframes lightning { 0%,100%{opacity:0} 5%,15%{opacity:1} 10%,20%{opacity:0} 25%{opacity:0.8} 30%{opacity:0} }
+.mapa-rayo { animation: lightning 3.5s ease-in-out infinite; }
+
+/* Ruta pulsante */
+@keyframes routePulse { 0%,100%{stroke-dashoffset:0} 100%{stroke-dashoffset:-20} }
+.mapa-ruta-linea { animation: routePulse 1.5s linear infinite; }
+
+/* Marcador pulsante */
+@keyframes markerPulse { 0%,100%{r:10;opacity:0.25} 50%{r:14;opacity:0.1} }
+.mapa-pulse { animation: markerPulse 2s ease-in-out infinite; }
+
+/* Infraestructura */
+.mapa-infra-row {
+  display: flex;
+  gap: 12px;
+  padding: 12px 16px 14px;
+  flex-wrap: wrap;
+  border-top: 1px solid rgba(255,255,255,0.08);
+}
+.mapa-infra-ciudad {
+  flex: 1;
+  min-width: 160px;
+}
+.mapa-infra-ciudad-nombre {
+  font-size: 12px;
+  font-weight: 700;
+  color: rgba(255,255,255,0.7);
+  margin-bottom: 5px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+.mapa-infra {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.mapa-infra-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  width: fit-content;
+}
+.mapa-infra-aero {
+  background: rgba(30,120,255,0.15);
+  border: 1px solid rgba(30,120,255,0.35);
+  color: #90CAF9;
+}
+.mapa-infra-term {
+  background: rgba(76,175,80,0.12);
+  border: 1px solid rgba(76,175,80,0.3);
+  color: #A5D6A7;
+}
+.mapa-infra-none {
+  background: rgba(255,100,0,0.1);
+  border: 1px solid rgba(255,100,0,0.25);
+  color: #FFCC80;
+  font-size: 11px;
+}
+@media (max-width: 600px) {
+  .mapa-clima-row { padding: 10px; gap: 8px; }
+  .mapa-clima-card { min-width: 140px; padding: 8px 10px; }
+  .mapa-clima-temp { font-size: 22px; }
+  .mapa-infra-row { padding: 10px; }
+}
