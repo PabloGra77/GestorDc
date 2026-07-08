@@ -2,342 +2,788 @@
 declare(strict_types=1);
 /**
  * GET /viajes/buscar
- * Busca opciones de vuelo y bus entre dos ciudades colombianas.
- * Intenta Amadeus API; si no está configurada o falla, retorna precios estimados.
+ * Transporte entre ciudades colombianas: vuelo, bus o multimodal (avión+bus).
+ * Cuando el destino es un municipio sin aeropuerto, genera rutas combinadas
+ * automáticamente (p.ej. Bogotá→Valledupar en avión + bus a Pelaya).
+ * Intenta Amadeus API; si falla o no está configurada, usa simulación enriquecida.
  *
- * Params: origen (IATA|nombre), destino (IATA|nombre), fecha_ida (YYYY-MM-DD), fecha_regreso? (YYYY-MM-DD)
+ * Params: origen, destino, fecha_ida (YYYY-MM-DD), fecha_regreso? (YYYY-MM-DD)
  */
 
 Auth::requireUser();
 Throttle::hit('viajes:' . Throttle::clientIp(), 30, 60);
 
-/* ─── Parámetros ─────────────────────────────────────────────── */
-$origen       = strtoupper(trim($_GET['origen']   ?? ''));
-$destino      = strtoupper(trim($_GET['destino']  ?? ''));
-$fechaIda     = trim($_GET['fecha_ida']            ?? '');
-$fechaRegreso = trim($_GET['fecha_regreso']         ?? '');
+/* ── Parámetros ──────────────────────────────────────────────────────────── */
+$origenRaw    = strtoupper(trim($_GET['origen']       ?? ''));
+$destinoRaw   = strtoupper(trim($_GET['destino']      ?? ''));
+$fechaIda     = trim($_GET['fecha_ida']                ?? '');
+$fechaRegreso = trim($_GET['fecha_regreso']             ?? '');
 
-if (!$origen || !$destino) {
+if (!$origenRaw || !$destinoRaw)
     Response::error('Parámetros origen y destino son obligatorios', 400);
-}
-if (!$fechaIda || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $fechaIda)) {
+if (!$fechaIda || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $fechaIda))
     Response::error('fecha_ida debe tener formato YYYY-MM-DD', 400);
-}
-if ($fechaRegreso && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $fechaRegreso)) {
+if ($fechaRegreso && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $fechaRegreso))
     Response::error('fecha_regreso debe tener formato YYYY-MM-DD', 400);
-}
-if ($origen === $destino) {
+if ($origenRaw === $destinoRaw)
     Response::error('Origen y destino no pueden ser iguales', 400);
-}
 
-/* ─── Normalizar a códigos IATA (máx 3 letras A-Z) ──────────── */
-function validarIata(string $code): bool
+/* ── Helpers ─────────────────────────────────────────────────────────────── */
+function validarIata(string $c): bool
 {
-    return (bool) preg_match('/^[A-Z]{2,3}$/', $code);
+    return (bool) preg_match('/^[A-Z]{2,3}$/', $c);
 }
 
-// Si el parámetro es un nombre de ciudad, intentamos obtener IATA del mapa
+function normCiudad(string $s): string
+{
+    $s = mb_strtoupper(trim($s), 'UTF-8');
+    return strtr($s, [
+        'Á'=>'A','É'=>'E','Í'=>'I','Ó'=>'O','Ú'=>'U','Ü'=>'U','Ñ'=>'N',
+        'á'=>'a','é'=>'e','í'=>'i','ó'=>'o','ú'=>'u','ü'=>'u','ñ'=>'n',
+    ]);
+}
+
+function minutosADur(int $mins): string
+{
+    $h = intdiv($mins, 60);
+    $m = $mins % 60;
+    return trim(($h ? "{$h}h " : '') . ($m ? "{$m}m" : '')) ?: '—';
+}
+
+function sumarMinutos(string $hora, int $mins): string
+{
+    $parts = explode(':', $hora . ':00');
+    $t = (int)$parts[0] * 60 + (int)$parts[1] + $mins;
+    return sprintf('%02d:%02d', intdiv($t, 60) % 24, $t % 60);
+}
+
+function seedRuta(string $a, string $b, string $fecha): void
+{
+    mt_srand(abs(crc32("{$a}-{$b}-{$fecha}")));
+}
+
+function precioRand(int $min, int $max): int
+{
+    // Redondear a miles para precios más naturales
+    $raw = mt_rand($min, $max);
+    return (int) (round($raw / 1000) * 1000);
+}
+
+function elegirSlots(array $slots, int $n): array
+{
+    shuffle($slots);
+    $sel = array_slice($slots, 0, min($n, count($slots)));
+    sort($sel);
+    return $sel;
+}
+
+/* ── Ciudades con aeropuerto → IATA ──────────────────────────────────────── */
 $CIUDAD_IATA = [
-    'BOGOTA'       => 'BOG', 'BOGOTÁ'        => 'BOG',
-    'MEDELLIN'     => 'MDE', 'MEDELLÍN'      => 'MDE',
-    'CALI'         => 'CLO',
-    'CARTAGENA'    => 'CTG',
-    'BARRANQUILLA' => 'BAQ',
-    'BUCARAMANGA'  => 'BGA',
-    'PEREIRA'      => 'PEI',
-    'SANTAMARTA'   => 'SMR', 'SANTA MARTA'  => 'SMR',
-    'CUCUTA'       => 'CUC', 'CÚCUTA'       => 'CUC',
-    'MANIZALES'    => 'MZL',
-    'ARMENIA'      => 'AXM',
-    'IBAGUE'       => 'IBE', 'IBAGUÉ'       => 'IBE',
-    'MONTERIA'     => 'MTR', 'MONTERÍA'     => 'MTR',
-    'VILLAVICENCIO'=> 'VVC',
-    'PASTO'        => 'PSO',
-    'NEIVA'        => 'HEI',
-    'VALLEDUPAR'   => 'VUP',
-    'SANANDRES'    => 'ADZ', 'SAN ANDRÉS'   => 'ADZ',
-    'POPAYAN'      => 'PPN', 'POPAYÁN'      => 'PPN',
-    'LETICIA'      => 'LET',
-    'FLORENCIA'    => 'FLA',
-    'YOPAL'        => 'EYP',
-    'RIOHACHA'     => 'RCH',
+    /* Capitales / grandes aeropuertos */
+    'BOGOTA'=>'BOG','BOGOTÁ'=>'BOG','SANTAFE DE BOGOTA'=>'BOG','SANTA FE DE BOGOTA'=>'BOG',
+    'MEDELLIN'=>'MDE','MEDELLÍN'=>'MDE','BELLO'=>'MDE','ITAGUI'=>'MDE','ITAGÜÍ'=>'MDE','ENVIGADO'=>'MDE',
+    'CALI'=>'CLO','PALMIRA'=>'CLO','YUMBO'=>'CLO',
+    'CARTAGENA'=>'CTG','CARTAGENA DE INDIAS'=>'CTG',
+    'BARRANQUILLA'=>'BAQ','SOLEDAD'=>'BAQ',
+    'BUCARAMANGA'=>'BGA','FLORIDABLANCA'=>'BGA','GIRON'=>'BGA','GIRÓN'=>'BGA','PIEDECUESTA'=>'BGA',
+    'PEREIRA'=>'PEI','DOSQUEBRADAS'=>'PEI',
+    'SANTA MARTA'=>'SMR','SANTAMARTA'=>'SMR',
+    'CUCUTA'=>'CUC','CÚCUTA'=>'CUC','VILLA DEL ROSARIO'=>'CUC','LOS PATIOS'=>'CUC','SAN JOSE DE CUCUTA'=>'CUC',
+    'MANIZALES'=>'MZL',
+    'ARMENIA'=>'AXM',
+    'IBAGUE'=>'IBE','IBAGUÉ'=>'IBE',
+    'MONTERIA'=>'MTR','MONTERÍA'=>'MTR',
+    'VILLAVICENCIO'=>'VVC',
+    'PASTO'=>'PSO',
+    'NEIVA'=>'HEI',
+    'VALLEDUPAR'=>'VUP',
+    'SAN ANDRES'=>'ADZ','SAN ANDRÉS'=>'ADZ','SANANDRES'=>'ADZ','ISLA DE SAN ANDRES'=>'ADZ',
+    'POPAYAN'=>'PPN','POPAYÁN'=>'PPN',
+    'LETICIA'=>'LET',
+    'FLORENCIA'=>'FLA',
+    'YOPAL'=>'EYP',
+    'RIOHACHA'=>'RCH',
+    'QUIBDO'=>'UIB','QUIBDÓ'=>'UIB',
+    'ARAUCA'=>'AUC',
+    'BARRANCABERMEJA'=>'EJA',
+    'TUMACO'=>'TCC',
+    'COROZAL'=>'CZU','SINCELEJO'=>'CZU',
+    'APARTADO'=>'APO','APARTADÓ'=>'APO',
+    'TURBO'=>'TRB',
+    'PUERTO CARRENO'=>'PCR','PUERTO CARREÑO'=>'PCR',
+    'MITU'=>'MVP','MITÚ'=>'MVP',
+    'INIRIDA'=>'PDA','INÍRIDA'=>'PDA',
+    'SAN JOSE DEL GUAVIARE'=>'SJE','SAN JOSÉ DEL GUAVIARE'=>'SJE',
+    'SARAVENA'=>'ULS',
+    /* Departamentos → aeropuerto principal */
+    'CESAR'=>'VUP','DEPARTAMENTO DE CESAR'=>'VUP',
+    'CORDOBA'=>'MTR','CÓRDOBA'=>'MTR',
+    'CAUCA'=>'PPN',
+    'NARINO'=>'PSO','NARIÑO'=>'PSO',
+    'HUILA'=>'HEI',
+    'META'=>'VVC',
+    'CASANARE'=>'EYP',
+    'CAQUETA'=>'FLA','CAQUETÁ'=>'FLA',
+    'GUAVIARE'=>'SJE',
+    'CHOCO'=>'UIB','CHOCÓ'=>'UIB',
+    'LA GUAJIRA'=>'RCH',
+    'MAGDALENA'=>'SMR',
+    'BOLIVAR'=>'CTG','BOLÍVAR'=>'CTG',
 ];
 
-$origenIata  = validarIata($origen)  ? $origen  : ($CIUDAD_IATA[$origen]  ?? $origen);
-$destinoIata = validarIata($destino) ? $destino : ($CIUDAD_IATA[$destino] ?? $destino);
+/* ── Municipios SIN aeropuerto → aeropuerto más cercano ─────────────────── */
+/* Formato: nombre → [iata, ciudad_aeropuerto, min_bus, precio_min, precio_max, [empresas]] */
+$MUNICIPIOS_SIN_AEROPUERTO = [
+    /* Cesar */
+    'PELAYA'                 => ['VUP','Valledupar',  90, 20000, 28000, ['Copetran','Expreso Brasilia']],
+    'PAILITAS'               => ['VUP','Valledupar', 120, 25000, 35000, ['Copetran','Expreso Brasilia']],
+    'AGUACHICA'              => ['BGA','Bucaramanga',150, 32000, 45000, ['Copetran','Berlinas del Fonce']],
+    'GAMARRA'                => ['VUP','Valledupar', 150, 30000, 42000, ['Copetran']],
+    'LA JAGUA DE IBIRICO'    => ['VUP','Valledupar',  60, 16000, 22000, ['Copetran']],
+    'BECERRIL'               => ['VUP','Valledupar', 120, 24000, 34000, ['Copetran']],
+    'CHIMICHAGUA'            => ['VUP','Valledupar', 150, 28000, 40000, ['Copetran']],
+    'CURUMANI'               => ['VUP','Valledupar', 120, 23000, 32000, ['Copetran']],
+    'MANAURE BALCON DEL CESAR'=> ['VUP','Valledupar', 80, 18000, 25000, ['Copetran']],
+    'SAN ALBERTO'            => ['BGA','Bucaramanga',180, 38000, 52000, ['Copetran','Berlinas del Fonce']],
+    'AGUACHICA CESAR'        => ['BGA','Bucaramanga',150, 32000, 45000, ['Copetran']],
+    /* Magdalena */
+    'EL BANCO'               => ['VUP','Valledupar', 180, 42000, 58000, ['Expreso Brasilia','Copetran']],
+    'PLATO'                  => ['SMR','Santa Marta', 120, 28000, 38000, ['Flota Magdalena','Expreso Brasilia']],
+    'CIENAGA'                => ['SMR','Santa Marta',  60, 13000, 18000, ['Flota Magdalena','Expreso Brasilia']],
+    'FUNDACION'              => ['SMR','Santa Marta',  90, 20000, 28000, ['Flota Magdalena']],
+    'ARACATACA'              => ['SMR','Santa Marta', 120, 26000, 36000, ['Flota Magdalena']],
+    'PIVIJAY'                => ['BAQ','Barranquilla',  90, 22000, 30000, ['Expreso Brasilia']],
+    'EL DIFICIL'             => ['SMR','Santa Marta', 150, 30000, 42000, ['Flota Magdalena']],
+    /* Bolívar */
+    'MAGANGUE'               => ['CTG','Cartagena',  210, 50000, 70000, ['Expreso Brasilia','Rápido Ochoa']],
+    'MAGANGUÉ'               => ['CTG','Cartagena',  210, 50000, 70000, ['Expreso Brasilia','Rápido Ochoa']],
+    'MOMPOX'                 => ['BAQ','Barranquilla',300, 60000, 85000, ['Expreso Brasilia']],
+    'MOMPOS'                 => ['BAQ','Barranquilla',300, 60000, 85000, ['Expreso Brasilia']],
+    'EL CARMEN DE BOLIVAR'   => ['CTG','Cartagena',  180, 40000, 56000, ['Expreso Brasilia']],
+    'SAN JUAN NEPOMUCENO'    => ['CTG','Cartagena',  150, 35000, 48000, ['Expreso Brasilia']],
+    /* Boyacá */
+    'TUNJA'                  => ['BOG','Bogotá',      150, 28000, 38000, ['Expreso Bolivariano','Libertadores']],
+    'DUITAMA'                => ['BOG','Bogotá',      180, 33000, 46000, ['Expreso Bolivariano','Libertadores']],
+    'SOGAMOSO'               => ['BOG','Bogotá',      210, 36000, 50000, ['Expreso Bolivariano','Libertadores']],
+    'PAIPA'                  => ['BOG','Bogotá',      170, 30000, 42000, ['Expreso Bolivariano']],
+    'VILLA DE LEYVA'         => ['BOG','Bogotá',      175, 32000, 44000, ['Expreso Bolivariano']],
+    'CHIQUINQUIRA'           => ['BOG','Bogotá',      180, 30000, 42000, ['Expreso Bolivariano','Flota Boyacá']],
+    /* Caldas */
+    'LA DORADA'              => ['MZL','Manizales',    90, 23000, 32000, ['Expreso Bolivariano','Flota Occidental']],
+    'RIOSUCIO'               => ['MZL','Manizales',   120, 26000, 36000, ['Expreso Bolivariano']],
+    'CHINCHINA'              => ['MZL','Manizales',    40, 10000, 14000, ['Expreso Bolivariano']],
+    'ANSERMA'                => ['MZL','Manizales',    90, 20000, 28000, ['Flota Occidental']],
+    /* Cundinamarca */
+    'GIRARDOT'               => ['BOG','Bogotá',      120, 26000, 36000, ['Expreso Bolivariano','Flota Magdalena']],
+    'FUSAGASUGA'             => ['BOG','Bogotá',       90, 16000, 22000, ['Expreso Bolivariano']],
+    'FUSAGASUGÁ'             => ['BOG','Bogotá',       90, 16000, 22000, ['Expreso Bolivariano']],
+    'FACATATIVA'             => ['BOG','Bogotá',       50, 10000, 14000, ['Expreso Bolivariano']],
+    'FACATATIVÁ'             => ['BOG','Bogotá',       50, 10000, 14000, ['Expreso Bolivariano']],
+    'ZIPAQUIRA'              => ['BOG','Bogotá',       60, 12000, 16000, ['Expreso Bolivariano']],
+    'ZIPAQUIRÁ'              => ['BOG','Bogotá',       60, 12000, 16000, ['Expreso Bolivariano']],
+    'VILLETA'                => ['BOG','Bogotá',       90, 18000, 25000, ['Expreso Bolivariano']],
+    'LA MESA'                => ['BOG','Bogotá',       75, 14000, 20000, ['Expreso Bolivariano']],
+    /* Santander */
+    'SAN GIL'                => ['BGA','Bucaramanga', 120, 26000, 36000, ['Berlinas del Fonce','Copetran']],
+    'VELEZ'                  => ['BGA','Bucaramanga', 180, 36000, 50000, ['Copetran']],
+    'VÉLEZ'                  => ['BGA','Bucaramanga', 180, 36000, 50000, ['Copetran']],
+    'SOCORRO'                => ['BGA','Bucaramanga', 150, 30000, 42000, ['Copetran']],
+    'MALAGA'                 => ['BGA','Bucaramanga', 180, 35000, 48000, ['Copetran']],
+    'MÁLAGA'                 => ['BGA','Bucaramanga', 180, 35000, 48000, ['Copetran']],
+    'BARBOSA'                => ['BGA','Bucaramanga',  90, 20000, 28000, ['Berlinas del Fonce']],
+    /* Norte de Santander */
+    'OCANA'                  => ['CUC','Cúcuta',      180, 36000, 50000, ['Coflonorte','Fronteras']],
+    'OCAÑA'                  => ['CUC','Cúcuta',      180, 36000, 50000, ['Coflonorte','Fronteras']],
+    'PAMPLONA'               => ['CUC','Cúcuta',       90, 16000, 22000, ['Copetran','Fronteras']],
+    'TIBU'                   => ['CUC','Cúcuta',      120, 22000, 30000, ['Fronteras']],
+    'TIBÚ'                   => ['CUC','Cúcuta',      120, 22000, 30000, ['Fronteras']],
+    'CHINACOTA'              => ['CUC','Cúcuta',       60, 12000, 16000, ['Fronteras']],
+    /* Tolima */
+    'ESPINAL'                => ['IBE','Ibagué',       60, 16000, 22000, ['Expreso Bolivariano']],
+    'HONDA'                  => ['IBE','Ibagué',       90, 20000, 28000, ['Expreso Bolivariano','Flota Magdalena']],
+    'MELGAR'                 => ['IBE','Ibagué',       90, 18000, 25000, ['Expreso Bolivariano']],
+    'CHAPARRAL'              => ['IBE','Ibagué',      120, 26000, 36000, ['Coomotor']],
+    'PURIFICACION'           => ['IBE','Ibagué',      100, 22000, 30000, ['Expreso Bolivariano']],
+    'PURIFICACIÓN'           => ['IBE','Ibagué',      100, 22000, 30000, ['Expreso Bolivariano']],
+    /* Huila */
+    'GARZON'                 => ['HEI','Neiva',       120, 26000, 36000, ['Coomotor','Expreso Bolivariano']],
+    'GARZÓN'                 => ['HEI','Neiva',       120, 26000, 36000, ['Coomotor','Expreso Bolivariano']],
+    'PITALITO'               => ['HEI','Neiva',       180, 32000, 45000, ['Coomotor']],
+    'LA PLATA'               => ['HEI','Neiva',       150, 28000, 38000, ['Coomotor']],
+    'SAN AGUSTIN'            => ['HEI','Neiva',       210, 38000, 52000, ['Coomotor']],
+    'SAN AGUSTÍN'            => ['HEI','Neiva',       210, 38000, 52000, ['Coomotor']],
+    /* Nariño */
+    'IPIALES'                => ['PSO','Pasto',        90, 20000, 28000, ['Expreso Bolivariano','La Veloz del Sur']],
+    'SAMANIEGO'              => ['PSO','Pasto',       120, 26000, 36000, ['Expreso Bolivariano']],
+    'LA UNION'               => ['PSO','Pasto',        90, 18000, 25000, ['Expreso Bolivariano']],
+    'LA UNIÓN'               => ['PSO','Pasto',        90, 18000, 25000, ['Expreso Bolivariano']],
+    /* Putumayo */
+    'MOCOA'                  => ['PSO','Pasto',       120, 26000, 36000, ['Expreso Bolivariano']],
+    'PUERTO ASIS'            => ['PSO','Pasto',       300, 60000, 84000, ['Cootranscaquetá']],
+    'PUERTO ASÍS'            => ['PSO','Pasto',       300, 60000, 84000, ['Cootranscaquetá']],
+    'SIBUNDOY'               => ['PSO','Pasto',        90, 18000, 25000, ['Expreso Bolivariano']],
+    'ORITO'                  => ['PSO','Pasto',       270, 55000, 75000, ['Cootranscaquetá']],
+    /* Cauca */
+    'SANTANDER DE QUILICHAO' => ['CLO','Cali',         60, 16000, 22000, ['Expreso Bolivariano','Flota Occidental']],
+    'MIRANDA'                => ['CLO','Cali',          80, 18000, 25000, ['Expreso Bolivariano']],
+    'PUERTO TEJADA'          => ['CLO','Cali',          70, 16000, 22000, ['Flota Occidental']],
+    'PATIA'                  => ['PPN','Popayán',       90, 18000, 25000, ['Expreso Bolivariano']],
+    /* Córdoba */
+    'LORICA'                 => ['MTR','Montería',      45, 10000, 14000, ['Expreso Brasilia']],
+    'PLANETA RICA'           => ['MTR','Montería',     120, 20000, 28000, ['Expreso Brasilia','Rápido Ochoa']],
+    'SAHAGUN'                => ['MTR','Montería',     120, 22000, 30000, ['Expreso Brasilia']],
+    'SAHAGÚN'                => ['MTR','Montería',     120, 22000, 30000, ['Expreso Brasilia']],
+    'CIENAGA DE ORO'         => ['MTR','Montería',      60, 13000, 18000, ['Expreso Brasilia']],
+    'TIERRALTA'              => ['MTR','Montería',     150, 28000, 38000, ['Expreso Brasilia']],
+    /* Sucre */
+    'SINCE'                  => ['CZU','Sincelejo',     45, 10000, 14000, ['Expreso Brasilia']],
+    'SAMPUES'                => ['CZU','Sincelejo',     60, 13000, 18000, ['Expreso Brasilia']],
+    'TOLU'                   => ['CZU','Sincelejo',     90, 18000, 25000, ['Expreso Brasilia']],
+    'TOLÚ'                   => ['CZU','Sincelejo',     90, 18000, 25000, ['Expreso Brasilia']],
+    'SAN MARCOS'             => ['CZU','Sincelejo',    120, 22000, 30000, ['Expreso Brasilia']],
+    /* Antioquia/Urabá */
+    'CHIGORODO'              => ['APO','Apartadó',      45, 10000, 14000, ['Rápido Ochoa']],
+    'CHIGORODÓ'              => ['APO','Apartadó',      45, 10000, 14000, ['Rápido Ochoa']],
+    /* Meta */
+    'ACACIAS'                => ['VVC','Villavicencio',  40, 10000, 14000, ['Expreso Bolivariano']],
+    'GRANADA META'           => ['VVC','Villavicencio',  90, 20000, 28000, ['Expreso Bolivariano']],
+    'SAN MARTIN DE LOS LLANOS'=> ['VVC','Villavicencio', 60, 14000, 20000, ['Expreso Bolivariano']],
+    /* Casanare */
+    'AGUAZUL'                => ['EYP','Yopal',          60, 13000, 18000, ['Expreso Bolivariano']],
+    'TAURAMENA'              => ['EYP','Yopal',           90, 18000, 25000, ['Expreso Bolivariano']],
+    'VILLANUEVA'             => ['EYP','Yopal',           90, 18000, 25000, ['Expreso Bolivariano']],
+];
 
-/* ─── Base de precios estimados Colombia ─────────────────────── */
-// Formato: 'ORG-DST' => ['vuelo' => [min, mid, max], 'bus' => precio|null, 'durVuelo' => 'Xh Ym', 'durBus' => 'Xh Ym'|null]
+/* ── Aerolíneas colombianas por tipo de ruta ─────────────────────────────── */
+$AL_TRUNK    = ['Avianca','LATAM Colombia','Wingo','JetSmart','Copa Airlines'];
+$AL_REGIONAL = ['Avianca','LATAM Colombia','EasyFly','JetSmart','Wingo'];
+$AL_REMOTE   = ['Satena','EasyFly','Avianca'];
+
+/* Horarios de salida por tipo */
+$SLV_TRUNK    = ['05:30','06:10','07:20','08:00','08:45','09:30','10:30','11:15','12:30','13:00','14:30','15:00','16:00','17:20','17:45','18:30','19:00','20:10'];
+$SLV_REGIONAL = ['06:00','06:30','07:30','08:30','09:00','10:00','11:00','12:30','14:00','15:30','16:30','17:30','18:00','19:00'];
+$SLV_REMOTE   = ['06:00','08:00','10:00','12:30','14:00','16:00'];
+$SL_BUS       = ['04:00','04:30','05:00','05:30','06:00','06:30','07:00','08:00','09:00','10:00','11:00','13:00','14:00','15:00','16:00','17:00','18:00','19:00','20:00','21:00','22:00','22:30'];
+
+/* ── Empresas de bus por región ──────────────────────────────────────────── */
+$BUS_COSTA    = ['Expreso Brasilia','Copetran','Flota Magdalena','Omega Ltda','Berlinastur','Expreso Bolivariano'];
+$BUS_INTERIOR = ['Expreso Bolivariano','Flota Occidental','Rápido Tolima','Autobuses del Sur','Coflonorte'];
+$BUS_ORIENTE  = ['Copetran','Berlinas del Fonce','San Silvestre','Fronteras','Expreso Brasilia'];
+$BUS_SUR      = ['Coomotor','La Veloz del Sur','Expreso Bolivariano','Cootranscaquetá','Sotracesa'];
+$BUS_ANTIOQ   = ['Rápido Ochoa','Flota Occidental','Expreso Bolivariano','Cotrafa','Transportes Gómez Hernández'];
+$BUS_GENERAL  = ['Expreso Bolivariano','Expreso Brasilia','Copetran','Flota Magdalena','Omega Ltda','Rápido Ochoa'];
+
+/* ── Tabla de rutas ──────────────────────────────────────────────────────── */
+/* [v=>[min,max], b=>[min,max]|null, dv=>min_vuelo, db=>min_bus|null, al=>trunk/regional/remote, rb=>&$buses] */
 $RUTAS = [
-    'BOG-MDE' => ['vuelo' => [280000, 320000, 370000], 'bus' => 78000,  'durVuelo' => '1h 10m', 'durBus' => '8h 30m'],
-    'BOG-CLO' => ['vuelo' => [260000, 300000, 350000], 'bus' => 72000,  'durVuelo' => '1h 05m', 'durBus' => '8h'],
-    'BOG-CTG' => ['vuelo' => [320000, 380000, 460000], 'bus' => 130000, 'durVuelo' => '1h 35m', 'durBus' => '20h'],
-    'BOG-BAQ' => ['vuelo' => [300000, 360000, 440000], 'bus' => 120000, 'durVuelo' => '1h 25m', 'durBus' => '17h'],
-    'BOG-BGA' => ['vuelo' => [220000, 260000, 310000], 'bus' => 55000,  'durVuelo' => '50m',    'durBus' => '6h'],
-    'BOG-PEI' => ['vuelo' => [230000, 270000, 330000], 'bus' => 50000,  'durVuelo' => '55m',    'durBus' => '5h 30m'],
-    'BOG-SMR' => ['vuelo' => [280000, 340000, 410000], 'bus' => 100000, 'durVuelo' => '1h 20m', 'durBus' => '15h'],
-    'BOG-CUC' => ['vuelo' => [250000, 300000, 360000], 'bus' => 90000,  'durVuelo' => '1h 10m', 'durBus' => '12h'],
-    'BOG-MZL' => ['vuelo' => [240000, 280000, 340000], 'bus' => 58000,  'durVuelo' => '1h 00m', 'durBus' => '7h'],
-    'BOG-AXM' => ['vuelo' => [230000, 270000, 325000], 'bus' => 52000,  'durVuelo' => '55m',    'durBus' => '6h'],
-    'BOG-IBE' => ['vuelo' => [220000, 260000, 310000], 'bus' => 40000,  'durVuelo' => '50m',    'durBus' => '4h'],
-    'BOG-MTR' => ['vuelo' => [260000, 310000, 375000], 'bus' => 95000,  'durVuelo' => '1h 10m', 'durBus' => '14h'],
-    'BOG-VVC' => ['vuelo' => [210000, 250000, 300000], 'bus' => 45000,  'durVuelo' => '45m',    'durBus' => '4h 30m'],
-    'BOG-PSO' => ['vuelo' => [260000, 310000, 375000], 'bus' => 75000,  'durVuelo' => '1h 15m', 'durBus' => '9h'],
-    'BOG-HEI' => ['vuelo' => [230000, 270000, 325000], 'bus' => 55000,  'durVuelo' => '55m',    'durBus' => '6h 30m'],
-    'BOG-VUP' => ['vuelo' => [280000, 340000, 415000], 'bus' => 110000, 'durVuelo' => '1h 20m', 'durBus' => '16h'],
-    'BOG-ADZ' => ['vuelo' => [420000, 520000, 650000], 'bus' => null,   'durVuelo' => '1h 55m', 'durBus' => null],
-    'BOG-PPN' => ['vuelo' => [250000, 295000, 355000], 'bus' => 68000,  'durVuelo' => '1h 05m', 'durBus' => '8h 30m'],
-    'BOG-LET' => ['vuelo' => [380000, 470000, 590000], 'bus' => null,   'durVuelo' => '2h 00m', 'durBus' => null],
-    'BOG-FLA' => ['vuelo' => [220000, 260000, 315000], 'bus' => 50000,  'durVuelo' => '50m',    'durBus' => '6h'],
-    'BOG-EYP' => ['vuelo' => [230000, 275000, 330000], 'bus' => 48000,  'durVuelo' => '55m',    'durBus' => '5h'],
-    'BOG-RCH' => ['vuelo' => [290000, 350000, 430000], 'bus' => 115000, 'durVuelo' => '1h 25m', 'durBus' => '18h'],
-    'MDE-CLO' => ['vuelo' => [220000, 260000, 315000], 'bus' => 65000,  'durVuelo' => '1h 00m', 'durBus' => '7h'],
-    'MDE-CTG' => ['vuelo' => [260000, 310000, 375000], 'bus' => 110000, 'durVuelo' => '1h 10m', 'durBus' => '13h'],
-    'MDE-BAQ' => ['vuelo' => [240000, 290000, 355000], 'bus' => 90000,  'durVuelo' => '1h 05m', 'durBus' => '11h'],
-    'MDE-BGA' => ['vuelo' => [200000, 240000, 295000], 'bus' => 55000,  'durVuelo' => '45m',    'durBus' => '6h'],
-    'CLO-CTG' => ['vuelo' => [260000, 315000, 380000], 'bus' => 120000, 'durVuelo' => '1h 15m', 'durBus' => '16h'],
-    'CTG-BAQ' => ['vuelo' => [200000, 240000, 295000], 'bus' => 50000,  'durVuelo' => '40m',    'durBus' => '5h'],
-    /* ── Rutas bus corto/mediano (solo bus, sin vuelo comercial) ── */
-    'CLO-IBE' => ['vuelo' => null,                     'bus' => 55000,  'durVuelo' => null,      'durBus' => '3h 30m'],
-    'CLO-PEI' => ['vuelo' => [200000, 240000, 290000], 'bus' => 35000,  'durVuelo' => '45m',     'durBus' => '3h'],
-    'CLO-MZL' => ['vuelo' => [200000, 240000, 290000], 'bus' => 42000,  'durVuelo' => '50m',     'durBus' => '4h'],
-    'CLO-AXM' => ['vuelo' => null,                     'bus' => 38000,  'durVuelo' => null,      'durBus' => '2h 30m'],
-    'CLO-BGA' => ['vuelo' => [240000, 285000, 345000], 'bus' => 85000,  'durVuelo' => '1h 10m',  'durBus' => '9h'],
-    'CLO-BAQ' => ['vuelo' => [255000, 305000, 370000], 'bus' => 140000, 'durVuelo' => '1h 15m',  'durBus' => '20h'],
-    'CLO-PPN' => ['vuelo' => null,                     'bus' => 38000,  'durVuelo' => null,      'durBus' => '2h'],
-    'CLO-HEI' => ['vuelo' => [220000, 265000, 320000], 'bus' => 75000,  'durVuelo' => '55m',     'durBus' => '8h'],
-    'MDE-MZL' => ['vuelo' => [195000, 235000, 285000], 'bus' => 40000,  'durVuelo' => '45m',     'durBus' => '4h'],
-    'MDE-PEI' => ['vuelo' => [195000, 235000, 285000], 'bus' => 45000,  'durVuelo' => '40m',     'durBus' => '4h 30m'],
-    'MDE-AXM' => ['vuelo' => [195000, 235000, 285000], 'bus' => 42000,  'durVuelo' => '45m',     'durBus' => '5h'],
-    'MDE-IBE' => ['vuelo' => [210000, 255000, 310000], 'bus' => 60000,  'durVuelo' => '50m',     'durBus' => '6h'],
-    'MDE-CUC' => ['vuelo' => [220000, 265000, 320000], 'bus' => 75000,  'durVuelo' => '1h',      'durBus' => '9h'],
-    'MDE-SMR' => ['vuelo' => [235000, 280000, 340000], 'bus' => 90000,  'durVuelo' => '1h 05m',  'durBus' => '12h'],
-    'MDE-HEI' => ['vuelo' => [225000, 270000, 330000], 'bus' => 75000,  'durVuelo' => '55m',     'durBus' => '8h'],
-    'MDE-VVC' => ['vuelo' => [210000, 255000, 310000], 'bus' => 80000,  'durVuelo' => '50m',     'durBus' => '9h'],
-    'MDE-PSO' => ['vuelo' => [250000, 300000, 365000], 'bus' => 95000,  'durVuelo' => '1h 15m',  'durBus' => '12h'],
-    'BGA-CUC' => ['vuelo' => [185000, 225000, 275000], 'bus' => 45000,  'durVuelo' => '45m',     'durBus' => '5h'],
-    'BGA-BOG' => ['vuelo' => [220000, 260000, 310000], 'bus' => 55000,  'durVuelo' => '50m',     'durBus' => '6h'],
-    'PEI-MZL' => ['vuelo' => null,                     'bus' => 15000,  'durVuelo' => null,      'durBus' => '1h'],
-    'PEI-AXM' => ['vuelo' => null,                     'bus' => 18000,  'durVuelo' => null,      'durBus' => '1h 30m'],
-    'IBE-PEI' => ['vuelo' => null,                     'bus' => 28000,  'durVuelo' => null,      'durBus' => '2h'],
-    'IBE-AXM' => ['vuelo' => null,                     'bus' => 32000,  'durVuelo' => null,      'durBus' => '2h 30m'],
-    'IBE-MZL' => ['vuelo' => null,                     'bus' => 35000,  'durVuelo' => null,      'durBus' => '3h'],
-    'IBE-CLO' => ['vuelo' => null,                     'bus' => 55000,  'durVuelo' => null,      'durBus' => '3h 30m'],
-    'CTG-SMR' => ['vuelo' => [190000, 230000, 280000], 'bus' => 40000,  'durVuelo' => '40m',     'durBus' => '4h'],
-    'BAQ-SMR' => ['vuelo' => null,                     'bus' => 25000,  'durVuelo' => null,      'durBus' => '2h'],
-    'BAQ-CUC' => ['vuelo' => [195000, 235000, 285000], 'bus' => 55000,  'durVuelo' => '45m',     'durBus' => '6h'],
-    'CLO-VVC' => ['vuelo' => [230000, 275000, 335000], 'bus' => 90000,  'durVuelo' => '1h',      'durBus' => '10h'],
+    /* ── Bogotá ── */
+    'BOG-MDE'=>['v'=>[248000,395000],'b'=>[62000,95000],  'dv'=>70, 'db'=>510,'al'=>'trunk',    'rb'=>&$BUS_ANTIOQ],
+    'BOG-CLO'=>['v'=>[235000,380000],'b'=>[58000,88000],  'dv'=>65, 'db'=>480,'al'=>'trunk',    'rb'=>&$BUS_INTERIOR],
+    'BOG-CTG'=>['v'=>[285000,465000],'b'=>[115000,162000],'dv'=>95, 'db'=>1200,'al'=>'trunk',   'rb'=>&$BUS_COSTA],
+    'BOG-BAQ'=>['v'=>[265000,445000],'b'=>[105000,150000],'dv'=>85, 'db'=>1020,'al'=>'trunk',   'rb'=>&$BUS_COSTA],
+    'BOG-BGA'=>['v'=>[198000,322000],'b'=>[45000,72000],  'dv'=>50, 'db'=>360,'al'=>'trunk',    'rb'=>&$BUS_ORIENTE],
+    'BOG-PEI'=>['v'=>[208000,338000],'b'=>[42000,65000],  'dv'=>55, 'db'=>330,'al'=>'regional', 'rb'=>&$BUS_INTERIOR],
+    'BOG-SMR'=>['v'=>[258000,422000],'b'=>[88000,130000], 'dv'=>80, 'db'=>900,'al'=>'trunk',    'rb'=>&$BUS_COSTA],
+    'BOG-CUC'=>['v'=>[228000,372000],'b'=>[78000,118000], 'dv'=>70, 'db'=>720,'al'=>'regional', 'rb'=>&$BUS_ORIENTE],
+    'BOG-MZL'=>['v'=>[218000,348000],'b'=>[48000,74000],  'dv'=>60, 'db'=>420,'al'=>'regional', 'rb'=>&$BUS_INTERIOR],
+    'BOG-AXM'=>['v'=>[208000,332000],'b'=>[43000,67000],  'dv'=>55, 'db'=>360,'al'=>'regional', 'rb'=>&$BUS_INTERIOR],
+    'BOG-IBE'=>['v'=>[198000,318000],'b'=>[33000,52000],  'dv'=>50, 'db'=>240,'al'=>'regional', 'rb'=>&$BUS_INTERIOR],
+    'BOG-MTR'=>['v'=>[238000,388000],'b'=>[85000,125000], 'dv'=>70, 'db'=>840,'al'=>'regional', 'rb'=>&$BUS_COSTA],
+    'BOG-VVC'=>['v'=>[192000,308000],'b'=>[38000,58000],  'dv'=>45, 'db'=>270,'al'=>'regional', 'rb'=>&$BUS_INTERIOR],
+    'BOG-PSO'=>['v'=>[238000,388000],'b'=>[65000,98000],  'dv'=>75, 'db'=>540,'al'=>'regional', 'rb'=>&$BUS_SUR],
+    'BOG-HEI'=>['v'=>[212000,342000],'b'=>[46000,72000],  'dv'=>55, 'db'=>390,'al'=>'regional', 'rb'=>&$BUS_SUR],
+    'BOG-VUP'=>['v'=>[258000,418000],'b'=>[98000,145000], 'dv'=>80, 'db'=>960,'al'=>'regional', 'rb'=>&$BUS_COSTA],
+    'BOG-ADZ'=>['v'=>[398000,662000],'b'=>[null,null],    'dv'=>115,'db'=>null,'al'=>'trunk',   'rb'=>[]],
+    'BOG-PPN'=>['v'=>[228000,368000],'b'=>[60000,90000],  'dv'=>65, 'db'=>510,'al'=>'regional', 'rb'=>&$BUS_SUR],
+    'BOG-LET'=>['v'=>[358000,602000],'b'=>[null,null],    'dv'=>120,'db'=>null,'al'=>'remote',  'rb'=>[]],
+    'BOG-FLA'=>['v'=>[202000,328000],'b'=>[43000,67000],  'dv'=>50, 'db'=>360,'al'=>'remote',   'rb'=>&$BUS_SUR],
+    'BOG-EYP'=>['v'=>[212000,342000],'b'=>[40000,62000],  'dv'=>55, 'db'=>300,'al'=>'remote',   'rb'=>&$BUS_INTERIOR],
+    'BOG-RCH'=>['v'=>[268000,432000],'b'=>[102000,150000],'dv'=>85, 'db'=>1080,'al'=>'regional','rb'=>&$BUS_COSTA],
+    'BOG-UIB'=>['v'=>[258000,418000],'b'=>[null,null],    'dv'=>55, 'db'=>null,'al'=>'remote',  'rb'=>[]],
+    'BOG-AUC'=>['v'=>[248000,402000],'b'=>[null,null],    'dv'=>60, 'db'=>null,'al'=>'remote',  'rb'=>[]],
+    'BOG-EJA'=>['v'=>[218000,352000],'b'=>[62000,95000],  'dv'=>55, 'db'=>420,'al'=>'regional', 'rb'=>&$BUS_ORIENTE],
+    'BOG-CZU'=>['v'=>[238000,385000],'b'=>[95000,138000], 'dv'=>60, 'db'=>780,'al'=>'regional', 'rb'=>&$BUS_COSTA],
+    'BOG-APO'=>['v'=>[258000,418000],'b'=>[null,null],    'dv'=>60, 'db'=>null,'al'=>'remote',  'rb'=>[]],
+    'BOG-TCC'=>['v'=>[282000,455000],'b'=>[null,null],    'dv'=>75, 'db'=>null,'al'=>'remote',  'rb'=>[]],
+    'BOG-SJE'=>['v'=>[228000,368000],'b'=>[null,null],    'dv'=>60, 'db'=>null,'al'=>'remote',  'rb'=>[]],
+    'BOG-PCR'=>['v'=>[348000,562000],'b'=>[null,null],    'dv'=>90, 'db'=>null,'al'=>'remote',  'rb'=>[]],
+    /* ── Medellín ── */
+    'MDE-CLO'=>['v'=>[202000,328000],'b'=>[55000,85000],  'dv'=>60, 'db'=>420,'al'=>'trunk',    'rb'=>&$BUS_INTERIOR],
+    'MDE-CTG'=>['v'=>[238000,388000],'b'=>[97000,142000], 'dv'=>70, 'db'=>780,'al'=>'trunk',    'rb'=>&$BUS_COSTA],
+    'MDE-BAQ'=>['v'=>[218000,355000],'b'=>[79000,118000], 'dv'=>65, 'db'=>660,'al'=>'trunk',    'rb'=>&$BUS_COSTA],
+    'MDE-BGA'=>['v'=>[182000,298000],'b'=>[46000,70000],  'dv'=>45, 'db'=>360,'al'=>'regional', 'rb'=>&$BUS_ORIENTE],
+    'MDE-MZL'=>['v'=>[178000,288000],'b'=>[33000,52000],  'dv'=>45, 'db'=>240,'al'=>'regional', 'rb'=>&$BUS_INTERIOR],
+    'MDE-PEI'=>['v'=>[178000,288000],'b'=>[36000,57000],  'dv'=>40, 'db'=>270,'al'=>'regional', 'rb'=>&$BUS_INTERIOR],
+    'MDE-AXM'=>['v'=>[178000,288000],'b'=>[33000,52000],  'dv'=>45, 'db'=>300,'al'=>'regional', 'rb'=>&$BUS_INTERIOR],
+    'MDE-IBE'=>['v'=>[192000,312000],'b'=>[50000,77000],  'dv'=>50, 'db'=>360,'al'=>'regional', 'rb'=>&$BUS_INTERIOR],
+    'MDE-CUC'=>['v'=>[202000,328000],'b'=>[65000,98000],  'dv'=>60, 'db'=>540,'al'=>'regional', 'rb'=>&$BUS_ORIENTE],
+    'MDE-SMR'=>['v'=>[212000,345000],'b'=>[79000,118000], 'dv'=>65, 'db'=>720,'al'=>'regional', 'rb'=>&$BUS_COSTA],
+    'MDE-HEI'=>['v'=>[202000,328000],'b'=>[65000,98000],  'dv'=>55, 'db'=>480,'al'=>'regional', 'rb'=>&$BUS_SUR],
+    'MDE-VVC'=>['v'=>[192000,312000],'b'=>[69000,105000], 'dv'=>50, 'db'=>540,'al'=>'regional', 'rb'=>&$BUS_INTERIOR],
+    'MDE-PSO'=>['v'=>[228000,372000],'b'=>[85000,128000], 'dv'=>75, 'db'=>720,'al'=>'regional', 'rb'=>&$BUS_SUR],
+    'MDE-ADZ'=>['v'=>[318000,515000],'b'=>[null,null],    'dv'=>85, 'db'=>null,'al'=>'regional','rb'=>[]],
+    'MDE-UIB'=>['v'=>[212000,345000],'b'=>[null,null],    'dv'=>35, 'db'=>null,'al'=>'remote',  'rb'=>[]],
+    'MDE-VUP'=>['v'=>[238000,385000],'b'=>[null,null],    'dv'=>75, 'db'=>null,'al'=>'regional','rb'=>[]],
+    /* ── Cali ── */
+    'CLO-CTG'=>['v'=>[238000,388000],'b'=>[108000,158000],'dv'=>75, 'db'=>960,'al'=>'trunk',    'rb'=>&$BUS_COSTA],
+    'CLO-BAQ'=>['v'=>[232000,378000],'b'=>[125000,178000],'dv'=>75, 'db'=>1200,'al'=>'trunk',   'rb'=>&$BUS_COSTA],
+    'CLO-BGA'=>['v'=>[218000,355000],'b'=>[75000,112000], 'dv'=>70, 'db'=>540,'al'=>'regional', 'rb'=>&$BUS_ORIENTE],
+    'CLO-IBE'=>['v'=>[null,null],    'b'=>[46000,70000],  'dv'=>null,'db'=>210,'al'=>null,      'rb'=>&$BUS_INTERIOR],
+    'CLO-PEI'=>['v'=>[182000,298000],'b'=>[28000,44000],  'dv'=>45, 'db'=>180,'al'=>'regional', 'rb'=>&$BUS_INTERIOR],
+    'CLO-MZL'=>['v'=>[182000,298000],'b'=>[34000,53000],  'dv'=>50, 'db'=>240,'al'=>'regional', 'rb'=>&$BUS_INTERIOR],
+    'CLO-AXM'=>['v'=>[null,null],    'b'=>[30000,46000],  'dv'=>null,'db'=>150,'al'=>null,      'rb'=>&$BUS_INTERIOR],
+    'CLO-PPN'=>['v'=>[null,null],    'b'=>[30000,46000],  'dv'=>null,'db'=>120,'al'=>null,      'rb'=>&$BUS_SUR],
+    'CLO-HEI'=>['v'=>[202000,328000],'b'=>[65000,98000],  'dv'=>55, 'db'=>480,'al'=>'regional', 'rb'=>&$BUS_SUR],
+    'CLO-PSO'=>['v'=>[212000,345000],'b'=>[58000,88000],  'dv'=>60, 'db'=>480,'al'=>'regional', 'rb'=>&$BUS_SUR],
+    'CLO-VVC'=>['v'=>[212000,342000],'b'=>[79000,118000], 'dv'=>60, 'db'=>600,'al'=>'regional', 'rb'=>&$BUS_INTERIOR],
+    'CLO-ADZ'=>['v'=>[348000,562000],'b'=>[null,null],    'dv'=>90, 'db'=>null,'al'=>'regional','rb'=>[]],
+    'CLO-SMR'=>['v'=>[248000,402000],'b'=>[108000,158000],'dv'=>90, 'db'=>840,'al'=>'regional', 'rb'=>&$BUS_COSTA],
+    /* ── Costa Caribe ── */
+    'CTG-BAQ'=>['v'=>[182000,298000],'b'=>[40000,62000],  'dv'=>40, 'db'=>300,'al'=>'trunk',    'rb'=>&$BUS_COSTA],
+    'CTG-SMR'=>['v'=>[172000,282000],'b'=>[33000,52000],  'dv'=>40, 'db'=>240,'al'=>'regional', 'rb'=>&$BUS_COSTA],
+    'CTG-BGA'=>['v'=>[212000,345000],'b'=>[85000,128000], 'dv'=>60, 'db'=>600,'al'=>'regional', 'rb'=>&$BUS_ORIENTE],
+    'CTG-VUP'=>['v'=>[182000,298000],'b'=>[75000,112000], 'dv'=>55, 'db'=>480,'al'=>'regional', 'rb'=>&$BUS_COSTA],
+    'BAQ-SMR'=>['v'=>[null,null],    'b'=>[20000,30000],  'dv'=>null,'db'=>120,'al'=>null,      'rb'=>&$BUS_COSTA],
+    'BAQ-CUC'=>['v'=>[178000,288000],'b'=>[46000,70000],  'dv'=>45, 'db'=>360,'al'=>'regional', 'rb'=>&$BUS_ORIENTE],
+    'BAQ-VUP'=>['v'=>[172000,282000],'b'=>[36000,55000],  'dv'=>35, 'db'=>270,'al'=>'regional', 'rb'=>&$BUS_COSTA],
+    'BAQ-RCH'=>['v'=>[162000,268000],'b'=>[28000,42000],  'dv'=>35, 'db'=>240,'al'=>'regional', 'rb'=>&$BUS_COSTA],
+    'BAQ-MTR'=>['v'=>[null,null],    'b'=>[40000,62000],  'dv'=>null,'db'=>240,'al'=>null,      'rb'=>&$BUS_COSTA],
+    'SMR-VUP'=>['v'=>[null,null],    'b'=>[28000,42000],  'dv'=>null,'db'=>180,'al'=>null,      'rb'=>&$BUS_COSTA],
+    'SMR-BGA'=>['v'=>[182000,298000],'b'=>[72000,108000], 'dv'=>55, 'db'=>540,'al'=>'regional', 'rb'=>&$BUS_ORIENTE],
+    'VUP-RCH'=>['v'=>[null,null],    'b'=>[26000,40000],  'dv'=>null,'db'=>180,'al'=>null,      'rb'=>&$BUS_COSTA],
+    'VUP-BGA'=>['v'=>[182000,298000],'b'=>[82000,122000], 'dv'=>55, 'db'=>600,'al'=>'regional', 'rb'=>&$BUS_ORIENTE],
+    /* ── Bucaramanga / Nororiente ── */
+    'BGA-CUC'=>['v'=>[168000,272000],'b'=>[36000,56000],  'dv'=>45, 'db'=>300,'al'=>'regional', 'rb'=>&$BUS_ORIENTE],
+    'BGA-SMR'=>['v'=>[182000,298000],'b'=>[72000,108000], 'dv'=>55, 'db'=>540,'al'=>'regional', 'rb'=>&$BUS_COSTA],
+    /* ── Eje Cafetero ── */
+    'PEI-MZL'=>['v'=>[null,null],    'b'=>[11000,17000],  'dv'=>null,'db'=>60, 'al'=>null,      'rb'=>&$BUS_INTERIOR],
+    'PEI-AXM'=>['v'=>[null,null],    'b'=>[13000,20000],  'dv'=>null,'db'=>90, 'al'=>null,      'rb'=>&$BUS_INTERIOR],
+    'MZL-AXM'=>['v'=>[null,null],    'b'=>[13000,20000],  'dv'=>null,'db'=>90, 'al'=>null,      'rb'=>&$BUS_INTERIOR],
+    'IBE-PEI'=>['v'=>[null,null],    'b'=>[22000,34000],  'dv'=>null,'db'=>120,'al'=>null,      'rb'=>&$BUS_INTERIOR],
+    'IBE-AXM'=>['v'=>[null,null],    'b'=>[26000,40000],  'dv'=>null,'db'=>150,'al'=>null,      'rb'=>&$BUS_INTERIOR],
+    'IBE-MZL'=>['v'=>[null,null],    'b'=>[28000,43000],  'dv'=>null,'db'=>180,'al'=>null,      'rb'=>&$BUS_INTERIOR],
+    'IBE-CLO'=>['v'=>[null,null],    'b'=>[46000,70000],  'dv'=>null,'db'=>210,'al'=>null,      'rb'=>&$BUS_INTERIOR],
+    'IBE-HEI'=>['v'=>[null,null],    'b'=>[22000,34000],  'dv'=>null,'db'=>120,'al'=>null,      'rb'=>&$BUS_SUR],
+    /* ── Sur / Pacífico ── */
+    'HEI-PSO'=>['v'=>[212000,345000],'b'=>[52000,80000],  'dv'=>60, 'db'=>420,'al'=>'regional', 'rb'=>&$BUS_SUR],
+    'HEI-CLO'=>['v'=>[202000,328000],'b'=>[65000,98000],  'dv'=>55, 'db'=>480,'al'=>'regional', 'rb'=>&$BUS_SUR],
+    'PSO-PPN'=>['v'=>[null,null],    'b'=>[18000,28000],  'dv'=>null,'db'=>120,'al'=>null,      'rb'=>&$BUS_SUR],
+    'FLA-PSO'=>['v'=>[202000,328000],'b'=>[52000,80000],  'dv'=>55, 'db'=>360,'al'=>'remote',   'rb'=>&$BUS_SUR],
+    'PPN-CLO'=>['v'=>[null,null],    'b'=>[30000,46000],  'dv'=>null,'db'=>120,'al'=>null,      'rb'=>&$BUS_SUR],
+    /* ── Llanos / Amazonía ── */
+    'EYP-VVC'=>['v'=>[null,null],    'b'=>[30000,46000],  'dv'=>null,'db'=>180,'al'=>null,      'rb'=>&$BUS_INTERIOR],
+    'EYP-AUC'=>['v'=>[null,null],    'b'=>[35000,52000],  'dv'=>null,'db'=>210,'al'=>null,      'rb'=>&$BUS_INTERIOR],
 ];
 
+/* ── Lookup ruta (bidireccional) ─────────────────────────────────────────── */
 function obtenerRuta(string $a, string $b, array &$RUTAS): ?array
 {
-    $key = "$a-$b";
-    $keyInv = "$b-$a";
-    if (isset($RUTAS[$key]))    return array_merge($RUTAS[$key], ['invertida' => false]);
-    if (isset($RUTAS[$keyInv])) return array_merge($RUTAS[$keyInv], ['invertida' => true]);
+    $k = "$a-$b"; $ki = "$b-$a";
+    if (isset($RUTAS[$k]))  return array_merge($RUTAS[$k],  ['inv'=>false]);
+    if (isset($RUTAS[$ki])) return array_merge($RUTAS[$ki], ['inv'=>true]);
     return null;
 }
 
-/* ─── Aerolíneas estimadas para el fallback ──────────────────── */
-$AEROLINEAS = [
-    ['Avianca', '06:10', '07:25'],
-    ['LATAM Colombia', '08:30', '09:40'],
-    ['JetSmart', '11:15', '12:20'],
-    ['Avianca', '15:00', '16:10'],
-    ['LATAM Colombia', '18:45', '19:55'],
-];
+/* ── Generar opciones estimadas para una ruta con aeropuerto ─────────────── */
+function generarOpciones(
+    string $orgIata, string $dstIata, array $ruta, string $fecha, bool $esReg,
+    array $alTrunk, array $alReg, array $alRem,
+    array $slvTrunk, array $slvReg, array $slvRem, array $slBus
+): array {
+    $pre = $esReg ? 'reg' : 'ida';
+    seedRuta($orgIata, $dstIata, $fecha);
 
-function generarOpcionesEstimadas(array $ruta, string $fechaIda, bool $esRegreso, array $aerols): array
-{
+    $alType = $ruta['al'] ?? null;
+    $buses  = $ruta['rb'] ?? [];
+
+    $aerols = match($alType) { 'trunk'=>$alTrunk, 'regional'=>$alReg, 'remote'=>$alRem, default=>[] };
+    $slotsV = match($alType) { 'trunk'=>$slvTrunk, 'regional'=>$slvReg, 'remote'=>$slvRem, default=>[] };
+
+    $minV = $ruta['v'][0] ?? null;
+    $maxV = $ruta['v'][1] ?? null;
+    $durV = $ruta['dv']   ?? null;
+    $minB = $ruta['b'][0] ?? null;
+    $maxB = $ruta['b'][1] ?? null;
+    $durB = $ruta['db']   ?? null;
+
     $opciones = [];
-    $prefix   = $esRegreso ? 'opt_reg_' : 'opt_ida_';
-    $precios  = $ruta['vuelo'] ?? null;
 
-    // Vuelos (solo si la ruta tiene servicio aéreo)
-    if (is_array($precios) && count($precios) >= 2) {
-        sort($precios);
-        // Máximo 3 aerolíneas con variación de precio
-        $aerolsVuelo = array_slice($aerols, 0, 3);
-        foreach ($aerolsVuelo as $i => [$empresa, $salida, $llegada]) {
-            $base   = $precios[min($i, count($precios) - 1)];
-            $precio = (int) round($base * (0.92 + ($i * 0.10)));
+    // ─ Vuelos ─
+    if ($alType && $minV && $maxV && $durV && count($aerols) > 0) {
+        $nV   = match($alType) { 'trunk' => mt_rand(4,6), 'regional' => mt_rand(3,5), default => mt_rand(2,3) };
+        $slots = elegirSlots($slotsV, $nV + 2);
+        sort($slots);
+        $usadas = [];
+        foreach (array_slice($slots, 0, $nV) as $i => $salida) {
+            // Elegir aerolínea sin repetir consecutivamente
+            do { $al = $aerols[array_rand($aerols)]; } while (count($aerols) > 1 && in_array($al, array_slice($usadas, -2)));
+            $usadas[] = $al;
+            $durVar  = $durV + mt_rand(-5, 12);
             $opciones[] = [
-                'id'         => $prefix . 'v' . $i,
+                'id'         => "{$pre}_v{$i}",
                 'tipo'       => 'vuelo',
+                'empresa'    => $al,
+                'salida'     => $salida,
+                'llegada'    => sumarMinutos($salida, $durVar),
+                'duracion'   => minutosADur($durVar),
+                'precio'     => precioRand($minV, $maxV),
+                'esEstimado' => true,
+            ];
+        }
+    }
+
+    // ─ Buses ─
+    if ($minB && $maxB && $durB && count($buses) > 0) {
+        $nB    = mt_rand(3, min(5, count($buses) + 2));
+        $slots = elegirSlots($slBus, $nB + 2);
+        sort($slots);
+        foreach (array_slice($slots, 0, $nB) as $i => $salida) {
+            $empresa = $buses[$i % count($buses)];
+            $durVar  = $durB + mt_rand(-15, 35);
+            $opciones[] = [
+                'id'         => "{$pre}_b{$i}",
+                'tipo'       => 'bus',
                 'empresa'    => $empresa,
                 'salida'     => $salida,
-                'llegada'    => $llegada,
-                'duracion'   => $ruta['durVuelo'] ?? '—',
-                'precio'     => $precio,
+                'llegada'    => sumarMinutos($salida, $durVar),
+                'duracion'   => minutosADur($durVar),
+                'precio'     => precioRand($minB, $maxB),
                 'esEstimado' => true,
             ];
         }
     }
 
-    // Bus (si aplica)
-    if (!empty($ruta['bus']) && !empty($ruta['durBus'])) {
-        $busPrecio = (int) $ruta['bus'];
-        $busEmpresas = ['Expreso Bolivariano', 'Expreso Brasilia', 'Copetran', 'Flota Magdalena'];
-        foreach ($busEmpresas as $idx => $busEmpresa) {
-            if ($idx >= 2) break;
-            $variacion = $idx === 0 ? 1.0 : 1.12;
-            $opciones[] = [
-                'id'         => $prefix . 'bus' . $idx,
-                'tipo'       => 'bus',
-                'empresa'    => $busEmpresa,
-                'salida'     => $idx === 0 ? '06:00' : '10:00',
-                'llegada'    => '—',
-                'duracion'   => $ruta['durBus'],
-                'precio'     => (int) round($busPrecio * $variacion),
-                'esEstimado' => true,
-            ];
-        }
-    }
-
-    // Ordenar por precio
     usort($opciones, fn($a, $b) => $a['precio'] - $b['precio']);
     return $opciones;
 }
 
-/* ─── Fallback universal para rutas no registradas ──────────── */
-function generarOpcionesGenericas(string $origen, string $destino, bool $esRegreso): array
+/* ── Generar opciones multimodal (avión→bus o bus→avión) ─────────────────── */
+function generarMultimodal(
+    string $orgIata, string $orgNombre,
+    string $aerIata,  string $aerNombre,
+    string $municipio,
+    int $busMinutos, int $busMin, int $busMax, array $busEmps,
+    string $fecha, bool $esReg,
+    array $rutaAerea,
+    array $alTrunk, array $alReg, array $alRem,
+    array $slvTrunk, array $slvReg, array $slvRem
+): array {
+    $pre    = $esReg ? 'mm_reg' : 'mm_ida';
+    $alType = $rutaAerea['al'] ?? 'regional';
+    $aerols = match($alType) { 'trunk'=>$alTrunk, 'remote'=>$alRem, default=>$alReg };
+    $slotsV = match($alType) { 'trunk'=>$slvTrunk, 'remote'=>$slvRem, default=>$slvReg };
+    $minV   = $rutaAerea['v'][0] ?? 240000;
+    $maxV   = $rutaAerea['v'][1] ?? 400000;
+    $durV   = $rutaAerea['dv']   ?? 75;
+
+    seedRuta($orgIata, $aerIata, $fecha . '_mm');
+
+    $n      = mt_rand(3, 5);
+    $slots  = elegirSlots($slotsV, $n + 2);
+    sort($slots);
+    $ops    = [];
+
+    foreach (array_slice($slots, 0, $n) as $i => $salidaP) {
+        $al     = $aerols[array_rand($aerols)];
+        $busEmp = $busEmps[array_rand($busEmps)];
+        $durVol = $durV + mt_rand(-5, 10);
+        $espera = mt_rand(30, 75); // tiempo entre aterrizar y tomar el bus
+
+        if (!$esReg) {
+            // IDA: vuelo primero, bus después
+            $llegadaAer  = sumarMinutos($salidaP, $durVol);
+            $salidaBus   = sumarMinutos($llegadaAer, $espera);
+            $durBus      = $busMinutos + mt_rand(-10, 20);
+            $llegadaFin  = sumarMinutos($salidaBus, $durBus);
+            $tramos = [
+                [
+                    'tipo'    => 'vuelo',
+                    'empresa' => $al,
+                    'origen'  => "{$orgNombre} ({$orgIata})",
+                    'destino' => "{$aerNombre} ({$aerIata})",
+                    'salida'  => $salidaP,
+                    'llegada' => $llegadaAer,
+                    'duracion'=> minutosADur($durVol),
+                    'precio'  => precioRand($minV, $maxV),
+                ],
+                [
+                    'tipo'    => 'bus',
+                    'empresa' => $busEmp,
+                    'origen'  => $aerNombre,
+                    'destino' => $municipio,
+                    'salida'  => $salidaBus,
+                    'llegada' => $llegadaFin,
+                    'duracion'=> minutosADur($durBus),
+                    'precio'  => precioRand($busMin, $busMax),
+                ],
+            ];
+        } else {
+            // REGRESO: bus primero desde municipio al aeropuerto, luego vuelo
+            $durBus      = $busMinutos + mt_rand(-10, 20);
+            $llegadaAer  = sumarMinutos($salidaP, $durBus);
+            $salidaVuelo = sumarMinutos($llegadaAer, $espera);
+            $llegadaFin  = sumarMinutos($salidaVuelo, $durVol);
+            $tramos = [
+                [
+                    'tipo'    => 'bus',
+                    'empresa' => $busEmp,
+                    'origen'  => $municipio,
+                    'destino' => $aerNombre,
+                    'salida'  => $salidaP,
+                    'llegada' => $llegadaAer,
+                    'duracion'=> minutosADur($durBus),
+                    'precio'  => precioRand($busMin, $busMax),
+                ],
+                [
+                    'tipo'    => 'vuelo',
+                    'empresa' => $al,
+                    'origen'  => "{$aerNombre} ({$aerIata})",
+                    'destino' => "{$orgNombre} ({$orgIata})",
+                    'salida'  => $salidaVuelo,
+                    'llegada' => $llegadaFin,
+                    'duracion'=> minutosADur($durVol),
+                    'precio'  => precioRand($minV, $maxV),
+                ],
+            ];
+        }
+
+        $durTotal    = $durVol + $espera + ($durBus ?? $busMinutos);
+        $precioTotal = array_sum(array_column($tramos, 'precio'));
+
+        $ops[] = [
+            'id'          => "{$pre}_{$i}",
+            'tipo'        => 'multimodal',
+            'empresa'     => $tramos[0]['empresa'] . ' + ' . $tramos[1]['empresa'],
+            'salida'      => $tramos[0]['salida'],
+            'llegada'     => end($tramos)['llegada'],
+            'duracion'    => minutosADur($durTotal),
+            'precio'      => $precioTotal,
+            'esEstimado'  => true,
+            'tramos'      => $tramos,
+            'notaRuta'    => "{$municipio} no tiene aeropuerto. La ruta óptima es " .
+                             ($esReg
+                                ? "bus {$municipio}→{$aerNombre} + vuelo {$aerNombre}→{$orgNombre}."
+                                : "vuelo {$orgNombre}→{$aerNombre} + bus {$aerNombre}→{$municipio}."),
+        ];
+    }
+
+    usort($ops, fn($a, $b) => $a['precio'] - $b['precio']);
+    return $ops;
+}
+
+/* ── Opciones genéricas cuando la ruta no está en la tabla ──────────────── */
+function generarGenericas(string $org, string $dst, string $fecha, bool $esReg): array
 {
-    $prefix = $esRegreso ? 'gen_reg_' : 'gen_ida_';
-    // Estimados genéricos inter-ciudades Colombia (vuelo + bus)
-    $opciones = [
-        ['id' => $prefix.'v0', 'tipo' => 'vuelo',  'empresa' => 'Avianca',         'salida' => '06:10', 'llegada' => '07:30', 'duracion' => '1h 20m', 'precio' => 280000, 'esEstimado' => true],
-        ['id' => $prefix.'v1', 'tipo' => 'vuelo',  'empresa' => 'LATAM Colombia',  'salida' => '08:30', 'llegada' => '09:50', 'duracion' => '1h 20m', 'precio' => 310000, 'esEstimado' => true],
-        ['id' => $prefix.'v2', 'tipo' => 'vuelo',  'empresa' => 'JetSmart',        'salida' => '11:15', 'llegada' => '12:35', 'duracion' => '1h 20m', 'precio' => 245000, 'esEstimado' => true],
-        ['id' => $prefix.'b0', 'tipo' => 'bus',    'empresa' => 'Expreso Bolivariano', 'salida' => '06:00', 'llegada' => '—', 'duracion' => '8h',   'precio' => 75000,  'esEstimado' => true],
-        ['id' => $prefix.'b1', 'tipo' => 'bus',    'empresa' => 'Expreso Brasilia', 'salida' => '10:00', 'llegada' => '—', 'duracion' => '8h',   'precio' => 82000,  'esEstimado' => true],
-    ];
-    usort($opciones, fn($a, $b) => $a['precio'] - $b['precio']);
-    return $opciones;
+    $pre    = $esReg ? 'gen_reg' : 'gen_ida';
+    $aerols = ['Avianca','LATAM Colombia','Wingo','JetSmart','EasyFly','Satena'];
+    $buses  = ['Expreso Bolivariano','Expreso Brasilia','Copetran','Omega Ltda','Rápido Ochoa'];
+    seedRuta($org, $dst, $fecha);
+
+    $ops = [];
+    $nV  = mt_rand(3, 5);
+    $nB  = mt_rand(2, 4);
+    $slV = ['06:10','08:30','10:00','12:30','15:00','17:30','19:00'];
+    $slB = ['05:00','06:00','08:00','14:00','20:00','22:00'];
+
+    $slotsV = elegirSlots($slV, $nV); sort($slotsV);
+    $slotsB = elegirSlots($slB, $nB); sort($slotsB);
+
+    foreach ($slotsV as $i => $sal) {
+        $dur = mt_rand(45, 150);
+        $ops[] = [
+            'id'=>"{$pre}_v{$i}",'tipo'=>'vuelo','empresa'=>$aerols[$i % count($aerols)],
+            'salida'=>$sal,'llegada'=>sumarMinutos($sal, $dur),
+            'duracion'=>minutosADur($dur),'precio'=>precioRand(215000, 440000),'esEstimado'=>true,
+        ];
+    }
+    foreach ($slotsB as $i => $sal) {
+        $dur = mt_rand(240, 900);
+        $ops[] = [
+            'id'=>"{$pre}_b{$i}",'tipo'=>'bus','empresa'=>$buses[$i % count($buses)],
+            'salida'=>$sal,'llegada'=>sumarMinutos($sal, $dur),
+            'duracion'=>minutosADur($dur),'precio'=>precioRand(50000, 165000),'esEstimado'=>true,
+        ];
+    }
+    usort($ops, fn($a, $b) => $a['precio'] - $b['precio']);
+    return $ops;
 }
 
-/* ─── Intentar Amadeus API ───────────────────────────────────── */
+/* ── Normalizar entradas ─────────────────────────────────────────────────── */
+$origenNorm  = normCiudad($origenRaw);
+$destinoNorm = normCiudad($destinoRaw);
+
+$origenIata  = validarIata($origenRaw)  ? $origenRaw  : ($CIUDAD_IATA[$origenRaw]  ?? $CIUDAD_IATA[$origenNorm]  ?? null);
+$destinoIata = validarIata($destinoRaw) ? $destinoRaw : ($CIUDAD_IATA[$destinoRaw] ?? $CIUDAD_IATA[$destinoNorm] ?? null);
+
+$origenNombre  = ucwords(strtolower($origenRaw));
+$destinoNombre = ucwords(strtolower($destinoRaw));
+
+// Detectar si origen/destino son municipios sin aeropuerto propio
+$destinoSinAerop = (!$destinoIata)
+    ? ($MUNICIPIOS_SIN_AEROPUERTO[$destinoRaw] ?? $MUNICIPIOS_SIN_AEROPUERTO[$destinoNorm] ?? null)
+    : null;
+$origenSinAerop  = (!$origenIata)
+    ? ($MUNICIPIOS_SIN_AEROPUERTO[$origenRaw] ?? $MUNICIPIOS_SIN_AEROPUERTO[$origenNorm] ?? null)
+    : null;
+
+// Si el origen es un municipio sin aeropuerto, para la ruta aérea usamos su aeropuerto más cercano
+if ($origenSinAerop && !$origenIata) $origenIata = $origenSinAerop[0];
+if ($destinoSinAerop && !$destinoIata) $destinoIata = $destinoSinAerop[0];
+
+/* ── Intentar Amadeus API ────────────────────────────────────────────────── */
 $clientId     = (string) Config::get('AMADEUS_CLIENT_ID',     '');
 $clientSecret = (string) Config::get('AMADEUS_CLIENT_SECRET', '');
 $opcionesIda     = [];
 $opcionesRegreso = [];
 $fuente          = 'estimado';
 
-if ($clientId && $clientSecret && validarIata($origenIata) && validarIata($destinoIata)) {
+if ($clientId && $clientSecret && $origenIata && $destinoIata && validarIata($origenIata) && validarIata($destinoIata)) {
     try {
-        // 1) Obtener token OAuth2
         $ch = curl_init('https://test.api.amadeus.com/v1/security/oauth2/token');
         curl_setopt_array($ch, [
-            CURLOPT_POST           => true,
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT        => 8,
-            CURLOPT_POSTFIELDS     => http_build_query([
-                'grant_type'    => 'client_credentials',
-                'client_id'     => $clientId,
-                'client_secret' => $clientSecret,
-            ]),
-            CURLOPT_HTTPHEADER => ['Content-Type: application/x-www-form-urlencoded'],
+            CURLOPT_POST=>true, CURLOPT_RETURNTRANSFER=>true, CURLOPT_TIMEOUT=>8,
+            CURLOPT_POSTFIELDS=>http_build_query(['grant_type'=>'client_credentials','client_id'=>$clientId,'client_secret'=>$clientSecret]),
+            CURLOPT_HTTPHEADER=>['Content-Type: application/x-www-form-urlencoded'],
         ]);
-        $tokenRaw = curl_exec($ch);
-        $tokenErr = curl_error($ch);
-        curl_close($ch);
-
-        if ($tokenErr || !$tokenRaw) throw new RuntimeException('Amadeus token error: ' . $tokenErr);
+        $tokenRaw = curl_exec($ch); $tokenErr = curl_error($ch); curl_close($ch);
+        if ($tokenErr || !$tokenRaw) throw new RuntimeException('Amadeus token: '.$tokenErr);
         $tokenData = json_decode((string)$tokenRaw, true);
-        $token     = $tokenData['access_token'] ?? '';
-        if (!$token) throw new RuntimeException('Amadeus: no access_token');
+        $token = $tokenData['access_token'] ?? '';
+        if (!$token) throw new RuntimeException('Amadeus: sin token');
 
-        // Mapa aerolíneas
-        $AIRLINES = ['AV' => 'Avianca', 'LA' => 'LATAM Colombia', 'P5' => 'LATAM Colombia',
-                     '5Z' => 'JetSmart', '9R' => 'JetSmart', 'KR' => 'Copa Airlines'];
+        $AIRLINES_MAP = ['AV'=>'Avianca','LA'=>'LATAM Colombia','P5'=>'LATAM Colombia',
+                         '5Z'=>'JetSmart','9R'=>'JetSmart','KR'=>'Copa Airlines','P9'=>'Wingo',
+                         'S9'=>'EasyFly','RC'=>'Satena'];
 
-        function buscarVuelosAmadeus(string $token, string $origen, string $destino, string $fecha, array $AIRLINES): array
-        {
-            $url = 'https://test.api.amadeus.com/v2/shopping/flight-offers?' . http_build_query([
-                'originLocationCode'      => $origen,
-                'destinationLocationCode' => $destino,
-                'departureDate'           => $fecha,
-                'adults'                  => 1,
-                'currencyCode'            => 'COP',
-                'max'                     => 6,
-            ]);
+        function buscarAmadeus(string $token, string $org, string $dst, string $fecha, array $AL): array {
+            $url = 'https://test.api.amadeus.com/v2/shopping/flight-offers?' . http_build_query(
+                ['originLocationCode'=>$org,'destinationLocationCode'=>$dst,'departureDate'=>$fecha,'adults'=>1,'currencyCode'=>'COP','max'=>8]
+            );
             $ch2 = curl_init($url);
-            curl_setopt_array($ch2, [
-                CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_TIMEOUT        => 10,
-                CURLOPT_HTTPHEADER     => ['Authorization: Bearer ' . $token],
-            ]);
-            $raw  = curl_exec($ch2);
-            $err2 = curl_error($ch2);
-            curl_close($ch2);
-            if ($err2 || !$raw) throw new RuntimeException('Amadeus flights error: ' . $err2);
+            curl_setopt_array($ch2,[CURLOPT_RETURNTRANSFER=>true,CURLOPT_TIMEOUT=>10,
+                CURLOPT_HTTPHEADER=>['Authorization: Bearer '.$token]]);
+            $raw = curl_exec($ch2); $err = curl_error($ch2); curl_close($ch2);
+            if ($err || !$raw) throw new RuntimeException('Amadeus flights: '.$err);
             $data = json_decode((string)$raw, true);
-            $offers = $data['data'] ?? [];
-            $opciones = [];
-            foreach ($offers as $i => $offer) {
-                $itinerary = $offer['itineraries'][0] ?? null;
-                if (!$itinerary) continue;
-                $seg0    = $itinerary['segments'][0] ?? null;
-                $segLast = end($itinerary['segments']);
-                if (!$seg0) continue;
-                $codigo   = $seg0['carrierCode'] ?? '';
-                $empresa  = $AIRLINES[$codigo] ?? $codigo;
-                $precio   = (int) round((float) ($offer['price']['grandTotal'] ?? 0));
-                $salida   = substr($seg0['departure']['at'] ?? '', 11, 5);
-                $llegada  = substr($segLast['arrival']['at'] ?? '', 11, 5);
-                $durRaw   = $itinerary['duration'] ?? 'PT1H';
-                // Convertir PT2H30M → '2h 30m'
-                preg_match('/PT(\d+H)?(\d+M)?/', $durRaw, $dm);
+            $ops  = [];
+            foreach (($data['data'] ?? []) as $i => $offer) {
+                $it  = $offer['itineraries'][0] ?? null; if (!$it) continue;
+                $s0  = $it['segments'][0] ?? null;       if (!$s0) continue;
+                $end = end($it['segments']);
+                $cod = $s0['carrierCode'] ?? '';
+                preg_match('/PT(\d+H)?(\d+M)?/', $it['duration'] ?? 'PT1H', $dm);
                 $h = isset($dm[1]) ? (int)$dm[1] : 0;
                 $m = isset($dm[2]) ? (int)$dm[2] : 0;
-                $dur = ($h ? "{$h}h " : '') . ($m ? "{$m}m" : '');
-                $opciones[] = [
-                    'id'         => "ama_$i",
-                    'tipo'       => count($itinerary['segments']) > 1 ? 'vuelo_escala' : 'vuelo',
-                    'empresa'    => $empresa ?: 'Aerolínea',
-                    'salida'     => $salida,
-                    'llegada'    => $llegada,
-                    'duracion'   => trim($dur) ?: '—',
-                    'precio'     => $precio,
+                $ops[] = [
+                    'id'         => "ama_{$i}",
+                    'tipo'       => count($it['segments']) > 1 ? 'vuelo_escala' : 'vuelo',
+                    'empresa'    => $AL[$cod] ?? ($cod ?: 'Aerolínea'),
+                    'salida'     => substr($s0['departure']['at'] ?? '', 11, 5),
+                    'llegada'    => substr($end['arrival']['at'] ?? '', 11, 5),
+                    'duracion'   => trim(($h ? "{$h}h " : '') . ($m ? "{$m}m" : '')) ?: '—',
+                    'precio'     => (int) round((float)($offer['price']['grandTotal'] ?? 0)),
                     'esEstimado' => false,
                 ];
             }
-            usort($opciones, fn($a, $b) => $a['precio'] - $b['precio']);
-            return $opciones;
+            usort($ops, fn($a,$b) => $a['precio'] - $b['precio']);
+            return $ops;
         }
 
-        $opcionesIda = buscarVuelosAmadeus($token, $origenIata, $destinoIata, $fechaIda, $AIRLINES);
-        if ($fechaRegreso) {
-            $opcionesRegreso = buscarVuelosAmadeus($token, $destinoIata, $origenIata, $fechaRegreso, $AIRLINES);
-        }
+        $opcionesIda = buscarAmadeus($token, $origenIata, $destinoIata, $fechaIda, $AIRLINES_MAP);
+        if ($fechaRegreso) $opcionesRegreso = buscarAmadeus($token, $destinoIata, $origenIata, $fechaRegreso, $AIRLINES_MAP);
         $fuente = 'api';
 
     } catch (Throwable $e) {
-        error_log('[gestordoc][viajes] Amadeus falló: ' . $e->getMessage() . '. Usando estimados.');
-        $opcionesIda     = [];
-        $opcionesRegreso = [];
-        $fuente          = 'estimado';
+        error_log('[gestordoc][viajes] Amadeus falló: ' . $e->getMessage() . ' — usando estimados.');
+        $opcionesIda = []; $opcionesRegreso = []; $fuente = 'estimado';
     }
 }
 
-/* ─── Fallback a precios estimados ──────────────────────────── */
+/* ── Fallback a simulación enriquecida ───────────────────────────────────── */
 if (empty($opcionesIda)) {
-    $ruta = obtenerRuta($origenIata, $destinoIata, $RUTAS);
-    if ($ruta) {
-        $opcionesIda = generarOpcionesEstimadas($ruta, $fechaIda, false, $AEROLINEAS);
+
+    if ($destinoSinAerop && $origenIata) {
+        /* ─ Destino es municipio sin aeropuerto → multimodal IDA ─ */
+        [$aerIata,$aerNombre,$busMins,$busMin,$busMax,$busEmps] = $destinoSinAerop;
+        $rutaAerea = obtenerRuta($origenIata, $aerIata, $RUTAS)
+            ?? ['v'=>[240000,400000],'b'=>[null,null],'dv'=>75,'db'=>null,'al'=>'regional','rb'=>[]];
+
+        $opcionesIda = generarMultimodal(
+            $origenIata, $origenNombre, $aerIata, $aerNombre, $destinoNombre,
+            $busMins, $busMin, $busMax, $busEmps,
+            $fechaIda, false, $rutaAerea,
+            $AL_TRUNK, $AL_REGIONAL, $AL_REMOTE, $SLV_TRUNK, $SLV_REGIONAL, $SLV_REMOTE
+        );
+
+        /* Agregar también opciones de bus directo si son razonables (<6h) */
+        if ($busMins <= 360 && $rutaAerea['b'][0] ?? null) {
+            seedRuta($origenIata, $destinoNombre, $fechaIda . '_busd');
+            $durTotalBus = ($rutaAerea['db'] ?? 480) + $busMins;
+            $busesDir    = array_merge($busEmps, ($rutaAerea['rb'] ?? []));
+            $slotsBusDir = elegirSlots($SL_BUS, 3); sort($slotsBusDir);
+            foreach ($slotsBusDir as $bi => $salida) {
+                $durVar = $durTotalBus + mt_rand(-20, 45);
+                $opcionesIda[] = [
+                    'id'         => "busd_ida_{$bi}",
+                    'tipo'       => 'bus',
+                    'empresa'    => $busesDir[$bi % count($busesDir)],
+                    'salida'     => $salida,
+                    'llegada'    => sumarMinutos($salida, $durVar),
+                    'duracion'   => minutosADur($durVar),
+                    'precio'     => precioRand((int)($rutaAerea['b'][0] * 0.9) + $busMin, (int)($rutaAerea['b'][1] * 1.1) + $busMax),
+                    'esEstimado' => true,
+                ];
+            }
+        }
+
         if ($fechaRegreso) {
-            $opcionesRegreso = generarOpcionesEstimadas($ruta, $fechaRegreso, true, $AEROLINEAS);
+            $opcionesRegreso = generarMultimodal(
+                $origenIata, $origenNombre, $aerIata, $aerNombre, $destinoNombre,
+                $busMins, $busMin, $busMax, $busEmps,
+                $fechaRegreso, true, $rutaAerea,
+                $AL_TRUNK, $AL_REGIONAL, $AL_REMOTE, $SLV_TRUNK, $SLV_REGIONAL, $SLV_REMOTE
+            );
+        }
+
+    } elseif ($origenIata && $destinoIata) {
+        /* ─ Ruta estándar (ambos tienen aeropuerto) ─ */
+        $ruta = obtenerRuta($origenIata, $destinoIata, $RUTAS);
+        if ($ruta) {
+            $opcionesIda = generarOpciones(
+                $origenIata, $destinoIata, $ruta, $fechaIda, false,
+                $AL_TRUNK, $AL_REGIONAL, $AL_REMOTE,
+                $SLV_TRUNK, $SLV_REGIONAL, $SLV_REMOTE, $SL_BUS
+            );
+            if ($fechaRegreso) {
+                $opcionesRegreso = generarOpciones(
+                    $destinoIata, $origenIata, $ruta, $fechaRegreso, true,
+                    $AL_TRUNK, $AL_REGIONAL, $AL_REMOTE,
+                    $SLV_TRUNK, $SLV_REGIONAL, $SLV_REMOTE, $SL_BUS
+                );
+            }
+        } else {
+            $opcionesIda = generarGenericas($origenIata, $destinoIata, $fechaIda, false);
+            if ($fechaRegreso) $opcionesRegreso = generarGenericas($destinoIata, $origenIata, $fechaRegreso, true);
         }
     } else {
-        // Ruta no registrada: usar estimados genéricos
-        $opcionesIda     = generarOpcionesGenericas($origenIata, $destinoIata, false);
-        $opcionesRegreso = $fechaRegreso
-            ? generarOpcionesGenericas($destinoIata, $origenIata, true)
-            : [];
+        /* ─ Ciudades completamente desconocidas ─ */
+        $orgKey = $origenIata ?: $origenNorm;
+        $dstKey = $destinoIata ?: $destinoNorm;
+        $opcionesIda = generarGenericas($orgKey, $dstKey, $fechaIda, false);
+        if ($fechaRegreso) $opcionesRegreso = generarGenericas($dstKey, $orgKey, $fechaRegreso, true);
     }
 }
 
+// Ordenar final
+usort($opcionesIda,     fn($a, $b) => $a['precio'] - $b['precio']);
+usort($opcionesRegreso, fn($a, $b) => $a['precio'] - $b['precio']);
+
 Response::json([
-    'opciones'        => $opcionesIda,
-    'opcionesRegreso' => $opcionesRegreso,
-    'fuente'          => $fuente,
+    'opciones'           => $opcionesIda,
+    'opcionesRegreso'    => $opcionesRegreso,
+    'fuente'             => $fuente,
+    'origenNombre'       => $origenNombre,
+    'destinoNombre'      => $destinoNombre,
+    'esMultimodal'       => $destinoSinAerop !== null,
+    'aeropuertoConexion' => $destinoSinAerop ? $destinoSinAerop[1] : null,
 ]);

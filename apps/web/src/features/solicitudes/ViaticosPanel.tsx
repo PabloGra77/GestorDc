@@ -97,7 +97,8 @@ const HOTELES_REF: Record<string, { min: number; max: number; nota: string }> = 
 /* ─── Tipos ─────────────────────────────────────────────────── */
 interface UsuarioSugerido { id: number; nombreCompleto: string; rol: string; area: string | null; }
 interface FacturaAdj { archivoId: string; nombre: string; alertas: string[]; }
-interface OpcionViaje { id: string; tipo: 'vuelo' | 'bus' | 'vuelo_escala'; empresa: string; salida: string; llegada: string; duracion: string; precio: number; esEstimado: boolean; }
+interface TramoViaje { tipo: 'vuelo' | 'bus'; empresa: string; origen: string; destino: string; salida: string; llegada: string; duracion: string; precio: number; }
+interface OpcionViaje { id: string; tipo: 'vuelo' | 'bus' | 'vuelo_escala' | 'multimodal'; empresa: string; salida: string; llegada: string; duracion: string; precio: number; esEstimado: boolean; tramos?: TramoViaje[]; notaRuta?: string; }
 
 /* ─── Helpers ───────────────────────────────────────────────── */
 async function prepararImagen(file: File): Promise<File> {
@@ -351,6 +352,8 @@ export function ViaticosPanel({ onCreada }: { onCreada?: (info: { id: number; nu
   const [opcionesRegreso, setOpcionesRegreso] = useState<OpcionViaje[]>([]);
   const [cargandoPrecios, setCargandoPrecios] = useState(false);
   const [fuentePrecios, setFuentePrecios] = useState<'api' | 'estimado' | null>(null);
+  const [esMultimodalRuta, setEsMultimodalRuta] = useState(false);
+  const [aeropuertoConexion, setAeropuertoConexion] = useState<string | null>(null);
 
   useEffect(() => {
     if (paso !== 3 || tipoViatico !== 'anticipo' || !ciudadOrigen || !ciudadDestino || !fechaIda) return;
@@ -358,18 +361,22 @@ export function ViaticosPanel({ onCreada }: { onCreada?: (info: { id: number; nu
     setCargandoPrecios(true);
     setOpcionesViaje([]);
     setOpcionesRegreso([]);
+    setEsMultimodalRuta(false);
+    setAeropuertoConexion(null);
     const qs = new URLSearchParams({
       origen: ciudadOrigen,
       destino: ciudadDestino,
       fecha_ida: fechaIda,
       ...(esIdaVuelta && fechaRegreso ? { fecha_regreso: fechaRegreso } : {}),
     });
-    api.get<{ opciones: OpcionViaje[]; opcionesRegreso: OpcionViaje[]; fuente: string }>(`/viajes/buscar?${qs}`)
+    api.get<{ opciones: OpcionViaje[]; opcionesRegreso: OpcionViaje[]; fuente: string; esMultimodal?: boolean; aeropuertoConexion?: string | null }>(`/viajes/buscar?${qs}`)
       .then((r) => {
         if (cancelled) return;
         setOpcionesViaje(r.data.opciones ?? []);
         setOpcionesRegreso(r.data.opcionesRegreso ?? []);
         setFuentePrecios(r.data.fuente === 'api' ? 'api' : 'estimado');
+        setEsMultimodalRuta(!!r.data.esMultimodal);
+        setAeropuertoConexion(r.data.aeropuertoConexion ?? null);
       })
       .catch(() => { /* silencioso: usará PRECIOS_REF estático */ })
       .finally(() => { if (!cancelled) setCargandoPrecios(false); });
@@ -744,13 +751,18 @@ export function ViaticosPanel({ onCreada }: { onCreada?: (info: { id: number; nu
                   {fuentePrecios === 'api' && <span className="viatico-fuente-badge">Precios actualizados</span>}
                   {fuentePrecios === 'estimado' && <span className="viatico-fuente-badge viatico-fuente-est">Precios de referencia</span>}
                 </div>
+                {esMultimodalRuta && aeropuertoConexion && (
+                  <div className="viatico-multimodal-aviso">
+                    ✈🚌 <strong>{ciudadDestino}</strong> no tiene aeropuerto propio. Las opciones combinan vuelo a <strong>{aeropuertoConexion}</strong> + bus hasta el destino.
+                  </div>
+                )}
                 <p className="leg-nota" style={{ marginBottom: 8 }}>Selecciona una opción para <strong>llenar automáticamente</strong> los datos del tiquete de <strong>ida</strong>.</p>
                 <div className="viatico-opciones-lista">
-                  {opcionesViaje.slice(0, 6).map((op) => (
+                  {opcionesViaje.slice(0, 7).map((op) => (
                     <button
                       key={op.id}
                       type="button"
-                      className="viatico-opcion-item viatico-opcion-btn"
+                      className={`viatico-opcion-item viatico-opcion-btn${op.tipo === 'multimodal' ? ' viatico-opcion-multi' : ''}`}
                       onClick={() => {
                         setTipoTrIda(op.tipo === 'bus' ? 'terrestre' : 'aereo');
                         setEmpresaIda(op.empresa);
@@ -759,10 +771,23 @@ export function ViaticosPanel({ onCreada }: { onCreada?: (info: { id: number; nu
                         setValorIda(String(op.precio));
                       }}
                     >
-                      <span className="viatico-opcion-icono">{op.tipo === 'bus' ? '🚌' : '✈'}</span>
+                      <span className="viatico-opcion-icono">{op.tipo === 'multimodal' ? '✈🚌' : op.tipo === 'bus' ? '🚌' : '✈'}</span>
                       <div className="viatico-opcion-info">
                         <strong>{op.empresa}</strong>
-                        <span>{op.salida !== '—' ? op.salida : ''}{op.llegada !== '—' ? ` → ${op.llegada}` : ''}{op.duracion !== '—' ? ` · ${op.duracion}` : ''}</span>
+                        {op.tipo === 'multimodal' && op.tramos ? (
+                          <span className="viatico-multi-tramos">
+                            {op.tramos.map((t, ti) => (
+                              <span key={ti} className="viatico-multi-tramo">
+                                {t.tipo === 'vuelo' ? '✈' : '🚌'} {t.empresa}: {t.salida}→{t.llegada} ({t.duracion}) · ${formatearMiles(t.precio)}
+                              </span>
+                            ))}
+                          </span>
+                        ) : (
+                          <span>{op.salida !== '—' ? op.salida : ''}{op.llegada !== '—' ? ` → ${op.llegada}` : ''}{op.duracion !== '—' ? ` · ${op.duracion}` : ''}</span>
+                        )}
+                        {op.tipo === 'multimodal' && (
+                          <span className="viatico-multi-total">Total viaje: {op.salida} → {op.llegada} · {op.duracion}</span>
+                        )}
                       </div>
                       <div className="viatico-opcion-precio">${formatearMiles(op.precio)}</div>
                       <span className="viatico-usar-tag">Usar ↓</span>
@@ -774,11 +799,11 @@ export function ViaticosPanel({ onCreada }: { onCreada?: (info: { id: number; nu
                   <>
                     <p className="leg-nota" style={{ margin: '10px 0 6px' }}>Opciones de <strong>regreso</strong> · {ciudadDestino} → {ciudadOrigen}:</p>
                     <div className="viatico-opciones-lista">
-                      {opcionesRegreso.slice(0, 4).map((op) => (
+                      {opcionesRegreso.slice(0, 5).map((op) => (
                         <button
                           key={op.id}
                           type="button"
-                          className="viatico-opcion-item viatico-opcion-btn viatico-opcion-regreso"
+                          className={`viatico-opcion-item viatico-opcion-btn viatico-opcion-regreso${op.tipo === 'multimodal' ? ' viatico-opcion-multi' : ''}`}
                           onClick={() => {
                             setTipoTrVuelta(op.tipo === 'bus' ? 'terrestre' : 'aereo');
                             setEmpresaVuelta(op.empresa);
@@ -787,10 +812,23 @@ export function ViaticosPanel({ onCreada }: { onCreada?: (info: { id: number; nu
                             setValorVuelta(String(op.precio));
                           }}
                         >
-                          <span className="viatico-opcion-icono">{op.tipo === 'bus' ? '🚌' : '✈'}</span>
+                          <span className="viatico-opcion-icono">{op.tipo === 'multimodal' ? '✈🚌' : op.tipo === 'bus' ? '🚌' : '✈'}</span>
                           <div className="viatico-opcion-info">
                             <strong>{op.empresa}</strong>
-                            <span>{op.salida !== '—' ? op.salida : ''}{op.llegada !== '—' ? ` → ${op.llegada}` : ''}{op.duracion !== '—' ? ` · ${op.duracion}` : ''}</span>
+                            {op.tipo === 'multimodal' && op.tramos ? (
+                              <span className="viatico-multi-tramos">
+                                {op.tramos.map((t, ti) => (
+                                  <span key={ti} className="viatico-multi-tramo">
+                                    {t.tipo === 'vuelo' ? '✈' : '🚌'} {t.empresa}: {t.salida}→{t.llegada} ({t.duracion}) · ${formatearMiles(t.precio)}
+                                  </span>
+                                ))}
+                              </span>
+                            ) : (
+                              <span>{op.salida !== '—' ? op.salida : ''}{op.llegada !== '—' ? ` → ${op.llegada}` : ''}{op.duracion !== '—' ? ` · ${op.duracion}` : ''}</span>
+                            )}
+                            {op.tipo === 'multimodal' && (
+                              <span className="viatico-multi-total">Total viaje: {op.salida} → {op.llegada} · {op.duracion}</span>
+                            )}
                           </div>
                           <div className="viatico-opcion-precio">${formatearMiles(op.precio)}</div>
                           <span className="viatico-usar-tag">Usar ↓</span>
