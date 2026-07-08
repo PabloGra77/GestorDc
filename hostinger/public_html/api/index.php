@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 
+define('PAYOPS_BOOTSTRAP', true);
 require __DIR__ . '/bootstrap.php';
 
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';

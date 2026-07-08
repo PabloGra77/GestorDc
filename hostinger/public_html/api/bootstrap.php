@@ -1,6 +1,12 @@
 <?php
 declare(strict_types=1);
 
+// Bloquear acceso web directo — solo puede ser incluido por index.php
+if (!defined('PAYOPS_BOOTSTRAP')) {
+    http_response_code(403);
+    exit;
+}
+
 // Sin exponer errores al usuario, todo a log
 ini_set('display_errors', '0');
 ini_set('display_startup_errors', '0');

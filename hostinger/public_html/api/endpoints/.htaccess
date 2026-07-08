@@ -1,0 +1,5 @@
+# Bloquear acceso web directo a todos los archivos PHP en endpoints/
+# Los endpoints solo deben ser llamados desde api/index.php (PHP interno), nunca desde el navegador
+<FilesMatch "\.php$">
+    Require all denied
+</FilesMatch>

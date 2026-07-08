@@ -1,0 +1,4 @@
+# Bloquear acceso web directo a las clases/helpers en lib/
+<FilesMatch "\.php$">
+    Require all denied
+</FilesMatch>

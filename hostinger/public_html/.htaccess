@@ -34,12 +34,11 @@ RewriteRule .* - [F,L]
 RewriteCond %{QUERY_STRING} (union[\s+]+select|<script|javascript:|base64_decode|eval\(|\.\./\.\.) [NC]
 RewriteRule .* - [F,L]
 
-# /api/* -> /api/index.php (excepto archivos reales como .css, .js dentro de api)
+# /api/* -> /api/index.php
+# NOTA: En este servidor LiteSpeed las RewriteRules no se procesan para rutas sin .php;
+# el frontend usa /api/index.php/<ruta> (PATH_INFO) por lo que estas reglas son un fallback.
 RewriteCond %{REQUEST_FILENAME} !-f
-RewriteRule ^api/.+$ api/index.php [QSA,END]
-
-# /api/ directorio sin path -> index.php
-RewriteRule ^api/?$ api/index.php [QSA,END]
+RewriteRule ^api/(.*)$ api/index.php/$1 [QSA,L]
 
 # Resto: SPA fallback
 RewriteCond %{REQUEST_FILENAME} !-f

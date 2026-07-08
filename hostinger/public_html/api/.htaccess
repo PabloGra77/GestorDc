@@ -1,0 +1,14 @@
+# API - LiteSpeed shared hosting
+# NOTA: RewriteRules no funcionan en este servidor; usar FilesMatch/Files para seguridad
+Options -Indexes
+
+# Bloquear acceso web directo a bootstrap.php
+<Files "bootstrap.php">
+    Require all denied
+</Files>
+
+# Pasar el header Authorization a PHP
+<IfModule lsapi_module>
+    CGIPassAuth On
+</IfModule>
+SetEnvIf Authorization "(.*)" HTTP_AUTHORIZATION=$1
