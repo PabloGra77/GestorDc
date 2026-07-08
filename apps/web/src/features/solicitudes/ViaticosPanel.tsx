@@ -353,7 +353,7 @@ export function ViaticosPanel({ onCreada }: { onCreada?: (info: { id: number; nu
   const [fuentePrecios, setFuentePrecios] = useState<'api' | 'estimado' | null>(null);
 
   useEffect(() => {
-    if (paso !== 3 || !ciudadOrigen || !ciudadDestino || !fechaIda) return;
+    if (paso !== 3 || tipoViatico !== 'anticipo' || !ciudadOrigen || !ciudadDestino || !fechaIda) return;
     let cancelled = false;
     setCargandoPrecios(true);
     setOpcionesViaje([]);
@@ -727,8 +727,8 @@ export function ViaticosPanel({ onCreada }: { onCreada?: (info: { id: number; nu
             : <p className="leg-nota">Ingresa los datos exactos de tu tiquete o comprobante de viaje.</p>
           }
 
-          {/* Buscador de precios interno */}
-          <div className="viatico-ref-box">
+          {/* Buscador de precios — solo para anticipo (en legalización ya tienes el tiquete real) */}
+          <div className="viatico-ref-box" style={tipoViatico !== 'anticipo' ? { display: 'none' } : undefined}>
             {cargandoPrecios ? (
               <div className="viatico-buscando">
                 <span className="viatico-buscando-spin">⏳</span>

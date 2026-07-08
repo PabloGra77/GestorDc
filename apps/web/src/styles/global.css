@@ -10036,3 +10036,142 @@ textarea {
   color: var(--text-primary);
 }
 .leg-radio-item input[type="radio"] { accent-color: var(--accent, #D4AF37); width: 16px; height: 16px; cursor: pointer; }
+
+/* ============================================================
+   TIPOS DE SOLICITUD — panel admin
+   ============================================================ */
+.tipos-panel { width: 100%; }
+.tipos-panel-head {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+  margin-bottom: 18px; flex-wrap: wrap;
+}
+.tipos-panel-head h4 { margin: 0 0 2px; font-size: 15px; color: var(--text-primary); }
+.tipos-crear-btn { font-size: 13px; white-space: nowrap; }
+
+/* Formulario crear nuevo tipo */
+.tipos-crear-form {
+  padding: 16px 18px; margin-bottom: 20px;
+  border: 1.5px solid var(--gold-line); border-radius: 10px;
+}
+.tipos-crear-form h5 { margin: 0 0 12px; font-size: 13px; color: var(--gold); text-transform: uppercase; letter-spacing: 0.05em; }
+.tipos-crear-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+.tipos-crear-acciones { display: flex; justify-content: flex-end; }
+
+/* Grupos por área */
+.tipos-lista { display: flex; flex-direction: column; gap: 24px; }
+.tipos-grupo {}
+.tipos-grupo-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 6px 4px 8px;
+  border-bottom: 1px solid var(--border-soft);
+  margin-bottom: 8px;
+}
+.tipos-grupo-area { font-size: 11px; font-weight: 700; color: var(--gold); text-transform: uppercase; letter-spacing: 0.08em; }
+.tipos-grupo-count { font-size: 11px; color: var(--text-muted); }
+
+/* Filas de tipo */
+.tipos-row {
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 8px;
+  background: rgba(255,255,255,0.02);
+  transition: border-color 0.15s;
+}
+.tipos-row:hover { border-color: var(--gold-line); }
+.tipos-row-edit { border-color: var(--royal-blue); background: rgba(61,90,254,0.04); }
+
+.tipos-row-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+}
+.tipos-row-info { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; }
+.tipos-nombre { font-size: 14px; color: var(--text-primary); }
+.tipos-slug {
+  font-size: 11px; color: var(--text-muted); background: rgba(255,255,255,0.05);
+  padding: 1px 6px; border-radius: 4px; font-family: monospace;
+}
+.tipos-hint-especial { font-size: 11px; color: var(--royal-blue-hover); background: rgba(61,90,254,0.12); padding: 1px 7px; border-radius: 4px; }
+.tipos-desc { font-size: 12px; color: var(--text-secondary); margin: 6px 0 0; line-height: 1.5; }
+
+.tipos-badge-activo {
+  font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;
+  padding: 2px 7px; border-radius: 20px;
+  background: rgba(0,200,100,0.15); color: #00c864;
+}
+.tipos-badge-activo.inactivo { background: rgba(255,60,60,0.12); color: #ff5e5e; }
+
+.tipos-row-acciones { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.tipos-toggle-btn {
+  font-size: 11px; padding: 4px 10px; border-radius: 6px;
+  background: rgba(0,200,100,0.1); color: #00c864; border: 1px solid rgba(0,200,100,0.25); cursor: pointer;
+  transition: background 0.15s;
+}
+.tipos-toggle-btn.off { background: rgba(61,90,254,0.1); color: var(--royal-blue-hover); border-color: rgba(61,90,254,0.25); }
+.tipos-toggle-btn:hover { filter: brightness(1.2); }
+
+/* Flujo resumido */
+.tipos-flujo-resumen {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 4px;
+  margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border-soft);
+}
+.tipos-flujo-step { display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--text-secondary); }
+.tipos-flujo-num {
+  width: 17px; height: 17px; border-radius: 50%;
+  background: var(--royal-blue-soft); color: var(--royal-blue-hover);
+  font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.tipos-flujo-arrow { color: var(--text-muted); margin: 0 2px; }
+
+/* Editor expandible */
+.tipos-editor {
+  margin-top: 14px; padding-top: 14px;
+  border-top: 1px solid var(--border-soft);
+  display: flex; flex-direction: column; gap: 20px;
+}
+.tipos-editor-section {}
+.tipos-editor-section h4 {
+  font-size: 12px; font-weight: 700; color: var(--gold);
+  text-transform: uppercase; letter-spacing: 0.07em;
+  margin: 0 0 10px;
+}
+.tipos-editor-fields { display: flex; flex-direction: column; gap: 12px; }
+.tipos-editor-fila-doble { display: grid; grid-template-columns: auto 1fr; gap: 16px; align-items: start; }
+.tipos-check-label { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-primary); cursor: pointer; margin-top: 4px; }
+.tipos-check-label input[type="checkbox"] { accent-color: var(--royal-blue); width: 15px; height: 15px; }
+
+/* Editor de flujo */
+.tipos-flujo-editor { display: flex; flex-direction: column; gap: 8px; }
+.tipos-flujo-editor-paso {
+  display: flex; align-items: center; gap: 8px;
+}
+.tipos-flujo-editor-paso select {
+  flex: 1; padding: 7px 10px; border-radius: 6px;
+  background: var(--bg-input); border: 1px solid var(--border-soft);
+  color: var(--text-primary); font-size: 13px;
+}
+.tipos-flujo-arrow-edit { color: var(--text-muted); font-size: 13px; padding: 0 2px; }
+.tipos-flujo-quitar {
+  width: 24px; height: 24px; border-radius: 50%; border: 1px solid rgba(255,60,60,0.3);
+  background: rgba(255,60,60,0.08); color: #ff5e5e; font-size: 11px;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.tipos-flujo-quitar:disabled { opacity: 0.3; cursor: not-allowed; }
+.tipos-flujo-agregar { font-size: 12px; align-self: flex-start; margin-top: 2px; }
+
+/* Acciones del editor */
+.tipos-editor-acciones {
+  display: flex; justify-content: flex-end; gap: 10px;
+  padding-top: 4px; border-top: 1px solid var(--border-soft);
+}
+
+/* Estado vacío */
+.tipos-vacio { padding: 32px; text-align: center; color: var(--text-secondary); }
+.tipos-vacio p { margin: 4px 0; }
+
+@media (max-width: 640px) {
+  .tipos-crear-fields { grid-template-columns: 1fr; }
+  .tipos-editor-fila-doble { grid-template-columns: 1fr; }
+  .tipos-row-head { flex-direction: column; align-items: flex-start; }
+  .tipos-row-acciones { width: 100%; justify-content: flex-end; }
+}

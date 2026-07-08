@@ -24,6 +24,7 @@ header('X-XSS-Protection: 0');
 header('Referrer-Policy: no-referrer');
 
 require_once __DIR__ . '/lib/config.php';
+require_once __DIR__ . '/lib/logger.php';
 require_once __DIR__ . '/lib/response.php';
 require_once __DIR__ . '/lib/db.php';
 require_once __DIR__ . '/lib/settings.php';
