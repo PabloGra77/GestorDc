@@ -101,6 +101,9 @@ $routes = [
     // Verificación forense de documentos
     ['POST',   '#^/forense$#',                                   'forense/analizar'],
 
+    // Migraciones de base de datos (solo admin, idempotentes)
+    ['POST',   '#^/admin/migrate/usuarios-ops$#',                'admin/migrate_usuarios_ops'],
+
     // Configuracion (solo admin)
     ['GET',    '#^/config/smtp$#',                               'config/smtp_get'],
     ['PUT',    '#^/config/smtp$#',                               'config/smtp_update'],
