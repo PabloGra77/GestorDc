@@ -6,7 +6,6 @@ import { api } from '../../services/http/api';
 import { appendChatMessages, formatRelativeNow } from '../../app/layout/requestsChatStore';
 import { RadicacionesModule } from '../radicaciones/RadicacionesModule';
 import { AreasPanel } from '../admin/AreasPanel';
-import { TiposSolicitudPanel } from '../admin/TiposSolicitudPanel';
 import { ReportesPanel } from '../admin/ReportesPanel';
 import { BulkCreatePanel } from '../admin/BulkCreatePanel';
 import { PersonalAutorizadoPanel } from '../admin/PersonalAutorizadoPanel';
@@ -18,7 +17,7 @@ import type { Role } from '../../types/role';
 import type { Radicado, VerificarRadicadoResponse } from '../../types/radicado';
 import type { Usuario } from '../../types/usuario';
 
-type AdminModule = 'Usuarios' | 'Personal autorizado' | 'Roles' | 'Areas' | 'Tipos de solicitud' | 'Usuarios en linea' | 'Reportes' | 'Configuracion' | 'Configuracion Legalizaciones';
+type AdminModule = 'Usuarios' | 'Personal autorizado' | 'Roles' | 'Areas' | 'Usuarios en linea' | 'Reportes' | 'Configuracion' | 'Configuracion Legalizaciones';
 
 const ROLE_PERMISSIONS_CATALOG = {
 	inicio: {
@@ -1126,7 +1125,7 @@ export function DashboardPage() {
 					</div>
 
 					<div className="admin-module-nav" role="tablist" aria-label="Módulos administrativos">
-						{(['Usuarios', 'Personal autorizado', 'Roles', 'Areas', 'Tipos de solicitud', 'Usuarios en linea', 'Reportes', 'Configuracion', 'Configuracion Legalizaciones'] as AdminModule[]).map((module) => (
+						{(['Usuarios', 'Personal autorizado', 'Roles', 'Areas', 'Usuarios en linea', 'Reportes', 'Configuracion', 'Configuracion Legalizaciones'] as AdminModule[]).map((module) => (
 							<button
 								key={module}
 								type="button"
@@ -1470,10 +1469,6 @@ export function DashboardPage() {
 
 						{activeAdminModule === 'Areas' ? (
 							<AreasPanel />
-						) : null}
-
-						{activeAdminModule === 'Tipos de solicitud' ? (
-							<TiposSolicitudPanel />
 						) : null}
 
 						{activeAdminModule === 'Reportes' ? (

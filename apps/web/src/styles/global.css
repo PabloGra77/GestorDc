@@ -9981,3 +9981,43 @@ textarea {
   .profile-avatar-col { flex-direction: row; align-items: center; gap: 16px; }
   .profile-avatar-circle { width: 56px; height: 56px; font-size: 24px; }
 }
+
+/* ============================================================
+   CUENTA DE COBRO OPS — resumen final (paso 5)
+   ============================================================ */
+.ops-resumen {
+  background: var(--surface-2, rgba(255,255,255,0.04));
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 18px;
+  margin: 20px 0 8px;
+}
+.ops-resumen h4 {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin: 0 0 12px;
+}
+.ops-resumen-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 14px;
+  font-size: 13px;
+}
+.ops-resumen-grid span { color: var(--text-secondary); white-space: nowrap; }
+.ops-resumen-grid strong { color: var(--text-primary); }
+[data-theme="light"] .ops-resumen { background: #F8F9FC; border-color: rgba(212,175,55,0.4); }
+
+/* Radio group inline (tipo de cuenta) */
+.leg-radio-group { display: flex; gap: 16px; align-items: center; padding: 6px 0; }
+.leg-radio-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  cursor: pointer;
+  color: var(--text-primary);
+}
+.leg-radio-item input[type="radio"] { accent-color: var(--accent, #D4AF37); width: 16px; height: 16px; cursor: pointer; }

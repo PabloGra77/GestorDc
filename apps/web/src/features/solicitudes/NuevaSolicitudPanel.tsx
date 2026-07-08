@@ -10,6 +10,7 @@ import { ordenarCamposPorPlantilla } from '../../utils/ordenCamposPlantilla';
 import { LegalizacionPanel } from './LegalizacionPanel';
 import { ViaticosPanel } from './ViaticosPanel';
 import { AnticipOPanel } from './AnticipOPanel';
+import { CuentaCobroOpsPanel } from './CuentaCobroOpsPanel';
 
 interface Area {
   id: number;
@@ -825,12 +826,14 @@ export function NuevaSolicitudPanel({ onCreada }: NuevaSolicitudPanelProps) {
 
           {(() => {
             const norm = (s: string) => (s ?? '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]/g,'');
-            const esLegal     = norm(tipoSel.slug) === 'legalizacion' || norm(tipoSel.nombre) === 'legalizacion';
-            const esViat      = norm(tipoSel.slug) === 'viaticos'    || norm(tipoSel.nombre) === 'viaticos';
-            const esAnticipo  = norm(tipoSel.slug) === 'anticipo'    || norm(tipoSel.nombre) === 'anticipo';
-            if (esLegal)    return <LegalizacionPanel tipoSolicitudId={tipoSel.id} areaId={areaSel?.id} onCreada={onCreada} />;
-            if (esViat)     return <ViaticosPanel     onCreada={onCreada} />;
-            if (esAnticipo) return <AnticipOPanel     onCreada={onCreada} />;
+            const esLegal       = norm(tipoSel.slug) === 'legalizacion' || norm(tipoSel.nombre) === 'legalizacion';
+            const esViat        = norm(tipoSel.slug) === 'viaticos'    || norm(tipoSel.nombre) === 'viaticos';
+            const esAnticipo    = norm(tipoSel.slug) === 'anticipo'    || norm(tipoSel.nombre) === 'anticipo';
+            const esCuentaCobro = norm(tipoSel.slug).includes('cuentacobro') || norm(tipoSel.nombre).includes('cuentacobro');
+            if (esLegal)       return <LegalizacionPanel    tipoSolicitudId={tipoSel.id} areaId={areaSel?.id} onCreada={onCreada} />;
+            if (esViat)        return <ViaticosPanel        onCreada={onCreada} />;
+            if (esAnticipo)    return <AnticipOPanel        onCreada={onCreada} />;
+            if (esCuentaCobro) return <CuentaCobroOpsPanel tipoSolicitudId={tipoSel.id} areaId={areaSel?.id} onCreada={onCreada} />;
             return (
           <form className="nueva-sol-form" onSubmit={enviar}>
             {/* Indicador de sub-pasos */}

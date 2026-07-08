@@ -59,6 +59,7 @@ $routes = [
     ['PATCH',  '#^/areas/(?P<id>\d+)$#',                         'areas/update'],
 
     // Tipos de solicitud
+    ['POST',   '#^/tipos/ensure$#',                              'tipos/ensure'],
     ['POST',   '#^/tipos$#',                                     'tipos/create'],
     ['GET',    '#^/tipos$#',                                     'tipos/find_all'],
     ['PATCH',  '#^/tipos/(?P<id>\d+)$#',                         'tipos/update'],
