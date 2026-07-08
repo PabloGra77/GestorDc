@@ -10169,11 +10169,72 @@ textarea {
 .tipos-vacio { padding: 32px; text-align: center; color: var(--text-secondary); }
 .tipos-vacio p { margin: 4px 0; }
 
+/* ── Resumen de meta (visibilidad + topes) en fila no editando ── */
+.tipos-meta-resumen {
+  display: flex; flex-wrap: wrap; gap: 8px 16px;
+  margin-top: 6px; padding-top: 6px;
+  border-top: 1px dashed var(--border-soft);
+}
+.tipos-meta-visib,
+.tipos-meta-topes {
+  font-size: 11.5px; color: var(--text-muted);
+  display: flex; align-items: center; gap: 4px;
+}
+
+/* ── Topes y límites ── */
+.tipos-topes-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px 16px;
+  margin-top: 12px;
+}
+
+/* ── Visibilidad por área ── */
+.tipos-visib-opts {
+  display: flex; flex-direction: column; gap: 8px;
+  margin-top: 10px;
+}
+.tipos-visib-radio { align-items: flex-start !important; }
+.tipos-visib-radio input[type="radio"] {
+  accent-color: var(--royal-blue);
+  width: 15px; height: 15px;
+  margin-top: 2px; flex-shrink: 0;
+}
+.tipos-areas-checkboxes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 8px 12px;
+  margin-top: 10px;
+  padding: 12px 14px;
+  background: var(--bg-card-alt, rgba(255,255,255,0.04));
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+}
+.tipos-area-cb { padding: 2px 0; }
+.tipos-visib-warn {
+  grid-column: 1 / -1;
+  font-size: 12px; color: var(--warm-orange);
+  margin: 0;
+}
+
 @media (max-width: 640px) {
   .tipos-crear-fields { grid-template-columns: 1fr; }
   .tipos-editor-fila-doble { grid-template-columns: 1fr; }
   .tipos-row-head { flex-direction: column; align-items: flex-start; }
   .tipos-row-acciones { width: 100%; justify-content: flex-end; }
+  .tipos-topes-grid { grid-template-columns: 1fr 1fr; }
+  .tipos-areas-checkboxes { grid-template-columns: 1fr; }
+}
+
+/* ── Hotel opciones (mismo estilo que viajes) ── */
+.viatico-hotel-opciones { margin: 12px 0 16px; }
+.viatico-opcion-item.viatico-opcion-selected {
+  border-color: var(--royal-blue) !important;
+  background: rgba(61, 90, 254, 0.14) !important;
+  box-shadow: 0 0 0 2px rgba(61, 90, 254, 0.25);
+}
+.viatico-opcion-precio small {
+  font-size: 10px; font-weight: 400; color: var(--text-muted); margin-left: 1px;
 }
 
 /* ============================================================

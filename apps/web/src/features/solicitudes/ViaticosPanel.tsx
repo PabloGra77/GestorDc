@@ -94,6 +94,19 @@ const HOTELES_REF: Record<string, { min: number; max: number; nota: string }> = 
   'Riohacha':       { min: 70000,  max: 250000, nota: 'Centro, Manaure' },
 };
 
+function getHotelOpciones(ciudad: string): { categoria: string; icono: string; precio: number; zona: string }[] {
+  const ref = HOTELES_REF[ciudad];
+  if (!ref) return [];
+  const { min, max, nota } = ref;
+  const rango = max - min;
+  return [
+    { categoria: 'Económico',  icono: '🏠', precio: min,                                                          zona: nota },
+    { categoria: 'Estándar',   icono: '🏨', precio: Math.round((min + rango * 0.30) / 1000) * 1000,               zona: nota },
+    { categoria: 'Confort',    icono: '🏩', precio: Math.round((min + rango * 0.65) / 1000) * 1000,               zona: nota },
+    { categoria: 'Superior',   icono: '⭐', precio: max,                                                          zona: nota },
+  ];
+}
+
 /* ─── Tipos ─────────────────────────────────────────────────── */
 interface UsuarioSugerido { id: number; nombreCompleto: string; rol: string; area: string | null; }
 interface FacturaAdj { archivoId: string; nombre: string; alertas: string[]; }
@@ -1007,31 +1020,30 @@ export function ViaticosPanel({ onCreada }: { onCreada?: (info: { id: number; nu
             </label>
           </div>
 
-          {/* Referencia de precios de hotel por ciudad */}
+          {/* Opciones de hotel por ciudad – mismo estilo que opciones de viaje */}
           {tieneHospedaje && ciudadDestino && HOTELES_REF[ciudadDestino] && (
-            <div className="viatico-hotel-ref">
-              <div className="viatico-hotel-ref-titulo">
-                🏨 Referencia de precios · {ciudadDestino}
+            <div className="viatico-hotel-opciones">
+              <div className="viatico-ref-titulo">
+                🏨 Opciones de hospedaje · {ciudadDestino}
               </div>
-              <div className="viatico-hotel-ref-rango">
-                <span className="viatico-hotel-ref-min">${formatearMiles(HOTELES_REF[ciudadDestino].min)}</span>
-                <span className="viatico-hotel-ref-sep">–</span>
-                <span className="viatico-hotel-ref-max">${formatearMiles(HOTELES_REF[ciudadDestino].max)}</span>
-                <span className="viatico-hotel-ref-unit">por noche</span>
-              </div>
-              <p className="viatico-hotel-ref-nota">{HOTELES_REF[ciudadDestino].nota}</p>
-              <div className="viatico-hotel-ref-acciones">
-                <button type="button" className="viatico-hotel-ref-btn"
-                  onClick={() => setHotelValorNoche(String(HOTELES_REF[ciudadDestino].min))}>
-                  Usar mínimo (${formatearMiles(HOTELES_REF[ciudadDestino].min)})
-                </button>
-                <button type="button" className="viatico-hotel-ref-btn viatico-hotel-ref-btn-mid"
-                  onClick={() => {
-                    const mid = Math.round((HOTELES_REF[ciudadDestino].min + HOTELES_REF[ciudadDestino].max) / 2 / 1000) * 1000;
-                    setHotelValorNoche(String(mid));
-                  }}>
-                  Usar promedio (${formatearMiles(Math.round((HOTELES_REF[ciudadDestino].min + HOTELES_REF[ciudadDestino].max) / 2 / 1000) * 1000)})
-                </button>
+              <p className="leg-nota" style={{ marginBottom: 8 }}>Selecciona una categoría para <strong>llenar automáticamente</strong> el valor por noche.</p>
+              <div className="viatico-opciones-lista">
+                {getHotelOpciones(ciudadDestino).map((h) => (
+                  <button
+                    key={h.categoria}
+                    type="button"
+                    className={`viatico-opcion-item viatico-opcion-btn${parseInt(hotelValorNoche) === h.precio ? ' viatico-opcion-selected' : ''}`}
+                    onClick={() => setHotelValorNoche(String(h.precio))}
+                  >
+                    <span className="viatico-opcion-icono">{h.icono}</span>
+                    <div className="viatico-opcion-info">
+                      <strong>{h.categoria}</strong>
+                      <span>{h.zona}</span>
+                    </div>
+                    <div className="viatico-opcion-precio">${formatearMiles(h.precio)}<small>/noche</small></div>
+                    <span className="viatico-usar-tag">Usar ↓</span>
+                  </button>
+                ))}
               </div>
             </div>
           )}
