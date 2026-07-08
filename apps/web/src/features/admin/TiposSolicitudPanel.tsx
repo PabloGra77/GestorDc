@@ -1403,6 +1403,19 @@ function PlantillaPdfEditor({ plantilla, onChange, campos, onCamposChange, onIns
   const [arrastrando, setArrastrando] = useState(false);
   const [guias, setGuias] = useState<{ x: number[]; y: number[] }>({ x: [], y: [] });
   const pageRef = useRef<HTMLDivElement | null>(null);
+  const autoPreviewDone = useRef(false);
+
+  // Auto-genera la vista previa PDF la primera vez que el editor carga con bloques
+  useEffect(() => {
+    if (autoPreviewDone.current || !plantilla?.bloques?.length) return;
+    autoPreviewDone.current = true;
+    setCargandoPdfPreview(true);
+    previewPlantillaBlobUrl(plantilla, campos)
+      .then((url) => { if (url) setPdfPreviewUrl(url); })
+      .catch(() => {})
+      .finally(() => setCargandoPdfPreview(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const ZOOM_MIN = 0.4;
   const ZOOM_MAX = 1.8;

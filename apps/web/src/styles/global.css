@@ -9259,6 +9259,20 @@ textarea {
   color: var(--accent);
 }
 
+/* ── Buscador interno de precios ── */
+.viatico-buscando {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+.viatico-buscando strong { display: block; color: var(--text-primary); }
+.viatico-buscando p { margin: 2px 0 0; font-size: 12px; color: var(--text-muted); }
+.viatico-buscando-spin { font-size: 20px; animation: spin 1.2s linear infinite; display: inline-block; }
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
 /* ── Caja de referencia de precios ── */
 .viatico-ref-box {
   border: 1.5px solid rgba(212,175,55,0.35);
@@ -9266,6 +9280,7 @@ textarea {
   padding: 14px 16px;
   margin-bottom: 20px;
   background: rgba(212,175,55,0.05);
+  min-height: 52px;
 }
 .viatico-ref-titulo {
   font-size: 14px;

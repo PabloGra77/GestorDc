@@ -712,18 +712,24 @@ export function ViaticosPanel({ onCreada }: { onCreada?: (info: { id: number; nu
           <h3>Datos del tiquete de transporte</h3>
           <p className="leg-nota">Ingresa los datos exactos de tu tiquete o comprobante de viaje.</p>
 
-          {/* Precios de referencia: API en tiempo real → fallback estático */}
+          {/* Buscador de precios interno */}
           <div className="viatico-ref-box">
             {cargandoPrecios ? (
-              <div className="viatico-ref-titulo">⏳ Consultando precios para {ciudadOrigen} → {ciudadDestino}…</div>
+              <div className="viatico-buscando">
+                <span className="viatico-buscando-spin">⏳</span>
+                <div>
+                  <strong>Buscando opciones de viaje…</strong>
+                  <p>{ciudadOrigen} → {ciudadDestino}</p>
+                </div>
+              </div>
             ) : opcionesViaje.length > 0 ? (
               <>
                 <div className="viatico-ref-titulo">
-                  📊 Opciones disponibles · {ciudadOrigen} → {ciudadDestino}
+                  🔍 Opciones de viaje · {ciudadOrigen} → {ciudadDestino}
                   {fuentePrecios === 'api' && <span className="viatico-fuente-badge">Precios actualizados</span>}
-                  {fuentePrecios === 'estimado' && <span className="viatico-fuente-badge viatico-fuente-est">Estimados de referencia</span>}
+                  {fuentePrecios === 'estimado' && <span className="viatico-fuente-badge viatico-fuente-est">Precios de referencia</span>}
                 </div>
-                <p className="leg-nota" style={{ marginBottom: 6 }}>Haz clic en una opción para pre-llenar el tiquete de <strong>ida</strong>.</p>
+                <p className="leg-nota" style={{ marginBottom: 8 }}>Selecciona una opción para <strong>llenar automáticamente</strong> los datos del tiquete de <strong>ida</strong>.</p>
                 <div className="viatico-opciones-lista">
                   {opcionesViaje.slice(0, 6).map((op) => (
                     <button
@@ -816,68 +822,16 @@ export function ViaticosPanel({ onCreada }: { onCreada?: (info: { id: number; nu
                   )}
                 </div>
               </>
-            ) : null}
-          </div>
-
-          {/* Buscar en plataformas reales */}
-          {ciudadOrigen && ciudadDestino && fechaIda && (() => {
-            const fechaFmt = new Date(fechaIda).toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' });
-            const q = `vuelos de ${ciudadOrigen} a ${ciudadDestino} el ${fechaFmt}`;
-            const plataformas = [
-              {
-                nombre: 'Google Vuelos', icono: '✈', color: '#4285f4',
-                url: `https://www.google.com/travel/flights?q=${encodeURIComponent(q)}&hl=es-419&gl=co&curr=COP`,
-                desc: 'Busca en todas las aerolíneas',
-              },
-              {
-                nombre: 'Despegar', icono: '✈', color: '#6c00e0',
-                url: `https://www.despegar.com.co/vuelos/?q=${encodeURIComponent(`${ciudadOrigen} a ${ciudadDestino}`)}`,
-                desc: 'Paquetes y vuelos',
-              },
-              {
-                nombre: 'Avianca', icono: '✈', color: '#e5001a',
-                url: `https://www.avianca.com/co/es/`,
-                desc: 'Aerolínea principal',
-              },
-              {
-                nombre: 'LATAM', icono: '✈', color: '#1b0088',
-                url: `https://www.latam.com/es_co/`,
-                desc: 'LATAM Colombia',
-              },
-              {
-                nombre: 'Buses (Redbus)', icono: '🚌', color: '#d84315',
-                url: `https://www.redbus.co/bus-tickets/${encodeURIComponent(ciudadOrigen.toLowerCase())}-to-${encodeURIComponent(ciudadDestino.toLowerCase())}`,
-                desc: 'Pasajes de bus inter-municipal',
-              },
-              {
-                nombre: 'Bolivariano', icono: '🚌', color: '#1b5e20',
-                url: `https://www.bolivariano.com.co/`,
-                desc: 'Empresa de buses',
-              },
-            ];
-            return (
-              <div className="viatico-plataformas">
-                <div className="viatico-plataformas-titulo">
-                  🌐 Ver precios reales en plataformas · {ciudadOrigen} → {ciudadDestino}
-                </div>
-                <p className="leg-nota" style={{ margin: '4px 0 8px' }}>
-                  Abre una pestaña nueva. Busca tu opción, copia el precio y regresa a llenar el formulario — o usa las tarjetas estimadas de arriba.
-                </p>
-                <div className="viatico-plataformas-grid">
-                  {plataformas.map((p) => (
-                    <a key={p.nombre} href={p.url} target="_blank" rel="noopener noreferrer"
-                      className="viatico-plataforma-btn"
-                      style={{ '--plat-color': p.color } as React.CSSProperties}
-                      title={p.desc}>
-                      <span className="viatico-plataforma-icono">{p.icono}</span>
-                      <span className="viatico-plataforma-nombre">{p.nombre}</span>
-                      <span className="viatico-plataforma-arrow">↗</span>
-                    </a>
-                  ))}
+            ) : ciudadOrigen && ciudadDestino && fechaIda ? (
+              <div className="viatico-buscando">
+                <span>🔍</span>
+                <div>
+                  <strong>Cargando opciones…</strong>
+                  <p>Consultando precios de referencia para {ciudadOrigen} → {ciudadDestino}</p>
                 </div>
               </div>
-            );
-          })()}
+            ) : null}
+          </div>
 
           <TiqueteForm
             titulo={esIdaVuelta ? '🛫 Tiquete de ida' : '🛫 Tiquete'}
@@ -1018,46 +972,6 @@ export function ViaticosPanel({ onCreada }: { onCreada?: (info: { id: number; nu
             </div>
           )}
 
-          {/* Links de plataformas de hospedaje */}
-          {tieneHospedaje && ciudadDestino && (() => {
-            const checkin = hotelEntrada || fechaIda;
-            const checkout = hotelSalida || (esIdaVuelta && fechaRegreso ? fechaRegreso : '');
-            const city = encodeURIComponent(ciudadDestino + ' Colombia');
-            const hoteles = [
-              {
-                nombre: 'Google Hoteles', icono: '🔍', color: '#4285f4',
-                url: `https://www.google.com/travel/hotels?q=hoteles+en+${encodeURIComponent(ciudadDestino)}&hl=es-419&gl=co&curr=COP${checkin ? `&dates=${checkin},${checkout}` : ''}`,
-              },
-              {
-                nombre: 'Booking.com', icono: '🏨', color: '#003580',
-                url: `https://www.booking.com/searchresults.es.html?ss=${city}${checkin ? `&checkin=${checkin}&checkout=${checkout}` : ''}&group_adults=1`,
-              },
-              {
-                nombre: 'Airbnb', icono: '🏠', color: '#ff5a5f',
-                url: `https://www.airbnb.com.co/s/${encodeURIComponent(ciudadDestino)}--Colombia/homes${checkin ? `?checkin=${checkin}&checkout=${checkout}&adults=1` : ''}`,
-              },
-              {
-                nombre: 'Trivago', icono: '🔍', color: '#007fc8',
-                url: `https://www.trivago.com.co/es-ES/srl?search=Hotel+${encodeURIComponent(ciudadDestino)}`,
-              },
-            ];
-            return (
-              <div className="viatico-plataformas viatico-plataformas-hotel">
-                <div className="viatico-plataformas-titulo">🌐 Buscar hospedaje en {ciudadDestino}</div>
-                <div className="viatico-plataformas-grid">
-                  {hoteles.map((h) => (
-                    <a key={h.nombre} href={h.url} target="_blank" rel="noopener noreferrer"
-                      className="viatico-plataforma-btn"
-                      style={{ '--plat-color': h.color } as React.CSSProperties}>
-                      <span className="viatico-plataforma-icono">{h.icono}</span>
-                      <span className="viatico-plataforma-nombre">{h.nombre}</span>
-                      <span className="viatico-plataforma-arrow">↗</span>
-                    </a>
-                  ))}
-                </div>
-              </div>
-            );
-          })()}
 
           {tieneHospedaje && (
             <>
