@@ -9533,6 +9533,21 @@ textarea {
   border-color: var(--gold);
 }
 
+/* Aviso informativo en flujo de anticipo */
+.viatico-anticipo-aviso {
+  background: rgba(61,90,254,0.08);
+  border: 1.5px solid rgba(61,90,254,0.3);
+  border-radius: 8px;
+  padding: 12px 14px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+@media (prefers-color-scheme: dark) {
+  .viatico-anticipo-aviso { background: rgba(61,90,254,0.12); border-color: rgba(61,90,254,0.4); color: var(--text-primary); }
+}
+:root[data-theme="dark"] .viatico-anticipo-aviso { background: rgba(61,90,254,0.12); border-color: rgba(61,90,254,0.4); color: var(--text-primary); }
+
 /* Sección de plataformas externas */
 .viatico-plataformas {
   margin: 14px 0;

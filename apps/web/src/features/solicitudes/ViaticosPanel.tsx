@@ -155,6 +155,7 @@ interface TiqueteFormProps {
   horaSalida: string; onHoraSalida: (v: string) => void;
   horaLlegada: string; onHoraLlegada: (v: string) => void;
   valor: string; onValor: (v: string) => void;
+  modoEstimacion?: boolean;
 }
 
 function TiqueteForm({
@@ -162,7 +163,7 @@ function TiqueteForm({
   empresa, onEmpresa, numDoc, onNumDoc, codReserva, onCodReserva,
   tramo, onTramo, puesto, onPuesto,
   horaSalida, onHoraSalida, horaLlegada, onHoraLlegada,
-  valor, onValor,
+  valor, onValor, modoEstimacion = false,
 }: TiqueteFormProps) {
   return (
     <div className="viatico-tiquete-bloque">
@@ -188,18 +189,20 @@ function TiqueteForm({
 
       <div className="leg-gasto-fields">
         <div className="leg-field">
-          <label>Empresa transportadora *</label>
+          <label>Empresa transportadora{modoEstimacion ? '' : ' *'}</label>
           <input type="text" value={empresa} onChange={(e) => onEmpresa(e.target.value)}
             placeholder={tipo === 'aereo' ? 'Ej: Avianca, LATAM, Aero República' : 'Ej: COOFLOTAX, Flota Magdalena'} />
         </div>
 
-        <div className="leg-field">
-          <label>{tipo === 'aereo' ? 'Número de vuelo *' : 'Número de tiquete *'}</label>
-          <input type="text" value={numDoc} onChange={(e) => onNumDoc(e.target.value.toUpperCase())}
-            placeholder={tipo === 'aereo' ? 'Ej: AV 8001, P5 7506' : 'Ej: DEST4-83964'} />
-        </div>
+        {!modoEstimacion && (
+          <div className="leg-field">
+            <label>{tipo === 'aereo' ? 'Número de vuelo *' : 'Número de tiquete *'}</label>
+            <input type="text" value={numDoc} onChange={(e) => onNumDoc(e.target.value.toUpperCase())}
+              placeholder={tipo === 'aereo' ? 'Ej: AV 8001, P5 7506' : 'Ej: DEST4-83964'} />
+          </div>
+        )}
 
-        {tipo === 'aereo' && (
+        {!modoEstimacion && tipo === 'aereo' && (
           <div className="leg-field">
             <label>Código de reserva</label>
             <input type="text" value={codReserva} onChange={(e) => onCodReserva(e.target.value.toUpperCase())}
@@ -207,7 +210,7 @@ function TiqueteForm({
           </div>
         )}
 
-        {tipo === 'terrestre' && (
+        {!modoEstimacion && tipo === 'terrestre' && (
           <>
             <div className="leg-field">
               <label>Tramo / Ruta</label>
@@ -222,18 +225,22 @@ function TiqueteForm({
           </>
         )}
 
-        <div className="leg-field">
-          <label>Hora de salida</label>
-          <input type="time" value={horaSalida} onChange={(e) => onHoraSalida(e.target.value)} />
-        </div>
+        {!modoEstimacion && (
+          <div className="leg-field">
+            <label>Hora de salida</label>
+            <input type="time" value={horaSalida} onChange={(e) => onHoraSalida(e.target.value)} />
+          </div>
+        )}
+
+        {!modoEstimacion && (
+          <div className="leg-field">
+            <label>Hora de llegada</label>
+            <input type="time" value={horaLlegada} onChange={(e) => onHoraLlegada(e.target.value)} />
+          </div>
+        )}
 
         <div className="leg-field">
-          <label>Hora de llegada</label>
-          <input type="time" value={horaLlegada} onChange={(e) => onHoraLlegada(e.target.value)} />
-        </div>
-
-        <div className="leg-field">
-          <label>Valor total del tiquete ($) *</label>
+          <label>{modoEstimacion ? 'Costo estimado ($) *' : 'Valor total del tiquete ($) *'}</label>
           <input type="text" inputMode="numeric" value={fmtValor(valor) ? `$${fmtValor(valor)}` : ''}
             onChange={(e) => onValor(e.target.value.replace(/\D/g, ''))}
             placeholder="$ 0" />
@@ -394,8 +401,9 @@ export function ViaticosPanel({ onCreada }: { onCreada?: (info: { id: number; nu
         if (contexto.valor && contexto.valor > 0) {
           const limpio = String(contexto.valor).replace(/\D/g, '');
           if (limpio.length >= 4) {
-            const v = validarOcrContraDato(texto, limpio, 'cc');
-            if (!v.coincide) alertas.push(`El valor $${formatearMiles(contexto.valor)} no se identificó claramente en el soporte.`);
+            // Precios colombianos: el OCR puede leer "184.000" → quitar separadores para comparar
+            const ocrFlat = texto.replace(/[.,\s]/g, '');
+            if (!ocrFlat.includes(limpio)) alertas.push(`El valor $${formatearMiles(contexto.valor)} no se identificó claramente en el soporte.`);
           }
         }
         if (contexto.ciudad) {
@@ -452,25 +460,27 @@ export function ViaticosPanel({ onCreada }: { onCreada?: (info: { id: number; nu
       if (esIdaVuelta && fechaRegreso && fechaRegreso < fechaIda) return 'La fecha de regreso debe ser posterior a la de ida';
     }
     if (paso === 3) {
-      if (!empresaIda.trim()) return 'Ingresa la empresa de transporte (tiquete de ida)';
-      if (!numDocIda.trim()) return tipoTrIda === 'aereo' ? 'Ingresa el número de vuelo' : 'Ingresa el número del tiquete';
-      if (!valorIda.replace(/\D/g, '')) return 'Ingresa el valor del tiquete de ida';
-      if (esIdaVuelta) {
-        if (!empresaVuelta.trim()) return 'Ingresa la empresa de transporte (tiquete de regreso)';
-        if (!numDocVuelta.trim()) return tipoTrVuelta === 'aereo' ? 'Ingresa el número de vuelo de regreso' : 'Ingresa el número del tiquete de regreso';
-        if (!valorVuelta.replace(/\D/g, '')) return 'Ingresa el valor del tiquete de regreso';
+      if (!valorIda.replace(/\D/g, '')) return tipoViatico === 'anticipo' ? 'Ingresa el costo estimado del transporte de ida' : 'Ingresa el valor del tiquete de ida';
+      if (esIdaVuelta && !valorVuelta.replace(/\D/g, '')) return tipoViatico === 'anticipo' ? 'Ingresa el costo estimado del transporte de regreso' : 'Ingresa el valor del tiquete de regreso';
+      if (tipoViatico === 'legalizar') {
+        if (!empresaIda.trim()) return 'Ingresa la empresa de transporte (tiquete de ida)';
+        if (!numDocIda.trim()) return tipoTrIda === 'aereo' ? 'Ingresa el número de vuelo' : 'Ingresa el número del tiquete';
+        if (esIdaVuelta) {
+          if (!empresaVuelta.trim()) return 'Ingresa la empresa de transporte (tiquete de regreso)';
+          if (!numDocVuelta.trim()) return tipoTrVuelta === 'aereo' ? 'Ingresa el número de vuelo de regreso' : 'Ingresa el número del tiquete de regreso';
+        }
+        if (!facturaTransporte?.archivoId) return 'Adjunta el tiquete o comprobante de transporte';
       }
-      if (!facturaTransporte?.archivoId) return 'Adjunta el tiquete o comprobante de transporte';
     }
     if (paso === 4) {
       if (tieneHospedaje) {
         if (!hotelNombre.trim()) return 'Ingresa el nombre del hotel';
         if (!hotelEntrada || !hotelSalida) return 'Ingresa las fechas de entrada y salida del hotel';
         if (!hotelValorNoche) return 'Ingresa el valor por noche del hospedaje';
-        if (!facturaHotel?.archivoId) return 'Adjunta la factura del hotel';
+        if (tipoViatico === 'legalizar' && !facturaHotel?.archivoId) return 'Adjunta la factura del hotel';
       }
       const tieneComidas = (parseInt(diasDesayuno) || 0) > 0 || (parseInt(diasAlmuerzo) || 0) > 0 || (parseInt(diasCena) || 0) > 0;
-      if (tieneComidas && !facturaComidas?.archivoId) return 'Adjunta el soporte de alimentación';
+      if (tieneComidas && tipoViatico === 'legalizar' && !facturaComidas?.archivoId) return 'Adjunta el soporte de alimentación';
     }
     if (paso === 5) {
       if (!firma) return 'La firma digital es obligatoria';
@@ -554,7 +564,9 @@ export function ViaticosPanel({ onCreada }: { onCreada?: (info: { id: number; nu
     }
   }
 
-  const PASOS = ['Tipo y autorización', 'Detalles del viaje', 'Tiquetes de transporte', 'Alojamiento y comidas', 'Resumen y firma'];
+  const PASOS = tipoViatico === 'anticipo'
+    ? ['Tipo y autorización', 'Detalles del viaje', 'Costos estimados', 'Hospedaje y comidas', 'Resumen y firma']
+    : ['Tipo y autorización', 'Detalles del viaje', 'Tiquetes de transporte', 'Alojamiento y comidas', 'Resumen y firma'];
 
   if (msg) {
     return (
@@ -706,11 +718,14 @@ export function ViaticosPanel({ onCreada }: { onCreada?: (info: { id: number; nu
         </div>
       )}
 
-      {/* ── PASO 3: Tiquetes ── */}
+      {/* ── PASO 3: Tiquetes / Estimación ── */}
       {paso === 3 && (
         <div className="leg-form card-surface">
-          <h3>Datos del tiquete de transporte</h3>
-          <p className="leg-nota">Ingresa los datos exactos de tu tiquete o comprobante de viaje.</p>
+          <h3>{tipoViatico === 'anticipo' ? 'Estimación de costos de transporte' : 'Datos del tiquete de transporte'}</h3>
+          {tipoViatico === 'anticipo'
+            ? <p className="leg-nota">Selecciona o ingresa el costo estimado del transporte. <strong>No necesitas el tiquete todavía</strong> — al recibir el anticipo deberás legalizarlo con los tiquetes reales.</p>
+            : <p className="leg-nota">Ingresa los datos exactos de tu tiquete o comprobante de viaje.</p>
+          }
 
           {/* Buscador de precios interno */}
           <div className="viatico-ref-box">
@@ -845,6 +860,7 @@ export function ViaticosPanel({ onCreada }: { onCreada?: (info: { id: number; nu
             horaSalida={hrSalidaIda} onHoraSalida={setHrSalidaIda}
             horaLlegada={hrLlegadaIda} onHoraLlegada={setHrLlegadaIda}
             valor={valorIda} onValor={setValorIda}
+            modoEstimacion={tipoViatico === 'anticipo'}
           />
 
           {esIdaVuelta && (
@@ -861,6 +877,7 @@ export function ViaticosPanel({ onCreada }: { onCreada?: (info: { id: number; nu
                 horaSalida={hrSalidaVuelta} onHoraSalida={setHrSalidaVuelta}
                 horaLlegada={hrLlegadaVuelta} onHoraLlegada={setHrLlegadaVuelta}
                 valor={valorVuelta} onValor={setValorVuelta}
+                modoEstimacion={tipoViatico === 'anticipo'}
               />
               {/* Validación precio regreso contra opciones API */}
               {opcionesRegreso.length > 0 && valorVuelta && (() => {
@@ -882,43 +899,49 @@ export function ViaticosPanel({ onCreada }: { onCreada?: (info: { id: number; nu
             </div>
           )}
 
-          {/* Adjuntar tiquete */}
-          <div className="leg-factura-section" style={{ marginTop: 20 }}>
-            <div className="leg-factura-label">
-              <strong>Adjuntar tiquete o comprobante *</strong>
-              {!facturaTransporte?.archivoId && <span className="leg-factura-falta">⚠ Obligatorio</span>}
-              {facturaTransporte?.archivoId && (
-                <span className={facturaTransporte.alertas.length ? 'leg-factura-warn' : 'leg-factura-ok'}>
-                  ✓ {facturaTransporte.nombre}
-                  {facturaTransporte.alertas.length > 0 && ` — ${facturaTransporte.alertas.length} alerta(s)`}
-                </span>
-              )}
+          {/* Adjuntar tiquete — solo para legalización */}
+          {tipoViatico === 'anticipo' ? (
+            <div className="viatico-anticipo-aviso" style={{ marginTop: 20 }}>
+              <strong>No necesitas adjuntar tiquete ahora.</strong> Al recibir el anticipo, la plataforma te pedirá que lo legalices con los tiquetes y facturas reales. Si sobra dinero, deberás devolverlo.
             </div>
-            <p className="leg-nota" style={{ marginBottom: 8 }}>Sube una foto o PDF del tiquete (aéreo o terrestre).</p>
-            <div className="leg-factura-actions">
-              {subiendoTransporte
-                ? <span className="leg-validando">Subiendo y analizando…</span>
-                : (
-                  <>
-                    <button type="button" className="leg-btn-camara admin-ghost-button"
-                      onClick={() => { if (fileTransporteRef.current) { fileTransporteRef.current.setAttribute('capture', 'environment'); fileTransporteRef.current.click(); } }}>
-                      📷 Cámara
-                    </button>
-                    <button type="button" className="admin-ghost-button"
-                      onClick={() => { if (fileTransporteRef.current) { fileTransporteRef.current.removeAttribute('capture'); fileTransporteRef.current.click(); } }}>
-                      {facturaTransporte?.archivoId ? 'Cambiar archivo' : 'Adjuntar tiquete'}
-                    </button>
-                  </>
-                )
+          ) : (
+            <div className="leg-factura-section" style={{ marginTop: 20 }}>
+              <div className="leg-factura-label">
+                <strong>Adjuntar tiquete o comprobante *</strong>
+                {!facturaTransporte?.archivoId && <span className="leg-factura-falta">⚠ Obligatorio</span>}
+                {facturaTransporte?.archivoId && (
+                  <span className={facturaTransporte.alertas.length ? 'leg-factura-warn' : 'leg-factura-ok'}>
+                    ✓ {facturaTransporte.nombre}
+                    {facturaTransporte.alertas.length > 0 && ` — ${facturaTransporte.alertas.length} alerta(s)`}
+                  </span>
+                )}
+              </div>
+              <p className="leg-nota" style={{ marginBottom: 8 }}>Sube una foto o PDF del tiquete (aéreo o terrestre).</p>
+              <div className="leg-factura-actions">
+                {subiendoTransporte
+                  ? <span className="leg-validando">Subiendo y analizando…</span>
+                  : (
+                    <>
+                      <button type="button" className="leg-btn-camara admin-ghost-button"
+                        onClick={() => { if (fileTransporteRef.current) { fileTransporteRef.current.setAttribute('capture', 'environment'); fileTransporteRef.current.click(); } }}>
+                        📷 Cámara
+                      </button>
+                      <button type="button" className="admin-ghost-button"
+                        onClick={() => { if (fileTransporteRef.current) { fileTransporteRef.current.removeAttribute('capture'); fileTransporteRef.current.click(); } }}>
+                        {facturaTransporte?.archivoId ? 'Cambiar archivo' : 'Adjuntar tiquete'}
+                      </button>
+                    </>
+                  )
+                }
+                <input ref={fileTransporteRef} type="file" accept="image/*,application/pdf" style={{ display: 'none' }}
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) subirFactura(f, 'transporte', { valor: totalTransporte, ciudad: ciudadDestino, fecha: fechaIda }); e.target.value = ''; }} />
+              </div>
+              {facturaTransporte?.alertas.length
+                ? <ul className="leg-alertas-list">{facturaTransporte.alertas.map((a, i) => <li key={i}>{a}</li>)}</ul>
+                : null
               }
-              <input ref={fileTransporteRef} type="file" accept="image/*,application/pdf" style={{ display: 'none' }}
-                onChange={(e) => { const f = e.target.files?.[0]; if (f) subirFactura(f, 'transporte', { valor: totalTransporte, ciudad: ciudadDestino, fecha: fechaIda }); e.target.value = ''; }} />
             </div>
-            {facturaTransporte?.alertas.length
-              ? <ul className="leg-alertas-list">{facturaTransporte.alertas.map((a, i) => <li key={i}>{a}</li>)}</ul>
-              : null
-            }
-          </div>
+          )}
 
           <div className="leg-actions">
             <button type="button" className="admin-ghost-button" onClick={anterior}>← Atrás</button>
@@ -932,14 +955,17 @@ export function ViaticosPanel({ onCreada }: { onCreada?: (info: { id: number; nu
       {/* ── PASO 4: Alojamiento y alimentación ── */}
       {paso === 4 && (
         <div className="leg-form card-surface">
-          <h3>Alojamiento y alimentación</h3>
+          <h3>{tipoViatico === 'anticipo' ? 'Estimación de hospedaje y alimentación' : 'Alojamiento y alimentación'}</h3>
+          {tipoViatico === 'anticipo' && (
+            <p className="leg-nota">Ingresa los costos <strong>estimados</strong>. No necesitas adjuntar facturas ahora — lo harás al legalizar el anticipo.</p>
+          )}
 
           {/* HOSPEDAJE */}
           <div className="viaticos-seccion-titulo">🏨 Hospedaje</div>
           <div className="leg-field">
             <label className="viaticos-check-label">
               <input type="checkbox" checked={tieneHospedaje} onChange={(e) => setTieneHospedaje(e.target.checked)} />
-              El viaje requirió / requerirá hospedaje
+              {tipoViatico === 'anticipo' ? 'El viaje requerirá hospedaje' : 'El viaje requirió / requerirá hospedaje'}
             </label>
           </div>
 
@@ -1003,46 +1029,48 @@ export function ViaticosPanel({ onCreada }: { onCreada?: (info: { id: number; nu
                   🏨 {noches} noche(s) × ${formatearMiles(parseInt(hotelValorNoche) || 0)} = <strong>${formatearMiles(totalHospedaje)}</strong>
                 </div>
               )}
-              <div className="leg-factura-section">
-                <div className="leg-factura-label">
-                  <strong>Factura del hotel *</strong>
-                  {!facturaHotel?.archivoId && <span className="leg-factura-falta">⚠ Obligatoria</span>}
-                  {facturaHotel?.archivoId && (
-                    <span className={facturaHotel.alertas.length ? 'leg-factura-warn' : 'leg-factura-ok'}>
-                      ✓ {facturaHotel.nombre}
-                    </span>
-                  )}
-                </div>
-                <div className="leg-factura-actions">
-                  {subiendoHotel
-                    ? <span className="leg-validando">Subiendo y analizando…</span>
-                    : (
-                      <>
-                        <button type="button" className="leg-btn-camara admin-ghost-button"
-                          onClick={() => { if (fileHotelRef.current) { fileHotelRef.current.setAttribute('capture', 'environment'); fileHotelRef.current.click(); } }}>
-                          📷 Cámara
-                        </button>
-                        <button type="button" className="admin-ghost-button"
-                          onClick={() => { if (fileHotelRef.current) { fileHotelRef.current.removeAttribute('capture'); fileHotelRef.current.click(); } }}>
-                          {facturaHotel?.archivoId ? 'Cambiar' : 'Adjuntar factura'}
-                        </button>
-                      </>
-                    )
+              {tipoViatico === 'legalizar' && (
+                <div className="leg-factura-section">
+                  <div className="leg-factura-label">
+                    <strong>Factura del hotel *</strong>
+                    {!facturaHotel?.archivoId && <span className="leg-factura-falta">⚠ Obligatoria</span>}
+                    {facturaHotel?.archivoId && (
+                      <span className={facturaHotel.alertas.length ? 'leg-factura-warn' : 'leg-factura-ok'}>
+                        ✓ {facturaHotel.nombre}
+                      </span>
+                    )}
+                  </div>
+                  <div className="leg-factura-actions">
+                    {subiendoHotel
+                      ? <span className="leg-validando">Subiendo y analizando…</span>
+                      : (
+                        <>
+                          <button type="button" className="leg-btn-camara admin-ghost-button"
+                            onClick={() => { if (fileHotelRef.current) { fileHotelRef.current.setAttribute('capture', 'environment'); fileHotelRef.current.click(); } }}>
+                            📷 Cámara
+                          </button>
+                          <button type="button" className="admin-ghost-button"
+                            onClick={() => { if (fileHotelRef.current) { fileHotelRef.current.removeAttribute('capture'); fileHotelRef.current.click(); } }}>
+                            {facturaHotel?.archivoId ? 'Cambiar' : 'Adjuntar factura'}
+                          </button>
+                        </>
+                      )
+                    }
+                    <input ref={fileHotelRef} type="file" accept="image/*,application/pdf" style={{ display: 'none' }}
+                      onChange={(e) => { const f = e.target.files?.[0]; if (f) subirFactura(f, 'hotel', { valor: totalHospedaje, ciudad: ciudadDestino, fecha: hotelEntrada }); e.target.value = ''; }} />
+                  </div>
+                  {facturaHotel?.alertas.length
+                    ? <ul className="leg-alertas-list">{facturaHotel.alertas.map((a, i) => <li key={i}>{a}</li>)}</ul>
+                    : null
                   }
-                  <input ref={fileHotelRef} type="file" accept="image/*,application/pdf" style={{ display: 'none' }}
-                    onChange={(e) => { const f = e.target.files?.[0]; if (f) subirFactura(f, 'hotel', { valor: totalHospedaje, ciudad: ciudadDestino, fecha: hotelEntrada }); e.target.value = ''; }} />
                 </div>
-                {facturaHotel?.alertas.length
-                  ? <ul className="leg-alertas-list">{facturaHotel.alertas.map((a, i) => <li key={i}>{a}</li>)}</ul>
-                  : null
-                }
-              </div>
+              )}
             </>
           )}
 
           {/* ALIMENTACIÓN */}
           <div className="viaticos-seccion-titulo" style={{ marginTop: 24 }}>🍽 Alimentación</div>
-          <p className="leg-nota">Ingresa los días y valor por tipo de comida que cubre el viático.</p>
+          <p className="leg-nota">{tipoViatico === 'anticipo' ? 'Estima los días y costo por tipo de comida.' : 'Ingresa los días y valor por tipo de comida que cubre el viático.'}</p>
 
           <div className="viaticos-comidas-grid">
             {([
@@ -1076,7 +1104,7 @@ export function ViaticosPanel({ onCreada }: { onCreada?: (info: { id: number; nu
             </div>
           )}
 
-          {totalComidas > 0 && (
+          {totalComidas > 0 && tipoViatico === 'legalizar' && (
             <div className="leg-factura-section">
               <div className="leg-factura-label">
                 <strong>Soportes de alimentación *</strong>
@@ -1177,21 +1205,29 @@ export function ViaticosPanel({ onCreada }: { onCreada?: (info: { id: number; nu
             )}
 
             <div className="leg-resumen-total-line">
-              <span>TOTAL VIÁTICO:</span>
+              <span>{tipoViatico === 'anticipo' ? 'ANTICIPO SOLICITADO:' : 'TOTAL A REEMBOLSAR:'}</span>
               <strong>${formatearMiles(totalGeneral)} COP</strong>
             </div>
+            {tipoViatico === 'anticipo' && (
+              <div className="viatico-anticipo-aviso" style={{ marginTop: 12 }}>
+                Al recibir este anticipo, deberás <strong>legalizarlo en la plataforma</strong> adjuntando los tiquetes y facturas reales. Si quedó dinero sin usar, deberás reportarlo y devolverlo.
+              </div>
+            )}
           </div>
 
           <div className="leg-field">
             <label>Firma del solicitante *</label>
-            <p className="leg-nota">Al firmar, declaras que la información es veraz y los soportes adjuntos son auténticos.</p>
+            <p className="leg-nota">{tipoViatico === 'anticipo'
+              ? 'Al firmar, declaras que el viaje está autorizado y te comprometes a legalizar el anticipo con facturas reales.'
+              : 'Al firmar, declaras que la información es veraz y los soportes adjuntos son auténticos.'
+            }</p>
             <SignaturePad value={firma} onChange={setFirma} />
           </div>
 
           <div className="leg-actions">
             <button type="button" className="admin-ghost-button" onClick={anterior}>← Atrás</button>
             <button type="button" className="admin-primary-button" onClick={enviar} disabled={enviando}>
-              {enviando ? 'Enviando…' : 'Enviar solicitud de viático'}
+              {enviando ? 'Enviando…' : tipoViatico === 'anticipo' ? 'Solicitar anticipo de viático' : 'Enviar legalización de viático'}
             </button>
           </div>
         </div>
