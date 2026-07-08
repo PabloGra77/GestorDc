@@ -558,20 +558,37 @@ export function LegalizacionPanel({ onCreada, tipoSolicitudId, areaId }: Legaliz
           numeroCuenta,
           titularCuenta,
           // Datos personales del solicitante (desde perfil + sesión)
-          ...(usr ? {
-            primerNombre: perfilPersonal.primerNombre || usr.primerNombre || usr.nombreCompleto.split(' ')[0] || '',
-            segundoNombre: perfilPersonal.segundoNombre || '',
-            primerApellido: perfilPersonal.primerApellido || usr.primerApellido || '',
-            segundoApellido: perfilPersonal.segundoApellido || '',
-            nombreCompleto: usr.nombreCompleto ?? '',
-            correoElectronico: usr.correo ?? '',
-            numeroDocumento: perfilPersonal.numeroDocumento || usr.numeroDocumento || '',
-            tipoDocumento: perfilPersonal.tipoDocumento || usr.tipoDocumento || '',
-            telefono: perfilPersonal.telefono || '',
-            fechaNacimiento: perfilPersonal.fechaNacimiento || '',
-            fechaExpedicion: perfilPersonal.fechaExpedicion || '',
-            lugarExpedicion: perfilPersonal.lugarExpedicion || '',
-          } : {}),
+          // Se envían en camelCase Y snake_case para compatibilidad con cualquier
+          // configuración de campos en la plantilla del tipo de solicitud.
+          ...(usr ? (() => {
+            const usrAny    = usr as unknown as Record<string, string | null | undefined>;
+            const pNombre   = perfilPersonal.primerNombre   || usrAny.primerNombre   || usr.nombreCompleto.split(' ')[0] || '';
+            const sNombre   = perfilPersonal.segundoNombre  || '';
+            const pApellido = perfilPersonal.primerApellido  || usrAny.primerApellido  || '';
+            const sApellido = perfilPersonal.segundoApellido || '';
+            const tipDoc    = perfilPersonal.tipoDocumento   || usrAny.tipoDocumento   || '';
+            const numDoc    = perfilPersonal.numeroDocumento  || usrAny.numeroDocumento  || '';
+            const telefono  = perfilPersonal.telefono  || '';
+            const fNac      = perfilPersonal.fechaNacimiento || '';
+            const fExp      = perfilPersonal.fechaExpedicion || '';
+            const lExp      = perfilPersonal.lugarExpedicion || '';
+            const nomComp   = usr.nombreCompleto ?? '';
+            const correo    = usr.correo ?? '';
+            return {
+              // camelCase
+              primerNombre: pNombre, segundoNombre: sNombre,
+              primerApellido: pApellido, segundoApellido: sApellido,
+              nombreCompleto: nomComp, correoElectronico: correo,
+              numeroDocumento: numDoc, tipoDocumento: tipDoc,
+              telefono, fechaNacimiento: fNac, fechaExpedicion: fExp, lugarExpedicion: lExp,
+              // snake_case (por si la plantilla usa esas claves)
+              primer_nombre: pNombre, segundo_nombre: sNombre,
+              primer_apellido: pApellido, segundo_apellido: sApellido,
+              nombre_completo: nomComp, correo_electronico: correo,
+              numero_documento: numDoc, tipo_documento: tipDoc,
+              fecha_nacimiento: fNac, fecha_expedicion: fExp, lugar_expedicion: lExp,
+            };
+          })() : {}),
         },
         documentos: {},
         firmas: { profesional: firma },

@@ -30,8 +30,21 @@ if ((int)$tipo['area_activo'] !== 1) Response::error('El area esta inactiva', 40
 // Validar campos requeridos
 $campos = json_decode($tipo['campos_plantilla'] ?? '[]', true) ?: [];
 $alertas = [];
+
+// Construir mapa normalizado: snake_case → valor, para cubrir plantillas con claves snake_case
+// cuando el formulario envía camelCase (y viceversa)
+$datosBusqueda = $datosFormulario;
+foreach ($datosFormulario as $k => $v) {
+    // camelCase → snake_case
+    $snake = strtolower(preg_replace('/[A-Z]/', '_$0', lcfirst($k)));
+    if (!isset($datosBusqueda[$snake])) $datosBusqueda[$snake] = $v;
+    // snake_case → camelCase
+    $camel = lcfirst(str_replace('_', '', ucwords($k, '_')));
+    if (!isset($datosBusqueda[$camel])) $datosBusqueda[$camel] = $v;
+}
+
 foreach ($campos as $c) {
-    if (!empty($c['required']) && empty($datosFormulario[$c['key']]) && empty($documentos[$c['key']])) {
+    if (!empty($c['required']) && empty($datosBusqueda[$c['key']]) && empty($documentos[$c['key']])) {
         $alertas[] = [
             'tipo' => 'campo_vacio',
             'campo' => $c['key'],
@@ -74,11 +87,8 @@ $usuario = $u->fetch();
 $esAnticipo      = (($tipo['slug'] ?? '') === 'anticipo');
 $esLegalizacion  = (($tipo['slug'] ?? '') === 'legalizacion');
 
-// El area de la solicitud es la del solicitante
+// El area de la solicitud siempre es la del tipo seleccionado
 $areaSolicitud = (int)$tipo['area_id'];
-if (($esAnticipo || $esLegalizacion) && !empty($usuario['area_id'])) {
-    $areaSolicitud = (int)$usuario['area_id'];
-}
 
 // Limite: maximo 2 anticipos abiertos
 if ($esAnticipo) {
@@ -203,6 +213,24 @@ if ($esLegalizacion) {
 // Determinar primer paso del flujo
 $flujo = json_decode($tipo['flujo_aprobacion'] ?? '[]', true) ?: [];
 usort($flujo, fn($a, $b) => ($a['orden'] ?? 0) <=> ($b['orden'] ?? 0));
+
+// Para legalizaciones: el autorizador del gasto siempre es el primer paso,
+// independientemente de cómo esté configurado el flujo del tipo.
+if ($esLegalizacion) {
+    $autorizadorIdFlujo = (int)($datosFormulario['autorizadorId'] ?? 0);
+    if ($autorizadorIdFlujo > 0 && ($flujo[0]['rol'] ?? '') !== 'autorizador_visto_bueno') {
+        foreach ($flujo as &$fpaso) {
+            $fpaso['orden'] = (int)($fpaso['orden'] ?? 0) + 1;
+        }
+        unset($fpaso);
+        array_unshift($flujo, [
+            'rol'   => 'autorizador_visto_bueno',
+            'label' => 'Visto bueno del autorizador',
+            'orden' => 1,
+        ]);
+    }
+}
+
 $primerPaso = $flujo[0] ?? null;
 
 // Generar numero de radicado
