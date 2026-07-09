@@ -160,6 +160,7 @@ export function AnticipOPanel({ onCreada }: AnticipoPanelProps) {
   const [trOrigenCiudad, setTrOrigenCiudad] = useState('');
   const [trOrigenLocalidad, setTrOrigenLocalidad] = useState('');
   const [trLluviaOverride, setTrLluviaOverride] = useState<boolean | null>(null);
+  const [showOrigenSuger, setShowOrigenSuger] = useState(false);
 
   // ── Paso 2: Hospedaje ───────────────────────────────────────────────────────
   const [useHospedaje, setUseHospedaje] = useState(false);
@@ -191,6 +192,11 @@ export function AnticipOPanel({ onCreada }: AnticipoPanelProps) {
   const [otroDesc, setOtroDesc] = useState('');
   const [otroValor, setOtroValor] = useState('');
 
+  // ── Paso 3: Cuenta + Firma + Compromiso ────────────────────────────────────
+  // fechaLegalizacion: default = hoy + 3 días calendario
+  const [fechaLegalizacion, setFechaLegalizacion] = useState(() => {
+    const d = new Date(); d.setDate(d.getDate() + 3); return d.toISOString().slice(0, 10);
+  });
   // ── Paso 3: Cuenta + Firma ──────────────────────────────────────────────────
   const [banco, setBanco] = useState('');
   const [tipoCuenta, setTipoCuenta] = useState('Ahorros');
@@ -248,6 +254,19 @@ export function AnticipOPanel({ onCreada }: AnticipoPanelProps) {
     setAutorizadorInput(u.nombreCompleto);
     setShowSuger(false);
   }
+
+  const origenSugeridos = useMemo(() => {
+    const term = trOrigenCiudad.trim();
+    if (term.length < 2 || !showOrigenSuger) return [];
+    const tN = normTxt(term);
+    const all = [...LOCALIDADES_BOGOTA, ...TODAS_CIUDADES.map(c => c.nombre)];
+    const seen = new Set<string>();
+    return all.filter(s => {
+      if (seen.has(s)) return false;
+      seen.add(s);
+      return normTxt(s).includes(tN);
+    }).slice(0, 9);
+  }, [trOrigenCiudad, showOrigenSuger]);
 
   // ── Ciudades del depto seleccionado ────────────────────────────────────────
   const trCiudades = COLOMBIA[trDepto] || [];
@@ -333,6 +352,7 @@ export function AnticipOPanel({ onCreada }: AnticipoPanelProps) {
       if (topeT && total > topeT) return `El total ($ ${fmtN(total)}) supera el tope configurado de $ ${fmtN(topeT)}.`;
     }
     if (paso === 3) {
+      if (!fechaLegalizacion) return 'Define la fecha de compromiso de legalización.';
       if (!banco) return 'Indica el banco para el desembolso.';
       if (!numeroCuenta.trim()) return 'Indica el número de cuenta.';
       if (!firma) return 'Firma digital requerida.';
@@ -408,12 +428,25 @@ export function AnticipOPanel({ onCreada }: AnticipoPanelProps) {
       const destino = useTransporte
         ? [trDepto, trCiudad, trLocalidad].filter(Boolean).join(' › ')
         : '';
+      const modeName = MODOS_TRANSPORTE.find(m => m.key === trMode)?.label || trMode;
+      const categoriasStr = [
+        useTransporte && 'Transporte', useHospedaje && 'Hospedaje',
+        useAlimentacion && 'Alimentación', useMateriales && 'Materiales',
+        useCapacitacion && 'Capacitación', useOtro && 'Otro',
+      ].filter(Boolean).join(', ');
+      const mesAnioActual = new Date().toLocaleString('es-CO', { month: 'long', year: 'numeric' });
       await api.post<{ id: number; numeroRadicado: string }>('/solicitudes', {
         tipoSolicitudId: tipo.id,
         datos: {
           proposito,
+          justificacion: proposito,
           descripcionGasto: proposito,
           paraque: proposito,
+          categoria: categoriasStr,
+          tipoTransporte: useTransporte ? modeName : '',
+          medioTransporte: useTransporte ? modeName : '',
+          mesAnioRadicar: mesAnioActual,
+          fechaLegalizacion,
           fechaEvento,
           destino,
           autorizadorId: String(autorizadorId),
@@ -538,18 +571,27 @@ export function AnticipOPanel({ onCreada }: AnticipoPanelProps) {
               <div className="anticipo-cat-body">
                 {/* ── Punto de partida ── */}
                 <div className="anticipo-grid" style={{ gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
-                  <div className="form-group">
+                  <div className="form-group" style={{ position: 'relative' }}>
                     <label>📍 Punto de partida</label>
                     <input
-                      type="text" list="tr-origen-list"
+                      type="text"
                       placeholder="Ciudad o localidad de origen…"
                       value={trOrigenCiudad}
-                      onChange={e => { setTrOrigenCiudad(e.target.value); setTrOrigenLocalidad(''); }}
+                      onChange={e => { setTrOrigenCiudad(e.target.value); setTrOrigenLocalidad(''); setShowOrigenSuger(true); }}
+                      onFocus={() => setShowOrigenSuger(true)}
+                      onBlur={() => setTimeout(() => setShowOrigenSuger(false), 160)}
+                      autoComplete="off"
                     />
-                    <datalist id="tr-origen-list">
-                      {LOCALIDADES_BOGOTA.map(l => <option key={`loc-${l}`} value={l} />)}
-                      {TODAS_CIUDADES.map(c => <option key={`city-${c.nombre}`} value={c.nombre} />)}
-                    </datalist>
+                    {showOrigenSuger && origenSugeridos.length > 0 && (
+                      <div className="leg-sugeridos-list">
+                        {origenSugeridos.map(s => (
+                          <button key={s} type="button" className="leg-sugerido-item"
+                            onMouseDown={() => { setTrOrigenCiudad(s); setShowOrigenSuger(false); }}>
+                            {s}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                   {buscarCiudadFlex(trOrigenCiudad)?.nombre === 'Bogotá' && !BOGOTA_LOC_COORDS[trOrigenCiudad] && (
                     <div className="form-group">
@@ -918,6 +960,22 @@ export function AnticipOPanel({ onCreada }: AnticipoPanelProps) {
             <p style={{ marginTop: 6, fontSize: 12, opacity: 0.75 }}>{numeroAPesosEnLetras(String(total))}</p>
             {fechaEvento && <p style={{ fontSize: 13, marginTop: 4 }}>Fecha: <strong>{fechaEvento}</strong></p>}
             <p style={{ fontSize: 13, marginTop: 2 }}>Autorizado por: <strong>{autorizadorNombre}</strong></p>
+          </div>
+
+          {/* Compromiso de legalización */}
+          <div className="anticipo-resumen-section">
+            <h5 style={{ marginBottom: 6 }}>Compromiso de legalización</h5>
+            <p className="admin-help-text" style={{ marginBottom: 10 }}>
+              Tienes hasta esta fecha para presentar facturas y soportes del gasto. Si sobra dinero, debes devolverlo; si falta, declarar la diferencia.
+            </p>
+            <div className="form-group" style={{ maxWidth: 220 }}>
+              <label>Fecha límite para legalizar <span className="req">*</span></label>
+              <input
+                type="date" value={fechaLegalizacion}
+                min={new Date().toISOString().slice(0, 10)}
+                onChange={e => setFechaLegalizacion(e.target.value)}
+              />
+            </div>
           </div>
 
           {/* Cuenta para el desembolso */}
