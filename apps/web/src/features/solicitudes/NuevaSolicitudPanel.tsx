@@ -162,6 +162,7 @@ interface TipoSolicitud {
   activo: boolean;
   camposPlantilla: CampoPlantilla[];
   plantillaPdf?: PlantillaPdfMin | null;
+  configuracionTipo?: { areasVisibles?: 'todas' | number[] } | null;
 }
 
 interface NuevaSolicitudPanelProps {
@@ -347,6 +348,9 @@ export function NuevaSolicitudPanel({ onCreada }: NuevaSolicitudPanelProps) {
     if (!areaSel) return [];
     return tipos.filter((t) => {
       if (t.areaId === areaSel.id) return true;
+      const av = t.configuracionTipo?.areasVisibles;
+      if (av === 'todas') return true;
+      if (Array.isArray(av) && av.includes(areaSel.id)) return true;
       const participantes = (t as unknown as { flujoAreas?: { areasParticipantes?: number[] } })?.flujoAreas?.areasParticipantes;
       return Array.isArray(participantes) && participantes.includes(areaSel.id);
     });

@@ -1673,7 +1673,10 @@ function _generarPdfEspecial(s: SolicitudParaPdf, opts?: { bloburl?: boolean }):
     grupos.get(g)!.push(c);
   });
 
+  const GRUPOS_VALIDOS_ANTICIPO = new Set(['Solicitud de anticipo', 'Compromiso de legalización', 'Datos']);
   grupos.forEach((campos, grupo) => {
+    // Para anticipo: solo mostrar grupos del nuevo formulario limpio; omitir secciones obsoletas
+    if (esAnticipo && !GRUPOS_VALIDOS_ANTICIPO.has(grupo)) return;
     if (y > 260) { doc.addPage(); y = margin; }
     doc.setDrawColor(212, 175, 55);
     doc.line(margin, y, pageWidth - margin, y);

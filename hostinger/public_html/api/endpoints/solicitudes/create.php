@@ -87,8 +87,22 @@ $usuario = $u->fetch();
 $esAnticipo      = (($tipo['slug'] ?? '') === 'anticipo');
 $esLegalizacion  = (($tipo['slug'] ?? '') === 'legalizacion');
 
-// El area de la solicitud siempre es la del tipo seleccionado
-$areaSolicitud = (int)$tipo['area_id'];
+// Para anticipo: ignorar cualquier campo extra que el admin haya agregado a campos_plantilla
+// y solo validar los 3 realmente obligatorios del nuevo formulario.
+if ($esAnticipo) {
+    $camposValidosAnticipo = ['justificacion', 'valorPesos', 'autorizadoPor'];
+    $campos = array_filter($campos, fn($c) => in_array($c['key'], $camposValidosAnticipo, true) && !empty($c['required']));
+}
+
+// El area de la solicitud: si el tipo está configurado para "todas las áreas",
+// usar el área del solicitante (no la del tipo).
+$configTipo = json_decode($tipo['configuracion_tipo'] ?? '{}', true) ?: [];
+$areasVisiblesConfig = $configTipo['areasVisibles'] ?? null;
+if ($areasVisiblesConfig === 'todas') {
+    $areaSolicitud = (int)($usuario['area_id'] ?? 0) ?: (int)$tipo['area_id'];
+} else {
+    $areaSolicitud = (int)$tipo['area_id'];
+}
 
 // Limite: maximo 2 anticipos abiertos
 if ($esAnticipo) {

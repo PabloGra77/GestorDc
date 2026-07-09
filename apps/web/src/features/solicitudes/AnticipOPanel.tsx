@@ -352,9 +352,6 @@ export function AnticipOPanel({ onCreada }: AnticipoPanelProps) {
       if (topeT && total > topeT) return `El total ($ ${fmtN(total)}) supera el tope configurado de $ ${fmtN(topeT)}.`;
     }
     if (paso === 3) {
-      if (!fechaLegalizacion) return 'Define la fecha de compromiso de legalización.';
-      if (!banco) return 'Indica el banco para el desembolso.';
-      if (!numeroCuenta.trim()) return 'Indica el número de cuenta.';
       if (!firma) return 'Firma digital requerida.';
     }
     return '';
@@ -965,16 +962,8 @@ export function AnticipOPanel({ onCreada }: AnticipoPanelProps) {
           {/* Compromiso de legalización */}
           <div className="anticipo-resumen-section">
             <h5 style={{ marginBottom: 6 }}>Compromiso de legalización</h5>
-            <p className="admin-help-text" style={{ marginBottom: 10 }}>
-              Tienes hasta esta fecha para presentar facturas y soportes del gasto. Si sobra dinero, debes devolverlo; si falta, declarar la diferencia.
-            </p>
-            <div className="form-group" style={{ maxWidth: 220 }}>
-              <label>Fecha límite para legalizar <span className="req">*</span></label>
-              <input
-                type="date" value={fechaLegalizacion}
-                min={new Date().toISOString().slice(0, 10)}
-                onChange={e => setFechaLegalizacion(e.target.value)}
-              />
+            <div className="admin-help-text" style={{ padding: '10px 14px', background: 'var(--color-bg-alt, #f8f6ed)', borderRadius: 8, borderLeft: '3px solid #d4a017' }}>
+              ⏱ Una vez aprobado tu anticipo, tendrás <strong>3 días hábiles</strong> para presentar facturas y soportes que respalden el gasto. Si sobra dinero, debes devolverlo; si falta, declarar la diferencia.
             </div>
           </div>
 
