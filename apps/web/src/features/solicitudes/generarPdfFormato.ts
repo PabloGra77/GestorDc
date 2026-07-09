@@ -1301,57 +1301,12 @@ function _generarPdfEspecial(s: SolicitudParaPdf, opts?: { bloburl?: boolean }):
     } catch { /* datos inválidos */ }
   }
 
-  // ── Cuenta de Cobro OPS ──────────────────────────────────────────────────
+  // ── Cuenta de Cobro OPS — 4 documentos ────────────────────────────────────
   if (esCuentaCobroOps) {
     const d = s.datosFormulario;
     const get = (k: string) => String(d[k] ?? '');
-    const fmt$ = (v: string) => {
-      const n = Number(v.replace(/[^0-9]/g, ''));
-      return n ? `$ ${n.toLocaleString('es-CO')}` : (v || '—');
-    };
 
-    const seccionOps = (titulo: string) => {
-      if (y > 255) { doc.addPage(); y = margin; }
-      y += 2;
-      doc.setFillColor(7, 11, 29);
-      doc.rect(margin, y, pageWidth - margin * 2, 7, 'F');
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(212, 175, 55);
-      doc.setFontSize(9);
-      doc.text(titulo, margin + 3, y + 5);
-      y += 10;
-      doc.setFontSize(9.5);
-      doc.setTextColor(15, 23, 42);
-      doc.setFont('helvetica', 'normal');
-    };
-
-    const filaOps = (etiq: string, val: string, etiqR?: string, valR?: string) => {
-      if (y > 272) { doc.addPage(); y = margin; }
-      const fw = pageWidth - margin * 2;
-      const col = etiqR != null ? fw / 2 - 3 : fw;
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(9);
-      const ew = doc.getTextWidth(etiq + ':  ');
-      doc.text(etiq + ':', margin, y);
-      doc.setFont('helvetica', 'normal');
-      const lns = doc.splitTextToSize(val || '—', col - ew);
-      doc.text(lns, margin + ew, y);
-      if (etiqR != null) {
-        const rx = margin + fw / 2 + 3;
-        doc.setFont('helvetica', 'bold');
-        const rew = doc.getTextWidth(etiqR + ':  ');
-        doc.text(etiqR + ':', rx, y);
-        doc.setFont('helvetica', 'normal');
-        const rlns = doc.splitTextToSize(valR || '—', col - rew);
-        doc.text(rlns, rx + rew, y);
-        y += Math.max(lns.length, rlns.length) * 4.5 + 2;
-      } else {
-        y += lns.length * 4.5 + 2;
-      }
-    };
-
-    // ── 1. Datos del profesional ──
-    seccionOps('1. DATOS DEL PROFESIONAL OPS');
+    // Datos comunes
     const tipoDocP = get('tipoDocumento') || get('tipo_documento');
     const numDocP  = get('numeroDocumento') || get('numero_documento') || s.solicitanteDocumento || '';
     const nombreProf = [
@@ -1360,164 +1315,353 @@ function _generarPdfEspecial(s: SolicitudParaPdf, opts?: { bloburl?: boolean }):
       get('primerApellido') || get('primer_apellido'),
       get('segundoApellido') || get('segundo_apellido'),
     ].filter(Boolean).join(' ') || s.solicitanteNombre || '';
-    const epsValP  = get('eps') || get('entidadSalud');
-    const telValP  = get('telefono');
-    filaOps('Nombre completo', nombreProf || '—', tipoDocP ? tipoDocP : 'Documento', numDocP || '—');
-    if (epsValP || telValP) filaOps('EPS / Entidad de salud', epsValP || '—', 'Teléfono', telValP || '—');
-    filaOps('Correo electrónico', s.solicitanteCorreo || get('correoElectronico') || '—');
-    y += 2;
+    const profesion    = get('profesion');
+    const telefono     = get('telefono');
+    const correo       = s.solicitanteCorreo || get('correoElectronico') || '';
+    const lugarExp     = get('lugarExpedicion') || get('lugar_expedicion') || 'Bogotá';
+    const eps          = get('eps') || get('entidadSalud');
+    const banco        = get('banco');
+    const tipoCta      = get('tipoCuenta');
+    const numCta       = get('numeroCuenta');
+    const titularCta   = get('titularCuenta');
+    const periodoIni   = get('periodoInicio');
+    const periodoFin_  = get('periodoFin');
+    const fecIniCto    = get('fechaInicioContrato');
+    const valorRaw     = get('valorCobrar').replace(/[^0-9]/g, '');
+    const valorNum     = parseInt(valorRaw) || 0;
+    const valorFmt     = valorNum ? `$ ${valorNum.toLocaleString('es-CO')}` : '—';
+    const comentarios  = get('actividadesRealizadas') || get('comentariosAdicionales');
 
-    // ── 2. Período y valor ──
-    seccionOps('2. PERÍODO Y VALOR DEL COBRO');
-    const periodoIni = get('periodoInicio');
-    const periodoFin = get('periodoFin');
-    const fecIni = get('fechaInicioContrato');
-    const fecFin = get('fechaFinContrato');
-    filaOps(
-      'Período cobrado',
-      periodoIni && periodoFin ? `${periodoIni}  al  ${periodoFin}` : (periodoIni || periodoFin || '—'),
-      'Valor a cobrar', fmt$(get('valorCobrar')),
-    );
-    if (fecIni || fecFin) {
-      filaOps('Vigencia del contrato', fecIni && fecFin ? `${fecIni} — ${fecFin}` : (fecIni || fecFin));
-    }
-    // Valor en letras
-    const valorCobrarNum = parseInt(get('valorCobrar').replace(/[^0-9]/g, '')) || 0;
-    if (valorCobrarNum > 0) {
-      if (y > 272) { doc.addPage(); y = margin; }
-      doc.setFont('helvetica', 'italic');
-      doc.setFontSize(8.5);
-      doc.setTextColor(80, 80, 100);
-      doc.text(`(${numeroAPesosEnLetras(String(valorCobrarNum))})`, margin, y);
-      y += 5;
-      doc.setTextColor(15, 23, 42);
-    }
-    y += 2;
-
-    // ── 3. Relación de atenciones ──
-    seccionOps('3. RELACIÓN DE ATENCIONES REALIZADAS POR SEDE');
-    const atencionesRaw = get('atencionesJson');
-    let totalHC = 0;
-    let mostroAtenciones = false;
-    if (atencionesRaw) {
-      try {
-        const atenciones = JSON.parse(atencionesRaw) as Array<{ regional: string; sede: string; fecha: string; hc: string }>;
-        if (Array.isArray(atenciones) && atenciones.length > 0) {
-          mostroAtenciones = true;
-          // Agrupar por sede para visualización más limpia
-          const porSede = new Map<string, Array<{ fecha: string; hc: number }>>();
-          atenciones.forEach((a) => {
-            const key = a.sede || a.regional;
-            if (!porSede.has(key)) porSede.set(key, []);
-            porSede.get(key)!.push({ fecha: a.fecha, hc: parseInt(a.hc) || 0 });
-          });
-          porSede.forEach((dias, sede) => {
-            dias.forEach(({ fecha, hc }) => {
-              if (y > 275) { doc.addPage(); y = margin; }
-              totalHC += hc;
-              const linea = `• ${formatFechaBullet(fecha)} ${sede} (${hc})`;
-              doc.setFont('helvetica', 'normal');
-              doc.setFontSize(9.5);
-              doc.setTextColor(15, 23, 42);
-              const split = doc.splitTextToSize(linea, pageWidth - margin * 2 - 6);
-              doc.text(split, margin + 3, y);
-              y += split.length * 4.8 + 0.5;
-            });
-          });
-          y += 3;
-          // Total HC
-          if (y > 275) { doc.addPage(); y = margin; }
-          doc.setFillColor(212, 175, 55);
-          doc.rect(margin, y, pageWidth - margin * 2, 6.5, 'F');
-          doc.setFont('helvetica', 'bold');
-          doc.setFontSize(9);
-          doc.setTextColor(7, 11, 29);
-          doc.text('TOTAL DE HISTORIAS CLÍNICAS REGISTRADAS:', margin + 3, y + 4.5);
-          doc.text(String(totalHC), pageWidth - margin - 3, y + 4.5, { align: 'right' });
-          y += 10;
-        }
-      } catch { /* JSON inválido */ }
-    }
-    if (!mostroAtenciones) {
-      doc.setFont('helvetica', 'italic');
-      doc.setFontSize(9);
-      doc.setTextColor(120, 120, 120);
-      doc.text('No se registraron atenciones por sede en este período.', margin, y);
-      y += 8;
-    }
-
-    // ── 4. Notas aclaratorias (opcional) ──
-    if (get('conNotasAclaratorias') === 'si') {
-      const notasRaw = get('notasAclaratorias');
-      if (notasRaw) {
-        try {
-          const notas = JSON.parse(notasRaw) as Array<{ sede: string; regional: string; fecha: string; hc: string; descripcion: string }>;
-          if (Array.isArray(notas) && notas.length > 0) {
-            seccionOps('4. NOTAS ACLARATORIAS');
-            let totalHCNotas = 0;
-            notas.forEach((n) => {
-              if (y > 275) { doc.addPage(); y = margin; }
-              const hcNum = parseInt(n.hc) || 0;
-              totalHCNotas += hcNum;
-              const linea = `• ${formatFechaBullet(n.fecha)} ${n.sede || n.regional}${hcNum ? ` (${hcNum})` : ''}${n.descripcion ? ` — ${n.descripcion}` : ''}`;
-              doc.setFont('helvetica', 'normal');
-              doc.setFontSize(9.5);
-              doc.setTextColor(15, 23, 42);
-              const split = doc.splitTextToSize(linea, pageWidth - margin * 2 - 6);
-              doc.text(split, margin + 3, y);
-              y += split.length * 4.8 + 0.5;
-            });
-            if (totalHCNotas > 0) {
-              y += 3;
-              if (y > 275) { doc.addPage(); y = margin; }
-              doc.setFillColor(212, 175, 55);
-              doc.rect(margin, y, pageWidth - margin * 2, 6.5, 'F');
-              doc.setFont('helvetica', 'bold');
-              doc.setFontSize(9);
-              doc.setTextColor(7, 11, 29);
-              doc.text('TOTAL HC ACLARATORIAS:', margin + 3, y + 4.5);
-              doc.text(String(totalHCNotas), pageWidth - margin - 3, y + 4.5, { align: 'right' });
-              y += 10;
-            }
-          }
-        } catch { /* skip */ }
+    // Calcular info del movimiento para firmas
+    const _aprobPorPaso: Record<string, string> = {};
+    s.movimientos.forEach((m) => {
+      if ((m.accion === 'validada' || m.accion === 'reenviada' || m.accion === 'aprobada') && m.paso && m.usuarioNombre) {
+        _aprobPorPaso[m.paso] = m.usuarioNombre;
       }
+    });
+
+    // Parse atenciones
+    let atArr: Array<{ regional: string; sede: string; fecha: string; hc: string }> = [];
+    try { const raw = get('atencionesJson'); if (raw) atArr = JSON.parse(raw); } catch { /* skip */ }
+    let totalHC = 0;
+    atArr.forEach(a => { totalHC += parseInt(a.hc) || 0; });
+    const turnos = new Set(atArr.map(a => a.fecha)).size;
+
+    // Primary sede = mayor HC
+    const hcPorSede = new Map<string, number>();
+    atArr.forEach(a => { const s_ = a.sede || a.regional; hcPorSede.set(s_, (hcPorSede.get(s_) || 0) + (parseInt(a.hc) || 0)); });
+    let sedePrincipal = ''; let maxHcS = 0;
+    hcPorSede.forEach((hc, sede) => { if (hc > maxHcS) { maxHcS = hc; sedePrincipal = sede; } });
+    if (!sedePrincipal && atArr.length > 0) sedePrincipal = atArr[0].sede || atArr[0].regional;
+
+    // Parse notas aclaratorias
+    let notasArr: Array<{ sede: string; regional: string; fecha: string; hc: string; descripcion: string }> = [];
+    if (get('conNotasAclaratorias') === 'si') {
+      try { const rawN = get('notasAclaratorias'); if (rawN) notasArr = JSON.parse(rawN); } catch { /* skip */ }
     }
 
-    // ── 5. Comentarios adicionales (opcional) ──
-    const comentarios = get('actividadesRealizadas') || get('comentariosAdicionales');
-    if (comentarios.trim()) {
-      seccionOps('5. COMENTARIOS ADICIONALES');
-      const cLines = doc.splitTextToSize(comentarios, pageWidth - margin * 2);
-      if (y + cLines.length * 5 > 275) { doc.addPage(); y = margin; }
-      doc.setFont('helvetica', 'normal');
+    // Fechas del período
+    const fechaDocObj  = periodoFin_ ? new Date(periodoFin_ + 'T00:00:00') : null;
+    const diaDoc       = fechaDocObj ? fechaDocObj.getDate() : '';
+    const MESES_       = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+    const mesDocMin    = fechaDocObj ? MESES_[fechaDocObj.getMonth()] : '';
+    const mesDocUp     = mesDocMin.toUpperCase();
+    const anioDoc      = fechaDocObj ? fechaDocObj.getFullYear() : '';
+    const fechaDocFmt  = formatFechaBullet(periodoFin_); // "30 de JUNIO de 2026"
+
+    // ════════════════════════════════════════════════════════
+    // DOCUMENTO 1: CUENTA DE COBRO (INVOICE)
+    // La cabecera general (radicado/estado) ya está renderizada.
+    // A partir de aquí va el cuerpo de la factura.
+    // ════════════════════════════════════════════════════════
+    y += 4;
+
+    // Sede y fecha (alineado a la derecha)
+    if (sedePrincipal || fechaDocFmt) {
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.setTextColor(15, 23, 42);
+      doc.text(`${sedePrincipal.toUpperCase()}, ${fechaDocFmt.toUpperCase()}`, pageWidth - margin, y, { align: 'right' });
+      y += 7;
+    }
+
+    // Razón social
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.setTextColor(15, 23, 42);
+    doc.text('I.P.S GOLEMAN SERVICIO INTEGRAL S.A.S  NIT.900.231.829', pageWidth / 2, y, { align: 'center' });
+    y += 10;
+
+    // DEBE A block
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.text('DEBE A:', pageWidth / 2, y, { align: 'center' });
+    y += 6;
+    doc.setFontSize(12);
+    doc.text(nombreProf.toUpperCase() || '—', pageWidth / 2, y, { align: 'center' });
+    y += 6;
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    if (tipoDocP && numDocP) { doc.text(`${tipoDocP}  ${numDocP}`, pageWidth / 2, y, { align: 'center' }); y += 5; }
+    if (profesion) { doc.setFont('helvetica', 'bold'); doc.text(profesion.toUpperCase(), pageWidth / 2, y, { align: 'center' }); y += 5; doc.setFont('helvetica', 'normal'); }
+    y += 5;
+
+    // Valor en letras
+    if (valorNum > 0) {
       doc.setFontSize(9.5);
       doc.setTextColor(15, 23, 42);
-      doc.text(cLines, margin, y);
-      y += cLines.length * 5 + 4;
+      const letras = numeroAPesosEnLetras(String(valorNum));
+      const sumaLines = doc.splitTextToSize(`La suma de ${valorFmt} (${letras})`, pageWidth - margin * 2);
+      doc.text(sumaLines, margin, y);
+      y += sumaLines.length * 5 + 3;
     }
 
-    // ── 6. Datos bancarios ──
-    seccionOps('6. DATOS BANCARIOS PARA EL PAGO');
-    filaOps('Banco', get('banco'), 'Tipo de cuenta', get('tipoCuenta'));
-    filaOps('N° de cuenta', get('numeroCuenta'), 'Titular de la cuenta', get('titularCuenta'));
-    y += 2;
+    // POR CONCEPTO DE
+    const conceptoBase = profesion
+      ? `Prestación de servicios como ${profesion} en administración de medicamentos PPL`
+      : 'Prestación de servicios profesionales en administración de medicamentos PPL';
+    const conceptoLine = doc.splitTextToSize(`POR CONCEPTO DE: ${conceptoBase}`, pageWidth - margin * 2);
+    doc.setFontSize(9.5);
+    doc.text(conceptoLine, margin, y);
+    y += conceptoLine.length * 5;
+    if (periodoIni && periodoFin_) {
+      doc.text(`Período: ${periodoIni} al ${periodoFin_}`, margin, y);
+      y += 5;
+    }
+    y += 4;
 
-    // ── 7. Declaraciones ──
-    seccionOps('7. DECLARACIONES DEL PROFESIONAL');
-    const chk = (v: string) => (v === 'si' || v === 'true' || v === '1') ? '[✓]' : '[ ]';
-    const decl1 = `${chk(get('opsAlDia'))} Certifico que no tengo cuentas de cobro de períodos anteriores pendientes por radicar en esta institución.`;
-    const decl2 = `${chk(get('esNuevoColaborador'))} Soy colaborador(a) nuevo(a): es mi primera radicación en esta institución.`;
-    const certTexto = 'Quien suscribe certifica que los servicios descritos en el presente documento fueron efectivamente prestados durante el período indicado, que la información suministrada es verídica y que acepta la responsabilidad legal correspondiente ante cualquier irregularidad que se compruebe.';
-    [decl1, decl2, certTexto].forEach((txt, i) => {
+    // Bullet list de atenciones (ordenadas por fecha)
+    const atSorted = [...atArr].sort((a, b) => a.fecha.localeCompare(b.fecha));
+    atSorted.forEach((a) => {
       if (y > 272) { doc.addPage(); y = margin; }
-      const lines = doc.splitTextToSize(txt, pageWidth - margin * 2);
-      doc.setFont('helvetica', i === 2 ? 'italic' : 'normal');
-      doc.setFontSize(i === 2 ? 8.5 : 9.5);
-      doc.setTextColor(i === 2 ? 80 : 15, i === 2 ? 80 : 23, i === 2 ? 100 : 42);
-      doc.text(lines, margin, y);
-      y += lines.length * 4.5 + 3;
+      const hcN = parseInt(a.hc) || 0;
+      const linea = `• ${formatFechaBullet(a.fecha)} ${a.sede || a.regional} (${hcN})`;
+      const split = doc.splitTextToSize(linea, pageWidth - margin * 2 - 4);
+      doc.setFontSize(9.5); doc.setTextColor(15, 23, 42);
+      doc.text(split, margin + 4, y);
+      y += split.length * 5 + 0.5;
     });
+    y += 6;
+
+    // Declaración art. 383
+    if (y > 252) { doc.addPage(); y = margin; }
+    const art383 = `Yo, ${nombreProf}${tipoDocP && numDocP ? `, identificado(a) con ${tipoDocP} N° ${numDocP}` : ''},` +
+      ` de ${lugarExp}, dando cumplimiento al parágrafo 2 del artículo 383 del Estatuto Tributario,` +
+      ` modificado por el artículo 17 de la ley 1819 del 29 de diciembre de 2016, Certifico bajo la` +
+      ` gravedad de juramento que no he contratado, vinculado 2 o más trabajadores asociados a la actividad que desarrollo.`;
+    const art383Lines = doc.splitTextToSize(art383, pageWidth - margin * 2);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(15, 23, 42);
+    doc.text(art383Lines, margin, y);
+    y += art383Lines.length * 4.8 + 5;
+    doc.text('Atentamente,', margin, y); y += 18;
+
+    // Línea de firma del profesional
+    doc.setDrawColor(15, 23, 42); doc.setLineWidth(0.3);
+    doc.line(margin, y, margin + 75, y); y += 4;
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
+    doc.text(nombreProf.toUpperCase() || '—', margin, y); y += 4.5;
+    doc.setFont('helvetica', 'normal');
+    if (tipoDocP && numDocP) { doc.text(`${tipoDocP} ${numDocP}`, margin, y); y += 4.5; }
+    if (profesion) { doc.text(profesion, margin, y); y += 4.5; }
+
+    // ════════════════════════════════════════════════════════
+    // DOCUMENTO 2: CERTIFICACIÓN DE PRESTACIÓN DE SERVICIOS
+    // ════════════════════════════════════════════════════════
+    doc.addPage(); y = margin;
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.setTextColor(15, 23, 42);
+    doc.text('CERTIFICACIÓN DE PRESTACIÓN DE SERVICIOS', pageWidth / 2, y + 8, { align: 'center' });
+    y += 18;
+
+    // Párrafo introductorio
+    const introText = `Teniendo en cuenta la cuenta de cobro presentada por ${nombreProf} sobre las` +
+      ` actividades desarrolladas para dar cumplimiento a los términos contratados, he verificado los resultados` +
+      ` de su prestación, por lo que se autoriza el pago correspondiente al período comprendido del mes de` +
+      ` ${mesDocMin ? mesDocMin + (anioDoc ? ' ' + anioDoc : '') : (periodoFin_ || 'dicho período')}.`;
+    const introLines = doc.splitTextToSize(introText, pageWidth - margin * 2);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5);
+    doc.text(introLines, margin, y);
+    y += introLines.length * 5 + 6;
+
+    // Tabla de datos
+    const certFilas: Array<[string, string]> = [
+      ['Contratista', nombreProf],
+      ['Cédula del Cesionario', numDocP],
+      ['Objeto contractual', profesion ? `Prestación de servicios como ${profesion}` : 'Prestación de servicios profesionales'],
+      ['Fecha inicio de contrato', fecIniCto || '—'],
+      ['Período radicado', mesDocUp ? `${mesDocUp} ${anioDoc}` : (periodoFin_ || '—')],
+      ['Valor Certificado', valorFmt],
+    ];
+    certFilas.forEach(([label, val]) => {
+      if (y > 272) { doc.addPage(); y = margin; }
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
+      const lw = doc.getTextWidth(label + ':   ');
+      doc.text(`${label}:`, margin, y);
+      doc.setFont('helvetica', 'normal');
+      const vLines = doc.splitTextToSize(val, pageWidth - margin * 2 - lw);
+      doc.text(vLines, margin + lw, y);
+      y += vLines.length * 4.8 + 0.5;
+    });
+    y += 5;
+
+    // Texto legal
+    const legal1 = 'De acuerdo con la norma en el parágrafo 1 del Art. 23 la ley 1150 de 2017 y el Artículo 244 de' +
+      ' la ley 1955 de 2019, se adjunta certificado de salud activo sin planilla de seguridad social, teniendo en' +
+      ' cuenta que no supera un salario mínimo legal vigente.';
+    const l1Lines = doc.splitTextToSize(legal1, pageWidth - margin * 2);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(15, 23, 42);
+    doc.text(l1Lines, margin, y); y += l1Lines.length * 4.8 + 4;
+
+    const cumplioText = `Certifico que ${nombreProf} cumplió con las obligaciones generales contempladas en el contrato suscrito entre las partes.`;
+    const cLines = doc.splitTextToSize(cumplioText, pageWidth - margin * 2);
+    doc.text(cLines, margin, y); y += cLines.length * 4.8 + 4;
+
+    const sistText = `Así mismo, al verificar en el sistema se encontraron (${turnos} TURNO${turnos !== 1 ? 'S' : ''} Y ${totalHC} NOTA${totalHC !== 1 ? 'S' : ''}) debidamente registradas en salud 360.`;
+    const sistLines = doc.splitTextToSize(sistText, pageWidth - margin * 2);
+    doc.text(sistLines, margin, y); y += sistLines.length * 4.8 + 5;
+
+    // Notas aclaratorias
+    if (notasArr.length > 0) {
+      if (y > 260) { doc.addPage(); y = margin; }
+      doc.setFont('helvetica', 'bold'); doc.text('Nota Aclaratoria:', margin, y); y += 5;
+      doc.setFont('helvetica', 'normal');
+      notasArr.forEach((n) => {
+        if (y > 272) { doc.addPage(); y = margin; }
+        const notaLine = n.descripcion || `${formatFechaBullet(n.fecha)} ${n.sede || n.regional}${n.hc ? ` (${n.hc} HC)` : ''}`;
+        const nLines = doc.splitTextToSize(notaLine, pageWidth - margin * 2 - 4);
+        doc.text(nLines, margin + 4, y); y += nLines.length * 4.8 + 0.5;
+      });
+      y += 3;
+    }
+
+    // Comentarios adicionales
+    if (comentarios.trim()) {
+      if (y > 262) { doc.addPage(); y = margin; }
+      doc.setFont('helvetica', 'bold'); doc.text('Comentarios:', margin, y); y += 5;
+      doc.setFont('helvetica', 'normal');
+      const comLines2 = doc.splitTextToSize(comentarios, pageWidth - margin * 2);
+      doc.text(comLines2, margin, y); y += comLines2.length * 4.8 + 4;
+    }
+
+    // Constancia y firma del supervisor
+    if (y > 255) { doc.addPage(); y = margin; }
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5);
+    doc.text(`En constancia se firma a los ${diaDoc} días del mes de ${mesDocMin} de ${anioDoc}.`, margin, y); y += 12;
+    doc.text('Supervisor:', margin, y); y += 22;
+    doc.setDrawColor(15, 23, 42); doc.setLineWidth(0.3);
+    doc.line(margin, y, margin + 85, y); y += 4;
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5);
+    doc.text('COORDINADOR(A) DEL ÁREA', margin, y); y += 4;
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
+    doc.text('I.P.S Goleman Servicio Integral S.A.S', margin, y); y += 4;
+    doc.text('Coordinadora Nacional', margin, y); y += 3.5;
+    doc.text('Elaborado: Coordinación Área PPL', margin, y); y += 3.5;
+    doc.text('Aprobado: Coordinadora de Oficina Jurídica', margin, y); y += 8;
+
+    // Datos bancarios — al final del doc 2
+    if (y > 255) { doc.addPage(); y = margin; }
+    doc.setFillColor(7, 11, 29);
+    doc.rect(margin, y, pageWidth - margin * 2, 7, 'F');
+    doc.setFont('helvetica', 'bold'); doc.setTextColor(212, 175, 55); doc.setFontSize(9);
+    doc.text('DATOS BANCARIOS PARA EL PAGO', margin + 3, y + 5);
+    y += 10;
+    doc.setTextColor(15, 23, 42);
+    y = drawInfoGrid(doc, [
+      ['Banco', banco || '—'],
+      ['Tipo de cuenta', tipoCta || '—'],
+      ['N° de cuenta', numCta || '—'],
+      ['Titular de la cuenta', titularCta || '—'],
+      ['EPS / Entidad de salud', eps || '—'],
+      ['Período cobrado', periodoIni && periodoFin_ ? `${periodoIni} al ${periodoFin_}` : (periodoIni || periodoFin_ || '—')],
+    ], margin, pageWidth, y);
+    y += 4;
+
+    // ════════════════════════════════════════════════════════
+    // DOCUMENTO 3: CERTIFICACIÓN (OPS AL DÍA)
+    // ════════════════════════════════════════════════════════
+    doc.addPage(); y = margin;
+
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(14); doc.setTextColor(15, 23, 42);
+    doc.text('CERTIFICACIÓN', pageWidth / 2, y + 10, { align: 'center' });
+    y += 24;
+
+    const certOpsHdr = `Por medio de la presente, ${nombreProf} identificado(a) con ${tipoDocP} y ${numDocP} certifico que:`;
+    const certOpsHdrLines = doc.splitTextToSize(certOpsHdr, pageWidth - margin * 2);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(10);
+    doc.text(certOpsHdrLines, margin, y); y += certOpsHdrLines.length * 5.2 + 6;
+
+    const pt1 = `1.   Hago entrega de la cuenta de cobro correspondiente al mes de ${mesDocUp ? mesDocUp + ' ' + anioDoc : (periodoFin_ || 'dicho período')}.`;
+    const pt1Lines = doc.splitTextToSize(pt1, pageWidth - margin * 2);
+    doc.text(pt1Lines, margin, y); y += pt1Lines.length * 5.2 + 5;
+
+    const pt2 = `2.   A la fecha, no tengo pendientes cuentas de cobro de períodos anteriores por radicar a la empresa IPS GOLEMAN SERVICIO INTEGRAL SAS NIT 900.231.829, salvo la mencionada cuenta de cobro del mes de ${mesDocUp ? mesDocUp + ' ' + anioDoc : ''}.`;
+    const pt2Lines = doc.splitTextToSize(pt2, pageWidth - margin * 2);
+    doc.text(pt2Lines, margin, y); y += pt2Lines.length * 5.2 + 10;
+
+    const emision = 'Se emite esta certificación a solicitud del interesado(a) para los fines que estime convenientes.';
+    const emisionLines = doc.splitTextToSize(emision, pageWidth - margin * 2);
+    doc.text(emisionLines, margin, y); y += emisionLines.length * 5.2 + 12;
+
+    doc.text(`Fecha: ${diaDoc ? `${diaDoc} de ${mesDocMin} de ${anioDoc}` : formatFechaBullet(new Date().toISOString().slice(0, 10))}`, margin, y);
+    y += 22;
+
+    doc.setDrawColor(15, 23, 42); doc.setLineWidth(0.3);
+    doc.line(margin, y, margin + 85, y); y += 4;
+    doc.setFontSize(9);
+    doc.text(`Nombre: ${nombreProf}`, margin, y); y += 4.5;
+    doc.text(`Identificación: ${tipoDocP} ${numDocP}`, margin, y); y += 4.5;
+    if (profesion) { doc.text(`Labor: ${profesion}`, margin, y); y += 4.5; }
+    if (telefono)  { doc.text(`Teléfono de contacto: ${telefono}`, margin, y); y += 4.5; }
+    if (correo)    { doc.text(`Correo electrónico: ${correo}`, margin, y); y += 4.5; }
+
+    // ════════════════════════════════════════════════════════
+    // DOCUMENTO 4: PÁGINA DE FIRMAS
+    // ════════════════════════════════════════════════════════
+    doc.addPage(); y = margin;
+
+    doc.setFillColor(7, 11, 29);
+    doc.rect(margin, y, pageWidth - margin * 2, 10, 'F');
+    doc.setFont('helvetica', 'bold'); doc.setTextColor(212, 175, 55); doc.setFontSize(12);
+    doc.text('FIRMAS Y APROBACIONES', pageWidth / 2, y + 7, { align: 'center' });
+    y += 18;
+
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(80, 80, 100);
+    doc.text('Las firmas que aparecen a continuación dan fe de la revisión, validación y aprobación de la presente cuenta de cobro.', pageWidth / 2, y, { align: 'center' });
+    y += 10;
+
+    const sigColW = (pageWidth - margin * 2) / 2 - 4;
+    const sigH    = 24;
+    const drawFirmaOps = (dataUrl: string, label: string, sublabel: string, posX: number, posY: number) => {
+      if (dataUrl && dataUrl.startsWith('data:image')) {
+        try { doc.addImage(dataUrl, 'PNG', posX, posY, sigColW, sigH - 6); } catch { /* ok */ }
+      }
+      const lineY = posY + sigH - 2;
+      doc.setDrawColor(15, 23, 42); doc.setLineWidth(0.3);
+      doc.line(posX, lineY, posX + sigColW, lineY);
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5); doc.setTextColor(15, 23, 42);
+      doc.text(label, posX + sigColW / 2, lineY + 4.5, { align: 'center' });
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(100, 100, 120);
+      doc.text(sublabel, posX + sigColW / 2, lineY + 8.5, { align: 'center' });
+    };
+
+    const firmasOps = s.firmas || {};
+    const col1X = margin;
+    const col2X = margin + sigColW + 8;
+    const row1Y = y + 4;
+    const row2Y = row1Y + sigH + 22;
+
+    drawFirmaOps(firmasOps.profesional || '', nombreProf || 'Profesional OPS', 'Firma del Profesional OPS', col1X, row1Y);
+    drawFirmaOps(firmasOps.analista    || '', _aprobPorPaso['analista'] || 'Analista del Área', 'Analista del Área', col2X, row1Y);
+    drawFirmaOps(firmasOps.coordinador || '', _aprobPorPaso['coordinador'] || 'Coordinador(a) del Área', 'Coordinador(a) del Área', col1X, row2Y);
+    drawFirmaOps(firmasOps.contabilidad || '', _aprobPorPaso['contabilidad'] || 'Responsable Área Final', 'Revisó y aprobó pago', col2X, row2Y);
+
+    y = row2Y + sigH + 20;
+
+    // Pie de página del documento 4
+    doc.setFont('helvetica', 'italic'); doc.setFontSize(8); doc.setTextColor(150, 150, 150);
+    doc.text('I.P.S Goleman Servicio Integral S.A.S  ·  NIT 900.231.829  ·  Área PPL', pageWidth / 2, y, { align: 'center' });
     y += 4;
   }
 
@@ -1655,9 +1799,7 @@ function _generarPdfEspecial(s: SolicitudParaPdf, opts?: { bloburl?: boolean }):
     drawFirma(firmas.analista || firmas.coordinador || '', aprobacionPorPaso['analista'] || aprobacionPorPaso['coordinador'] || 'Analista / Coordinador', 'Validó', 2);
     drawFirma(firmas.contabilidad || '', aprobacionPorPaso['contabilidad'] || aprobacionPorPaso['director'] || 'Área final', 'Aprobó', 3);
   } else if (esCuentaCobroOps) {
-    drawFirma(firmas.profesional || '', s.solicitanteNombre || 'Profesional OPS', 'Firma del profesional', 0);
-    drawFirma(firmas.coordinador || '', aprobacionPorPaso['coordinador'] || aprobacionPorPaso['analista'] || 'Supervisor / Coordinador', 'Revisó y avaló', 1);
-    drawFirma(firmas.contabilidad || '', aprobacionPorPaso['contabilidad'] || 'Contabilidad / Tesorería', 'Aprobó pago', 2);
+    // Firmas ya renderizadas en Documento 4 dentro del bloque esCuentaCobroOps
   } else {
     drawFirma(firmas.profesional || firmas.analista || '', 'Profesional solicitante', 'Diligenciamiento', 0);
     drawFirma(firmas.coordinador || '', 'Coordinador', 'Validación', 1);

@@ -2,6 +2,8 @@ import { FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from '
 import { useNavigate } from 'react-router-dom';
 import { AppLayout } from '../../app/layout/AppLayout';
 import { clearAuthSession, getAuthSession } from '../auth/auth.service';
+import { useSessionTimeout } from '../auth/useSessionTimeout';
+import { SessionTimeoutModal } from '../auth/SessionTimeoutModal';
 import { api } from '../../services/http/api';
 import { appendChatMessages, formatRelativeNow } from '../../app/layout/requestsChatStore';
 import { RadicacionesModule } from '../radicaciones/RadicacionesModule';
@@ -361,6 +363,16 @@ export function DashboardPage() {
 		clearAuthSession();
 		navigate('/login', { replace: true });
 	}
+
+	// ── Sesión por inactividad ──────────────────────────────────────────────
+	const { state: sessionState, remaining: sessionRemaining, extend: extendSession } = useSessionTimeout(handleLogout);
+
+	// Escuchar evento 401 del interceptor axios (sesión expirada por el servidor)
+	useEffect(() => {
+		const handler = () => { /* el hook ya lo manejará cuando expire */ };
+		window.addEventListener('payops:session-expired', handler);
+		return () => window.removeEventListener('payops:session-expired', handler);
+	}, []);
 
 	function getErrorMessage(error: unknown) {
 		const maybeError = error as { response?: { data?: { message?: string | string[] } } };
@@ -824,6 +836,16 @@ export function DashboardPage() {
 	}
 
 	return (
+		<>
+		{(sessionState === 'warning' || sessionState === 'expired') && (
+			<SessionTimeoutModal
+				state={sessionState}
+				remaining={sessionRemaining}
+				correo={session.usuario.correo}
+				onExtend={extendSession}
+				onLogout={handleLogout}
+			/>
+		)}
 		<AppLayout
 			nombre={session.usuario.nombreCompleto}
 			rol={rol}
@@ -1595,5 +1617,6 @@ export function DashboardPage() {
 				</section>
 			) : null}
 		</AppLayout>
+		</>
 	);
 }

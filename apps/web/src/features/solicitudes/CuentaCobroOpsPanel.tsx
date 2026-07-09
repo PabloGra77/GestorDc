@@ -14,6 +14,37 @@ interface CuentaCobroOpsPanelProps {
 const TIPOS_DOC = ['CC', 'CE', 'TI', 'PA', 'NIT'];
 const TIPOS_CUENTA = ['Ahorros', 'Corriente'];
 
+const PROFESIONES_OPS = [
+  // Salud — terapias
+  'Fisioterapeuta',
+  'Fisioterapeuta Respiratoria',
+  'Fonoaudiólogo(a)',
+  'Terapeuta Ocupacional',
+  // Salud — clínicas
+  'Médico(a) General',
+  'Médico(a) Especialista',
+  'Psiquiatra',
+  'Psicólogo(a)',
+  'Enfermero(a)',
+  'Auxiliar de Enfermería',
+  'Bacteriólogo(a)',
+  'Nutricionista — Dietista',
+  'Regente de Farmacia',
+  'Auxiliar de Farmacia',
+  'Odontólogo(a)',
+  'Auxiliar de Odontología',
+  'Optómetra',
+  'Trabajador(a) Social',
+  'Médico(a) Legista',
+  // Ingenierías y otros
+  'Ingeniero(a) de Sistemas',
+  'Ingeniero(a) Industrial',
+  'Ingeniero(a) Biomédico(a)',
+  'Administrador(a) en Salud',
+  'Coordinador(a) de Área',
+  'Otro',
+];
+
 // ── Regionales y sedes INPEC ─────────────────────────────────────────────────
 const REGIONALES_PPL: Record<string, string[]> = {
   'Central': [
@@ -227,6 +258,7 @@ export function CuentaCobroOpsPanel({ onCreada, tipoSolicitudId, areaId }: Cuent
   // ── Paso 3: Datos personales (pre-cargados, verificar) ──────────────────────
   const [datosConfirmados, setDatosConfirmados] = useState(false);
   const [editandoDatos, setEditandoDatos] = useState(false);
+  const [profesion, setProfesion] = useState('');
 
   const [formTipoDoc, setFormTipoDoc] = useState('CC');
   const [formNumDoc, setFormNumDoc] = useState('');
@@ -301,6 +333,7 @@ export function CuentaCobroOpsPanel({ onCreada, tipoSolicitudId, areaId }: Cuent
       if (r.data.numeroCuenta) setNumeroCuenta(r.data.numeroCuenta);
       if (r.data.titularCuenta) setTitularCuenta(r.data.titularCuenta);
       if (r.data.eps) setEps(r.data.eps);
+      if (r.data.profesion) setProfesion(r.data.profesion);
       if (r.data.archivoEpsId) { setDocAfiliacionesId(r.data.archivoEpsId); setDocAfiliacionesNombre(r.data.archivoEpsNombre || 'Cert. EPS (perfil)'); }
       if (r.data.archivoCartaEpsId) { setDocCartaEpsId(r.data.archivoCartaEpsId); setDocCartaEpsNombre(r.data.archivoCartaEpsNombre || 'Carta EPS (perfil)'); }
       if (r.data.archivoCuentaId) { setDocCuentaId(r.data.archivoCuentaId); setDocCuentaNombre(r.data.archivoCuentaNombre || 'Cert. bancario (perfil)'); }
@@ -369,6 +402,7 @@ export function CuentaCobroOpsPanel({ onCreada, tipoSolicitudId, areaId }: Cuent
       if (!formNumDoc.trim()) return 'Ingresa tu número de documento.';
       if (!formPrimerNombre.trim()) return 'Ingresa tu primer nombre.';
       if (!formPrimerApellido.trim()) return 'Ingresa tu primer apellido.';
+      if (!profesion) return 'Selecciona tu profesión o cargo.';
       if (!banco) return 'Selecciona el banco para el pago.';
       if (!numeroCuenta.trim()) return 'Ingresa el número de cuenta bancaria.';
       if (!datosConfirmados) return 'Confirma que tus datos personales y bancarios son correctos.';
@@ -428,6 +462,7 @@ export function CuentaCobroOpsPanel({ onCreada, tipoSolicitudId, areaId }: Cuent
           correoElectronico: usr?.correo ?? '',
           banco, tipoCuenta, numeroCuenta, titularCuenta,
           eps, entidadSalud: eps,
+          profesion,
           opsAlDia: opsAlDia ? 'si' : 'no',
           esNuevoColaborador: esNuevo ? 'si' : 'no',
         },
@@ -673,6 +708,14 @@ export function CuentaCobroOpsPanel({ onCreada, tipoSolicitudId, areaId }: Cuent
             </div>
             <div className="ops-verify-row">
               <div className="ops-verify-section">
+                <span className="ops-verify-label">Profesión / Cargo</span>
+                <strong style={!profesion ? { color: 'var(--accent, #d4af1f)' } : {}}>
+                  {profesion || '⚠ Sin definir — haz clic en "Editar mis datos"'}
+                </strong>
+              </div>
+            </div>
+            <div className="ops-verify-row">
+              <div className="ops-verify-section">
                 <span className="ops-verify-label">Tipo de documento</span>
                 <strong>{formTipoDoc}</strong>
               </div>
@@ -779,6 +822,13 @@ export function CuentaCobroOpsPanel({ onCreada, tipoSolicitudId, areaId }: Cuent
                 <div className="leg-field">
                   <label>EPS a la que está afiliado</label>
                   <input type="text" value={eps} onChange={(e) => setEps(e.target.value)} placeholder="Ej: Sura, Nueva EPS, Sanitas…" />
+                </div>
+                <div className="leg-field">
+                  <label>Profesión / Cargo <span className="req">*</span></label>
+                  <select value={profesion} onChange={(e) => setProfesion(e.target.value)}>
+                    <option value="">— Selecciona tu profesión —</option>
+                    {PROFESIONES_OPS.map((p) => <option key={p} value={p}>{p}</option>)}
+                  </select>
                 </div>
               </div>
 
