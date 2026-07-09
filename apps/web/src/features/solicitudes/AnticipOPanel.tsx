@@ -4,6 +4,8 @@ import { SignaturePad } from '../../components/SignaturePad';
 import { BANCOS_COLOMBIA } from '../../utils/bancos';
 import { formatearMiles, numeroAPesosEnLetras } from '../../utils/numeroALetras';
 import { getAuthSession } from '../auth/auth.service';
+import { buscarCiudad, getClima, TODAS_CIUDADES } from './colombiaData';
+import type { CiudadCO } from './colombiaData';
 
 interface AnticipoPanelProps {
   onCreada?: (info: { id: number; numeroRadicado: string }) => void;
@@ -78,6 +80,35 @@ const LOCALIDADES_BOGOTA = [
 
 const DEPARTAMENTOS = Object.keys(COLOMBIA).sort((a, b) => a.localeCompare(b, 'es'));
 
+const BOGOTA_LOC_COORDS: Record<string, [number, number]> = {
+  'Usaquén':          [4.701, -74.031], 'Chapinero':       [4.646, -74.070],
+  'Santa Fe':         [4.598, -74.073], 'San Cristóbal':   [4.570, -74.079],
+  'Usme':             [4.479, -74.126], 'Tunjuelito':      [4.570, -74.134],
+  'Bosa':             [4.621, -74.196], 'Kennedy':         [4.627, -74.162],
+  'Fontibón':         [4.683, -74.148], 'Engativá':        [4.703, -74.111],
+  'Suba':             [4.741, -74.084], 'Barrios Unidos':  [4.671, -74.087],
+  'Teusaquillo':      [4.641, -74.089], 'Los Mártires':    [4.607, -74.089],
+  'Antonio Nariño':   [4.585, -74.108], 'Puente Aranda':   [4.618, -74.116],
+  'La Candelaria':    [4.596, -74.075], 'Rafael Uribe Uribe': [4.566, -74.108],
+  'Ciudad Bolívar':   [4.513, -74.163], 'Sumapaz':         [4.199, -74.390],
+};
+
+function haversineKm(la1: number, lo1: number, la2: number, lo2: number): number {
+  const R = 6371, d2r = Math.PI / 180;
+  const dl = (la2 - la1) * d2r, dg = (lo2 - lo1) * d2r;
+  const a = Math.sin(dl/2)**2 + Math.cos(la1*d2r)*Math.cos(la2*d2r)*Math.sin(dg/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+function buscarCiudadFlex(nombre: string): CiudadCO | undefined {
+  if (!nombre) return undefined;
+  const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z]/g, '');
+  const n = norm(nombre);
+  return buscarCiudad(nombre) ||
+    TODAS_CIUDADES.find(c => norm(c.nombre) === n) ||
+    TODAS_CIUDADES.find(c => n.startsWith(norm(c.nombre)) || norm(c.nombre).startsWith(n));
+}
+
 const MODOS_TRANSPORTE = [
   { key: 'uber',    label: 'Uber' },
   { key: 'yango',   label: 'Yango' },
@@ -126,8 +157,9 @@ export function AnticipOPanel({ onCreada }: AnticipoPanelProps) {
   const [trMode, setTrMode] = useState('uber');
   const [trTrayectos, setTrTrayectos] = useState('1');
   const [trValor, setTrValor] = useState('');
-  const [trKm, setTrKm] = useState('');
-  const [trLluvia, setTrLluvia] = useState(false);
+  const [trOrigenCiudad, setTrOrigenCiudad] = useState('');
+  const [trOrigenLocalidad, setTrOrigenLocalidad] = useState('');
+  const [trLluviaOverride, setTrLluviaOverride] = useState<boolean | null>(null);
 
   // ── Paso 2: Hospedaje ───────────────────────────────────────────────────────
   const [useHospedaje, setUseHospedaje] = useState(false);
@@ -225,13 +257,50 @@ export function AnticipOPanel({ onCreada }: AnticipoPanelProps) {
   const isApp = isCarApp || isMotoApp;
 
   // ── Calculadora de precio transporte ───────────────────────────────────────
-  const kmNum = parseFloat(trKm) || 0;
+  // Coordenadas de origen
+  const origenCoords = ((): [number, number] | null => {
+    const loc = BOGOTA_LOC_COORDS[trOrigenLocalidad] ?? BOGOTA_LOC_COORDS[trOrigenCiudad];
+    if (loc) return loc;
+    const city = buscarCiudadFlex(trOrigenCiudad);
+    if (city) return [city.lat, city.lng];
+    return null;
+  })();
+
+  // Coordenadas de destino
+  const destinoCityData = buscarCiudadFlex(trCiudad);
+  const destinoCoords = ((): [number, number] | null => {
+    const loc = BOGOTA_LOC_COORDS[trLocalidad];
+    if (esBogotaDest && loc) return loc;
+    if (destinoCityData) return [destinoCityData.lat, destinoCityData.lng];
+    return null;
+  })();
+
+  // Distancia km (haversine × factor vial: urbano 1.4, intercity 1.25)
+  const distLineal = (origenCoords && destinoCoords)
+    ? haversineKm(origenCoords[0], origenCoords[1], destinoCoords[0], destinoCoords[1])
+    : 0;
+  const mismaCiudad = !!trOrigenCiudad &&
+    (buscarCiudadFlex(trOrigenCiudad)?.nombre === (destinoCityData?.nombre ?? ''));
+  const trKmCalculado = distLineal > 0 ? Math.max(1, Math.round(distLineal * (mismaCiudad ? 1.4 : 1.25))) : 0;
+
+  // Clima auto-detectado (igual que viáticos) + override manual
+  const today = new Date().toISOString().slice(0, 10);
+  const climaAuto = destinoCityData ? getClima(destinoCityData, today) : null;
+  const esLluviosoAuto = climaAuto?.condicion === 'lluvioso' || climaAuto?.condicion === 'tormenta';
+  const esLluvioso = trLluviaOverride !== null ? trLluviaOverride : esLluviosoAuto;
+
+  // Horas pico: 6:00-8:00, 11:30-13:30, 16:30-20:00 · Noche desde 19:00
+  const _now = new Date();
+  const horaD = _now.getHours() + _now.getMinutes() / 60;
+  const isHoraPico = (horaD >= 6 && horaD < 8) || (horaD >= 11.5 && horaD < 13.5) || (horaD >= 16.5 && horaD < 20);
+  const isNoche = horaD >= 19;
+
+  // Precio estimado
   const baseKmRate = isMotoApp ? 1000 : 1500;
-  const horaActual = new Date().getHours();
-  const isHoraPico = (horaActual >= 6 && horaActual < 9) || (horaActual >= 17 && horaActual < 20);
-  const isNoche = horaActual >= 22 || horaActual < 5;
-  const trEstBase = Math.max(isMotoApp ? 5000 : 8000, Math.round(kmNum * baseKmRate));
-  const trEstMult = (isHoraPico ? 1.25 : 1) * (isNoche ? 1.15 : 1) * (trLluvia ? 1.25 : 1);
+  const trEstBase = trKmCalculado > 0
+    ? Math.max(isMotoApp ? 5000 : 8000, Math.round(trKmCalculado * baseKmRate))
+    : 0;
+  const trEstMult = (isHoraPico ? 1.25 : 1) * (isNoche ? 1.15 : 1) * (esLluvioso ? 1.25 : 1);
   const trEstMin = trEstBase;
   const trEstMax = Math.round(trEstBase * trEstMult);
 
@@ -467,6 +536,32 @@ export function AnticipOPanel({ onCreada }: AnticipoPanelProps) {
             </label>
             {useTransporte && (
               <div className="anticipo-cat-body">
+                {/* ── Punto de partida ── */}
+                <div className="anticipo-grid" style={{ gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+                  <div className="form-group">
+                    <label>📍 Punto de partida</label>
+                    <input
+                      type="text" list="tr-origen-list"
+                      placeholder="Ciudad o localidad de origen…"
+                      value={trOrigenCiudad}
+                      onChange={e => { setTrOrigenCiudad(e.target.value); setTrOrigenLocalidad(''); }}
+                    />
+                    <datalist id="tr-origen-list">
+                      {LOCALIDADES_BOGOTA.map(l => <option key={`loc-${l}`} value={l} />)}
+                      {TODAS_CIUDADES.map(c => <option key={`city-${c.nombre}`} value={c.nombre} />)}
+                    </datalist>
+                  </div>
+                  {buscarCiudadFlex(trOrigenCiudad)?.nombre === 'Bogotá' && !BOGOTA_LOC_COORDS[trOrigenCiudad] && (
+                    <div className="form-group">
+                      <label>Localidad de origen</label>
+                      <select value={trOrigenLocalidad} onChange={e => setTrOrigenLocalidad(e.target.value)}>
+                        <option value="">— selecciona —</option>
+                        {LOCALIDADES_BOGOTA.map(l => <option key={l} value={l}>{l}</option>)}
+                      </select>
+                    </div>
+                  )}
+                </div>
+
                 <div className="anticipo-grid-3">
                   <div className="form-group">
                     <label>Departamento de destino</label>
@@ -520,57 +615,67 @@ export function AnticipOPanel({ onCreada }: AnticipoPanelProps) {
                 {isApp && (
                   <div className="anticipo-hint-precios" style={{ marginTop: 12 }}>
                     <span className="anticipo-hint-title">
-                      💡 Calculadora de precio — {MODOS_TRANSPORTE.find(m => m.key === trMode)?.label}
+                      💡 Estimador de precio — {MODOS_TRANSPORTE.find(m => m.key === trMode)?.label}
                     </span>
-                    <div className="anticipo-calc-row">
-                      <div className="form-group" style={{ flex: '0 0 160px' }}>
-                        <label>Distancia del trayecto (km)</label>
-                        <input
-                          type="number" min="0.5" step="0.5" placeholder="Ej: 8"
-                          value={trKm}
-                          onChange={e => setTrKm(e.target.value)}
-                          style={{ textAlign: 'right' }}
-                        />
+
+                    {/* Clima auto-detectado para ciudad de destino */}
+                    {climaAuto && (
+                      <div className="anticipo-calc-indicadores" style={{ marginBottom: 8 }}>
+                        <span className={`anticipo-calc-badge ${esLluvioso ? 'lluvia' : 'normal'}`}>
+                          {climaAuto.emoji} {trCiudad}: {climaAuto.descripcion} · {climaAuto.temperatura}°C
+                        </span>
+                        <label className="anticipo-calc-check" style={{ fontSize: 11, marginLeft: 6 }}>
+                          <input
+                            type="checkbox"
+                            checked={trLluviaOverride ?? esLluviosoAuto}
+                            onChange={e => setTrLluviaOverride(e.target.checked === esLluviosoAuto ? null : e.target.checked)}
+                          />
+                          Marcar lluvia manualmente
+                        </label>
                       </div>
-                      <label className="anticipo-calc-check">
-                        <input type="checkbox" checked={trLluvia} onChange={e => setTrLluvia(e.target.checked)} />
-                        🌧️ Día lluvioso
-                      </label>
-                    </div>
-                    {kmNum > 0 ? (
+                    )}
+
+                    {trKmCalculado > 0 ? (
                       <>
                         <div className="anticipo-calc-indicadores">
+                          <span className="anticipo-calc-badge normal">📏 {trKmCalculado} km calculados</span>
                           {isHoraPico && <span className="anticipo-calc-badge pico">⏱ Hora pico +25%</span>}
                           {isNoche    && <span className="anticipo-calc-badge noche">🌙 Noche +15%</span>}
-                          {trLluvia   && <span className="anticipo-calc-badge lluvia">🌧️ Lluvia +25%</span>}
-                          {!isHoraPico && !isNoche && !trLluvia && <span className="anticipo-calc-badge normal">✓ Hora y clima normales</span>}
+                          {esLluvioso && <span className="anticipo-calc-badge lluvia">🌧️ Lluvia +25%</span>}
+                          {!isHoraPico && !isNoche && !esLluvioso && <span className="anticipo-calc-badge normal">✓ Condiciones normales</span>}
                         </div>
                         <div className="anticipo-calc-resultado">
                           Estimado por trayecto:&nbsp;
                           <strong>$ {fmtN(trEstMin)}{trEstMax > trEstMin ? ` – $ ${fmtN(trEstMax)}` : ''}</strong>
                         </div>
                         <p className="anticipo-hint-nota" style={{ marginTop: 4 }}>
-                          Base $ {baseKmRate.toLocaleString('es-CO')}/km · hora actual: {horaActual}:00 · mínimo de tarifa incluido
+                          Base $ {baseKmRate.toLocaleString('es-CO')}/km · hora actual: {Math.floor(horaD)}:{String(Math.round((horaD % 1) * 60)).padStart(2, '0')}
                         </p>
                         <button
                           type="button" className="admin-ghost-button"
                           style={{ marginTop: 8, fontSize: 12 }}
                           onClick={() => setTrValor(String(Math.round((trEstMin + trEstMax) / 2)))}
                         >
-                          ↑ Usar promedio estimado ($ {fmtN(Math.round((trEstMin + trEstMax) / 2))})
+                          ↑ Usar promedio ($ {fmtN(Math.round((trEstMin + trEstMax) / 2))})
                         </button>
                       </>
                     ) : (
-                      <div className="anticipo-precios-grid" style={{ marginTop: 8 }}>
-                        <span>Trayecto corto (&lt; 5 km)</span>
-                        <span>{isMotoApp ? '$ 5.000 – $ 8.000' : '$ 8.000 – $ 18.000'}</span>
-                        <span>Trayecto medio (5 – 15 km)</span>
-                        <span>{isMotoApp ? '$ 7.000 – $ 18.000' : '$ 15.000 – $ 35.000'}</span>
-                        <span>Trayecto largo (&gt; 15 km)</span>
-                        <span>{isMotoApp ? '$ 15.000 – $ 30.000' : '$ 25.000 – $ 55.000'}</span>
-                      </div>
+                      <>
+                        {!trOrigenCiudad && (
+                          <p className="anticipo-hint-nota" style={{ marginTop: 4, marginBottom: 6 }}>
+                            Ingresa el <strong>punto de partida</strong> para calcular km y precio automáticamente.
+                          </p>
+                        )}
+                        <div className="anticipo-precios-grid" style={{ marginTop: 6 }}>
+                          <span>Trayecto corto (&lt; 5 km)</span>
+                          <span>{isMotoApp ? '$ 5.000 – $ 8.000' : '$ 8.000 – $ 18.000'}</span>
+                          <span>Trayecto medio (5 – 15 km)</span>
+                          <span>{isMotoApp ? '$ 7.000 – $ 18.000' : '$ 15.000 – $ 35.000'}</span>
+                          <span>Trayecto largo (&gt; 15 km)</span>
+                          <span>{isMotoApp ? '$ 15.000 – $ 30.000' : '$ 25.000 – $ 55.000'}</span>
+                        </div>
+                      </>
                     )}
-                    <p className="anticipo-hint-nota">Ingresa los km para calcular el estimado según hora, lluvia y modo.</p>
                   </div>
                 )}
 
