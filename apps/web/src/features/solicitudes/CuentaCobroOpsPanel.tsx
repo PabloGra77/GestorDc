@@ -277,10 +277,7 @@ export function CuentaCobroOpsPanel({ onCreada, tipoSolicitudId, areaId }: Cuent
   const [titularCuenta, setTitularCuenta] = useState('');
 
   // ── Paso 4: Documentos ──────────────────────────────────────────────────────
-  const [docCertServiciosId, setDocCertServiciosId] = useState('');
-  const [docCertServiciosNombre, setDocCertServiciosNombre] = useState('');
-  const [docPanaceaId, setDocPanaceaId] = useState('');
-  const [docPanaceaNombre, setDocPanaceaNombre] = useState('');
+  // Nota: los documentos de prestación de servicios y Panacea/360 los carga el analista, no el profesional
   const [opsAlDia, setOpsAlDia] = useState(false);
   const [esNuevo, setEsNuevo] = useState(false);
   // Del perfil (solo mostrar estado, re-subir opcional)
@@ -368,9 +365,7 @@ export function CuentaCobroOpsPanel({ onCreada, tipoSolicitudId, areaId }: Cuent
       fd.append('archivo', file);
       const r = await api.post<{ id: string }>('/archivos', fd, { headers: { 'Content-Type': undefined } });
       const id = r.data.id; const nom = file.name;
-      if (campo === 'certServicios') { setDocCertServiciosId(id); setDocCertServiciosNombre(nom); }
-      else if (campo === 'panacea')      { setDocPanaceaId(id);      setDocPanaceaNombre(nom); }
-      else if (campo === 'cartaEps')     { setDocCartaEpsId(id);     setDocCartaEpsNombre(nom); }
+      if (campo === 'cartaEps')     { setDocCartaEpsId(id);     setDocCartaEpsNombre(nom); }
       else if (campo === 'afiliaciones') { setDocAfiliacionesId(id); setDocAfiliacionesNombre(nom); }
       else if (campo === 'cuenta')       { setDocCuentaId(id);       setDocCuentaNombre(nom); }
       else if (campo === 'documento')    { setDocDocumentoId(id);    setDocDocumentoNombre(nom); }
@@ -408,8 +403,6 @@ export function CuentaCobroOpsPanel({ onCreada, tipoSolicitudId, areaId }: Cuent
       if (!datosConfirmados) return 'Confirma que tus datos personales y bancarios son correctos.';
     }
     if (paso === 4) {
-      if (!docCertServiciosId) return 'Debes adjuntar el Certificado de prestación de servicios.';
-      if (!docPanaceaId) return 'Debes adjuntar la constancia de cargue en Panacea o 360.';
       if (!opsAlDia) return 'Debes confirmar la certificación de OPS al día.';
       if (esNuevo && !docDocumentoId) return 'Para primera radicación debes adjuntar la copia del documento de identidad.';
       if (esNuevo && !docRutId) return 'Para primera radicación debes adjuntar la copia del RUT.';
@@ -467,8 +460,6 @@ export function CuentaCobroOpsPanel({ onCreada, tipoSolicitudId, areaId }: Cuent
           esNuevoColaborador: esNuevo ? 'si' : 'no',
         },
         documentos: {
-          ...(docCertServiciosId ? { certificadoPrestacionServicios: { nombre: docCertServiciosNombre, archivoId: docCertServiciosId } } : {}),
-          ...(docPanaceaId       ? { constanciaPanacea360:           { nombre: docPanaceaNombre,       archivoId: docPanaceaId       } } : {}),
           ...(docCartaEpsId      ? { cartaEps:                       { nombre: docCartaEpsNombre,      archivoId: docCartaEpsId      } } : {}),
           ...(docAfiliacionesId  ? { certificadoEpsAdres:            { nombre: docAfiliacionesNombre,  archivoId: docAfiliacionesId  } } : {}),
           ...(docCuentaId        ? { certificadoCuentaBancaria:      { nombre: docCuentaNombre,        archivoId: docCuentaId        } } : {}),
@@ -494,7 +485,7 @@ export function CuentaCobroOpsPanel({ onCreada, tipoSolicitudId, areaId }: Cuent
         <p>{msg}</p>
         <p className="leg-nota">Puedes hacer seguimiento en <strong>Mis solicitudes</strong>.</p>
         <button type="button" className="admin-primary-button"
-          onClick={() => { setMsg(''); setPaso(1); setValorCobrar(''); setAtenciones([defaultAtencion()]); setConNotasAcl(false); setNotasAcl([defaultNota()]); setComentariosAdicionales(''); setDatosConfirmados(false); setFirma(''); setDocCertServiciosId(''); setDocCertServiciosNombre(''); setDocPanaceaId(''); setDocPanaceaNombre(''); setOpsAlDia(false); setEsNuevo(false); }}>
+          onClick={() => { setMsg(''); setPaso(1); setValorCobrar(''); setAtenciones([defaultAtencion()]); setConNotasAcl(false); setNotasAcl([defaultNota()]); setComentariosAdicionales(''); setDatosConfirmados(false); setFirma(''); setOpsAlDia(false); setEsNuevo(false); }}>
           Nueva cuenta de cobro
         </button>
       </div>
@@ -893,17 +884,6 @@ export function CuentaCobroOpsPanel({ onCreada, tipoSolicitudId, areaId }: Cuent
       {paso === 4 && (
         <div className="leg-form card-surface">
           <h3>Documentos adjuntos</h3>
-
-          {/* ── Del período (requeridos) ── */}
-          <h4 className="ops-docs-grupo-titulo">Documentos del período <span className="req">*</span></h4>
-
-          <DocField label="Certificado de prestación de servicios" nota="Documento que certifica los servicios prestados durante el período cobrado."
-            campo="certServicios" id={docCertServiciosId} nombre={docCertServiciosNombre} subiendo={subiendoDoc}
-            onSubir={subirDoc} onQuitar={() => { setDocCertServiciosId(''); setDocCertServiciosNombre(''); }} />
-
-          <DocField label="Cargue en Panacea o 360" nota="Constancia o pantallazo del registro en el sistema Panacea / 360."
-            campo="panacea" id={docPanaceaId} nombre={docPanaceaNombre} subiendo={subiendoDoc}
-            onSubir={subirDoc} onQuitar={() => { setDocPanaceaId(''); setDocPanaceaNombre(''); }} />
 
           <div className="leg-field" style={{ marginTop: 14 }}>
             <label className="leg-check-label" style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer' }}>

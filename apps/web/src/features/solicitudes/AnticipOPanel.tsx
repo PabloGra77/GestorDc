@@ -79,10 +79,11 @@ const LOCALIDADES_BOGOTA = [
 const DEPARTAMENTOS = Object.keys(COLOMBIA).sort((a, b) => a.localeCompare(b, 'es'));
 
 const MODOS_TRANSPORTE = [
-  { key: 'uber',   label: 'Uber' },
-  { key: 'yango',  label: 'Yango' },
-  { key: 'didi',   label: 'DiDi' },
-  { key: 'taxi',   label: 'Taxi' },
+  { key: 'uber',    label: 'Uber' },
+  { key: 'yango',   label: 'Yango' },
+  { key: 'didi',    label: 'DiDi' },
+  { key: 'motoapp', label: 'Moto de aplicación' },
+  { key: 'taxi',    label: 'Taxi' },
   { key: 'bus',    label: 'Bus / TransMilenio' },
   { key: 'inter',  label: 'Bus intermunicipal' },
   { key: 'propio', label: 'Vehículo propio' },
@@ -125,6 +126,8 @@ export function AnticipOPanel({ onCreada }: AnticipoPanelProps) {
   const [trMode, setTrMode] = useState('uber');
   const [trTrayectos, setTrTrayectos] = useState('1');
   const [trValor, setTrValor] = useState('');
+  const [trKm, setTrKm] = useState('');
+  const [trLluvia, setTrLluvia] = useState(false);
 
   // ── Paso 2: Hospedaje ───────────────────────────────────────────────────────
   const [useHospedaje, setUseHospedaje] = useState(false);
@@ -217,7 +220,20 @@ export function AnticipOPanel({ onCreada }: AnticipoPanelProps) {
   // ── Ciudades del depto seleccionado ────────────────────────────────────────
   const trCiudades = COLOMBIA[trDepto] || [];
   const esBogotaDest = trDepto === 'Bogotá D.C.';
-  const isApp = ['uber', 'yango', 'didi'].includes(trMode);
+  const isMotoApp = trMode === 'motoapp';
+  const isCarApp = ['uber', 'yango', 'didi'].includes(trMode);
+  const isApp = isCarApp || isMotoApp;
+
+  // ── Calculadora de precio transporte ───────────────────────────────────────
+  const kmNum = parseFloat(trKm) || 0;
+  const baseKmRate = isMotoApp ? 1000 : 1500;
+  const horaActual = new Date().getHours();
+  const isHoraPico = (horaActual >= 6 && horaActual < 9) || (horaActual >= 17 && horaActual < 20);
+  const isNoche = horaActual >= 22 || horaActual < 5;
+  const trEstBase = Math.max(isMotoApp ? 5000 : 8000, Math.round(kmNum * baseKmRate));
+  const trEstMult = (isHoraPico ? 1.25 : 1) * (isNoche ? 1.15 : 1) * (trLluvia ? 1.25 : 1);
+  const trEstMin = trEstBase;
+  const trEstMax = Math.round(trEstBase * trEstMult);
 
   // ── Materiales helpers ──────────────────────────────────────────────────────
   function addMat() { setMateriales(p => [...p, { id: uid(), desc: '', valor: '' }]); }
@@ -501,18 +517,60 @@ export function AnticipOPanel({ onCreada }: AnticipoPanelProps) {
                   </div>
                 </div>
 
-                {esBogotaDest && isApp && (
-                  <div className="anticipo-hint-precios">
+                {isApp && (
+                  <div className="anticipo-hint-precios" style={{ marginTop: 12 }}>
                     <span className="anticipo-hint-title">
-                      💡 Precios aproximados en Bogotá — {MODOS_TRANSPORTE.find(m => m.key === trMode)?.label}
+                      💡 Calculadora de precio — {MODOS_TRANSPORTE.find(m => m.key === trMode)?.label}
                     </span>
-                    <div className="anticipo-precios-grid">
-                      <span>Trayecto corto (&lt; 5 km)</span><span>$8.000 – $18.000</span>
-                      <span>Trayecto medio (5 – 15 km)</span><span>$15.000 – $35.000</span>
-                      <span>Trayecto largo (&gt; 15 km)</span><span>$25.000 – $55.000</span>
-                      <span>Hasta el aeropuerto El Dorado</span><span>$45.000 – $80.000</span>
+                    <div className="anticipo-calc-row">
+                      <div className="form-group" style={{ flex: '0 0 160px' }}>
+                        <label>Distancia del trayecto (km)</label>
+                        <input
+                          type="number" min="0.5" step="0.5" placeholder="Ej: 8"
+                          value={trKm}
+                          onChange={e => setTrKm(e.target.value)}
+                          style={{ textAlign: 'right' }}
+                        />
+                      </div>
+                      <label className="anticipo-calc-check">
+                        <input type="checkbox" checked={trLluvia} onChange={e => setTrLluvia(e.target.checked)} />
+                        🌧️ Día lluvioso
+                      </label>
                     </div>
-                    <p className="anticipo-hint-nota">Los precios varían según hora, tráfico y versión de la aplicación.</p>
+                    {kmNum > 0 ? (
+                      <>
+                        <div className="anticipo-calc-indicadores">
+                          {isHoraPico && <span className="anticipo-calc-badge pico">⏱ Hora pico +25%</span>}
+                          {isNoche    && <span className="anticipo-calc-badge noche">🌙 Noche +15%</span>}
+                          {trLluvia   && <span className="anticipo-calc-badge lluvia">🌧️ Lluvia +25%</span>}
+                          {!isHoraPico && !isNoche && !trLluvia && <span className="anticipo-calc-badge normal">✓ Hora y clima normales</span>}
+                        </div>
+                        <div className="anticipo-calc-resultado">
+                          Estimado por trayecto:&nbsp;
+                          <strong>$ {fmtN(trEstMin)}{trEstMax > trEstMin ? ` – $ ${fmtN(trEstMax)}` : ''}</strong>
+                        </div>
+                        <p className="anticipo-hint-nota" style={{ marginTop: 4 }}>
+                          Base $ {baseKmRate.toLocaleString('es-CO')}/km · hora actual: {horaActual}:00 · mínimo de tarifa incluido
+                        </p>
+                        <button
+                          type="button" className="admin-ghost-button"
+                          style={{ marginTop: 8, fontSize: 12 }}
+                          onClick={() => setTrValor(String(Math.round((trEstMin + trEstMax) / 2)))}
+                        >
+                          ↑ Usar promedio estimado ($ {fmtN(Math.round((trEstMin + trEstMax) / 2))})
+                        </button>
+                      </>
+                    ) : (
+                      <div className="anticipo-precios-grid" style={{ marginTop: 8 }}>
+                        <span>Trayecto corto (&lt; 5 km)</span>
+                        <span>{isMotoApp ? '$ 5.000 – $ 8.000' : '$ 8.000 – $ 18.000'}</span>
+                        <span>Trayecto medio (5 – 15 km)</span>
+                        <span>{isMotoApp ? '$ 7.000 – $ 18.000' : '$ 15.000 – $ 35.000'}</span>
+                        <span>Trayecto largo (&gt; 15 km)</span>
+                        <span>{isMotoApp ? '$ 15.000 – $ 30.000' : '$ 25.000 – $ 55.000'}</span>
+                      </div>
+                    )}
+                    <p className="anticipo-hint-nota">Ingresa los km para calcular el estimado según hora, lluvia y modo.</p>
                   </div>
                 )}
 

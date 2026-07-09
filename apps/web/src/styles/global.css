@@ -10030,6 +10030,58 @@ textarea {
   white-space: nowrap;
 }
 
+/* Calculadora dinámica de precio */
+.anticipo-calc-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+.anticipo-calc-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  cursor: pointer;
+  padding-bottom: 6px;
+}
+.anticipo-calc-indicadores {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.anticipo-calc-badge {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-weight: 600;
+}
+.anticipo-calc-badge.pico   { background: rgba(255,160,0,0.18); color: #c47700; }
+.anticipo-calc-badge.noche  { background: rgba(80,80,180,0.18); color: #6060cc; }
+.anticipo-calc-badge.lluvia { background: rgba(30,120,200,0.18); color: #1a7ab5; }
+.anticipo-calc-badge.normal { background: rgba(40,160,80,0.15);  color: #1e8840; }
+@media (prefers-color-scheme: dark) {
+  .anticipo-calc-badge.pico   { color: #ffb733; }
+  .anticipo-calc-badge.noche  { color: #9999ee; }
+  .anticipo-calc-badge.lluvia { color: #5ab3f0; }
+  .anticipo-calc-badge.normal { color: #5dcf80; }
+}
+:root[data-theme="dark"] .anticipo-calc-badge.pico   { color: #ffb733; }
+:root[data-theme="dark"] .anticipo-calc-badge.noche  { color: #9999ee; }
+:root[data-theme="dark"] .anticipo-calc-badge.lluvia { color: #5ab3f0; }
+:root[data-theme="dark"] .anticipo-calc-badge.normal { color: #5dcf80; }
+.anticipo-calc-resultado {
+  margin-top: 10px;
+  font-size: 14px;
+  font-weight: 500;
+}
+.anticipo-calc-resultado strong {
+  font-size: 16px;
+  color: var(--gold, #D4AF37);
+}
+
 /* Subtotal row */
 .anticipo-sub-row {
   text-align: right;
