@@ -21,10 +21,9 @@ interface Topes {
   diasMaximos?: number;
 }
 
-interface CamposPlantilla {
+interface ConfiguracionTipo {
   topes?: Topes;
   areasVisibles?: 'todas' | number[];
-  [key: string]: unknown;
 }
 
 interface TipoSolicitud {
@@ -37,7 +36,7 @@ interface TipoSolicitud {
   activo: boolean;
   orden: number;
   flujoAprobacion: FlujoStep[];
-  camposPlantilla: CamposPlantilla;
+  configuracionTipo: ConfiguracionTipo | null;
   creadoEn: string;
 }
 
@@ -95,8 +94,8 @@ export function TiposSolicitudPanel() {
         api.get<TipoSolicitud[]>('/tipos'),
         api.get<Area[]>('/areas'),
       ]);
-      setTipos(rTipos.data);
-      setAreas(rAreas.data);
+      setTipos(Array.isArray(rTipos.data) ? rTipos.data : []);
+      setAreas(Array.isArray(rAreas.data) ? rAreas.data : []);
       if (rAreas.data.length > 0 && cAreaId === 0) setCAreaId(rAreas.data[0].id);
     } catch {
       setErr('Error al cargar los tipos de solicitud.');
@@ -293,9 +292,10 @@ function TipoRow({ tipo, areas, editando, onAbrir, onCancelar, onGuardar, onTogg
     setESlug(tipo.slug);
     setEActivo(tipo.activo);
     setEOrden(tipo.orden);
-    setEFlujo(tipo.flujoAprobacion.length ? [...tipo.flujoAprobacion] : [...FLUJO_DEFAULT]);
-    const cp: CamposPlantilla = tipo.camposPlantilla ?? {};
-    const t: Topes = cp.topes ?? {};
+    const flujo = Array.isArray(tipo.flujoAprobacion) ? tipo.flujoAprobacion : [];
+    setEFlujo(flujo.length ? [...flujo] : [...FLUJO_DEFAULT]);
+    const cfg: ConfiguracionTipo = tipo.configuracionTipo ?? {};
+    const t: Topes = cfg.topes ?? {};
     setETopes({
       transporteTotal: t.transporteTotal ? String(t.transporteTotal) : '',
       hotelNoche:      t.hotelNoche      ? String(t.hotelNoche)      : '',
@@ -307,7 +307,8 @@ function TipoRow({ tipo, areas, editando, onAbrir, onCancelar, onGuardar, onTogg
       totalSolicitud:  t.totalSolicitud  ? String(t.totalSolicitud)  : '',
       diasMaximos:     t.diasMaximos     ? String(t.diasMaximos)     : '',
     });
-    setEAreasVisibles(cp.areasVisibles ?? 'todas');
+    const av = cfg.areasVisibles;
+    setEAreasVisibles(Array.isArray(av) ? av : 'todas');
     setEErr('');
   }, [editando, tipo]);
 
@@ -363,10 +364,8 @@ function TipoRow({ tipo, areas, editando, onAbrir, onCancelar, onGuardar, onTogg
     const dias = parseInt((eTopes.diasMaximos ?? '').replace(/\D/g, '')) || 0;
     if (dias > 0) topesObj.diasMaximos = dias;
 
-    const camposPlantilla: CamposPlantilla = {
-      areasVisibles: eAreasVisibles,
-    };
-    if (Object.keys(topesObj).length) camposPlantilla.topes = topesObj;
+    const configuracionTipo: ConfiguracionTipo = { areasVisibles: eAreasVisibles };
+    if (Object.keys(topesObj).length) configuracionTipo.topes = topesObj;
 
     await onGuardar(tipo.id, {
       nombre: eNombre.trim(),
@@ -375,13 +374,13 @@ function TipoRow({ tipo, areas, editando, onAbrir, onCancelar, onGuardar, onTogg
       activo: eActivo,
       orden: eOrden,
       flujoAprobacion: eFlujo.map((s, i) => ({ ...s, orden: i + 1 })),
-      camposPlantilla,
+      configuracionTipo,
     });
   }
 
   /* ── Resumen de topes (cuando no editando) ── */
   function resumenTopes(): string | null {
-    const t = tipo.camposPlantilla?.topes;
+    const t = tipo.configuracionTipo?.topes;
     if (!t || !Object.keys(t).length) return null;
     const partes: string[] = [];
     if (t.totalSolicitud) partes.push(`Total máx. $${formatearMiles(t.totalSolicitud)}`);
@@ -393,7 +392,7 @@ function TipoRow({ tipo, areas, editando, onAbrir, onCancelar, onGuardar, onTogg
 
   /* ── Resumen de visibilidad (cuando no editando) ── */
   function resumenVisibilidad(): string {
-    const av = tipo.camposPlantilla?.areasVisibles;
+    const av = tipo.configuracionTipo?.areasVisibles;
     if (!av || av === 'todas') return 'Todas las áreas';
     if (Array.isArray(av) && av.length === 0) return 'Sin áreas asignadas';
     if (Array.isArray(av)) {

@@ -10381,42 +10381,6 @@ textarea {
   display: block;
 }
 
-/* Animaciones lluvia */
-@keyframes rainFall {
-  0%   { transform: translateY(-20px); opacity: 0; }
-  10%  { opacity: 0.8; }
-  85%  { opacity: 0.7; }
-  100% { transform: translateY(500px); opacity: 0; }
-}
-.mapa-gota {
-  animation: rainFall linear infinite;
-  animation-duration: 0.8s;
-}
-
-/* Animación sol */
-@keyframes sunPulse {
-  0%, 100% { transform: scale(1); opacity: 0.9; }
-  50%       { transform: scale(1.08); opacity: 1; }
-}
-@keyframes rayRotate {
-  from { transform: rotate(0deg); }
-  to   { transform: rotate(360deg); }
-}
-.mapa-sol-centro { animation: sunPulse 3s ease-in-out infinite; transform-origin: center; }
-.mapa-sol-layer  { animation: rayRotate 18s linear infinite; transform-origin: 310px 55px; }
-
-/* Animación nubes */
-@keyframes cloudDrift1 { 0%,100% { transform: translateX(0); } 50% { transform: translateX(12px); } }
-@keyframes cloudDrift2 { 0%,100% { transform: translateX(0); } 50% { transform: translateX(-10px); } }
-@keyframes cloudDrift3 { 0%,100% { transform: translateX(0); } 50% { transform: translateX(8px); } }
-.mapa-nube.nube-1 { animation: cloudDrift1 8s ease-in-out infinite; }
-.mapa-nube.nube-2 { animation: cloudDrift2 11s ease-in-out infinite; }
-.mapa-nube.nube-3 { animation: cloudDrift3 9s ease-in-out infinite; }
-
-/* Relámpago */
-@keyframes lightning { 0%,100%{opacity:0} 5%,15%{opacity:1} 10%,20%{opacity:0} 25%{opacity:0.8} 30%{opacity:0} }
-.mapa-rayo { animation: lightning 3.5s ease-in-out infinite; }
-
 /* Ruta pulsante */
 @keyframes routePulse { 0%,100%{stroke-dashoffset:0} 100%{stroke-dashoffset:-20} }
 .mapa-ruta-linea { animation: routePulse 1.5s linear infinite; }
@@ -10477,8 +10441,148 @@ textarea {
   font-size: 11px;
 }
 @media (max-width: 600px) {
-  .mapa-clima-row { padding: 10px; gap: 8px; }
-  .mapa-clima-card { min-width: 140px; padding: 8px 10px; }
+  .mapa-clima-row { padding: 10px; gap: 8px; flex-direction: column; }
+  .mapa-clima-card { min-width: 0; width: 100%; padding: 8px 10px; }
+  .mapa-clima-sep { display: none; }
   .mapa-clima-temp { font-size: 22px; }
-  .mapa-infra-row { padding: 10px; }
+  .mapa-infra-row { padding: 10px; flex-direction: column; }
+  .mapa-infra-ciudad { min-width: 0; }
+  .mapa-svg-container { max-height: 260px; }
+  .mapa-svg { max-height: 260px; }
+}
+
+/* ============================================================
+   CLIMA DE TODA LA PÁGINA — fondo de body según data-weather
+   La animación de gotas la renderiza WeatherOverlay (canvas).
+   ============================================================ */
+body { transition: background-color 1.4s ease; }
+
+body[data-weather="lluvioso"]             { background-color: #06111c !important; }
+body[data-weather="tormenta"]             { background-color: #030810 !important; }
+body[data-weather="nublado"]              { background-color: #0c1520 !important; }
+body[data-weather="parcialmente_nublado"] { background-color: #080f1a !important; }
+body[data-weather="soleado"]              { background-color: #060d1c !important; }
+
+/* Aureola solar sutil (solo soleado) */
+@keyframes sunGlow { 0%,100%{opacity:0.08} 50%{opacity:0.16} }
+body[data-weather="soleado"]::before {
+  content: '';
+  position: fixed;
+  top: -140px; right: -140px;
+  width: 520px; height: 520px;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 9997;
+  background: radial-gradient(circle, rgba(255,210,50,0.22) 0%, rgba(0,0,0,0) 70%);
+  animation: sunGlow 4s ease-in-out infinite;
+}
+
+/* Destello de relámpago (solo tormenta) */
+@keyframes stormFlash { 0%,91%,100%{opacity:0} 93%,97%{opacity:0.05} }
+body[data-weather="tormenta"]::after {
+  content: '';
+  position: fixed; inset: 0;
+  pointer-events: none;
+  z-index: 9997;
+  background: #c8e8ff;
+  animation: stormFlash 4.5s ease-in-out infinite;
+}
+
+/* ============================================================
+   RESPONSIVE MÓVIL — mejoras globales adicionales
+   ============================================================ */
+@media (max-width: 600px) {
+  /* Opciones de viaje: precio va debajo en pantallas estrechas */
+  .viatico-opcion-item {
+    flex-wrap: wrap;
+    gap: 6px 10px;
+  }
+  .viatico-opcion-item .viatico-opcion-precio {
+    width: 100%;
+    margin-top: 2px;
+    font-size: 15px;
+  }
+  .viatico-opcion-btn {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  /* Resumen de cuenta de cobro: 1 columna */
+  .ops-resumen-grid {
+    grid-template-columns: 1fr !important;
+    gap: 4px 0;
+  }
+  .ops-resumen-grid span {
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+  .ops-resumen-grid strong {
+    padding-bottom: 4px;
+    border-bottom: 1px dashed var(--border-soft);
+  }
+
+  /* Radio group: apilar en columna */
+  .leg-radio-group {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  /* Anticipo: reducir padding del panel */
+  .anticipo-panel { padding: 12px; }
+
+  /* Tipos de solicitud: acortar panel admin en móvil */
+  .tipos-row { padding: 10px 12px; }
+  .tipos-panel-head { gap: 8px; }
+
+  /* Admin workspace: sin padding lateral extra */
+  .admin-workspace { padding: 10px !important; }
+
+  /* Viáticos: tipo grid → reducir padding tarjetas */
+  .viaticos-tipo-card { padding: 14px 12px; }
+  .viaticos-tipo-icon { font-size: 24px; }
+  .viaticos-tipo-card strong { font-size: 14px; }
+
+  /* Selector buscar vuelos: CTA full */
+  .viaticos-buscar-cta { padding: 16px 0; }
+
+  /* Seg pasos: comprimir */
+  .seg-paso-label { font-size: 11px; }
+  .seg-paso-estado { font-size: 10px; }
+  .seg-paso-circulo { width: 24px; height: 24px; font-size: 11px; }
+
+  /* Flujo de editor en tipos: apilar selects */
+  .tipos-flujo-editor-paso {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .tipos-flujo-editor-paso select { min-width: 0; }
+
+  /* Infraestructura mapa: tags en wrap */
+  .mapa-infra { flex-direction: row; flex-wrap: wrap; }
+  .mapa-infra-tag { font-size: 11px; padding: 3px 8px; }
+
+  /* Badge de fuente */
+  .viatico-fuente-badge { display: block; margin: 2px 0 0; }
+
+  /* Aviso multimodal más compacto */
+  .viatico-multimodal-aviso { font-size: 11px; padding: 7px 10px; }
+
+  /* Admin nav items: asegurar touch target */
+  .admin-nav-item {
+    padding: 8px 10px !important;
+    font-size: 12px !important;
+    min-height: 36px;
+  }
+
+  /* Perfil verify banner */
+  .profile-verify-banner {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .profile-verify-banner .pv-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
 }

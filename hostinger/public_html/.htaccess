@@ -54,6 +54,15 @@ DirectoryIndex index.html index.php
     Require all denied
 </FilesMatch>
 
+# No-cache para index.html y sw.js (evita que el browser sirva versiones antiguas)
+<IfModule mod_headers.c>
+    <FilesMatch "^(index\.html|sw\.js)$">
+        Header set Cache-Control "no-cache, no-store, must-revalidate"
+        Header set Pragma "no-cache"
+        Header set Expires "0"
+    </FilesMatch>
+</IfModule>
+
 # Compresion
 <IfModule mod_deflate.c>
     AddOutputFilterByType DEFLATE text/html text/css text/javascript application/javascript application/json image/svg+xml

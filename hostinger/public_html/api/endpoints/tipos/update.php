@@ -7,6 +7,11 @@ $id = (int)($params['id'] ?? 0);
 $body = Request::body();
 $pdo = Db::pdo();
 
+/* Agregar columna configuracion_tipo si aún no existe (idempotente) */
+try {
+    $pdo->exec("ALTER TABLE tipos_solicitud ADD COLUMN configuracion_tipo TEXT NULL");
+} catch (\PDOException $e) { /* ya existe — ignorar */ }
+
 $cur = $pdo->prepare("SELECT * FROM tipos_solicitud WHERE id = :id LIMIT 1");
 $cur->execute([':id' => $id]);
 $row = $cur->fetch();
@@ -51,11 +56,20 @@ if (array_key_exists('plantillaPdf', $body)) {
         ? json_encode($body['plantillaPdf'], JSON_UNESCAPED_UNICODE)
         : null;
 }
+/* configuracionTipo — config de topes/areasVisibles, campo separado para no pisar camposPlantilla */
+$configTipoRaw = null;
+if (array_key_exists('configuracionTipo', $body)) {
+    $v = $body['configuracionTipo'];
+    $configTipoRaw = ($v === null) ? null : json_encode($v, JSON_UNESCAPED_UNICODE);
+} else {
+    $configTipoRaw = $row['configuracion_tipo'] ?? null;
+}
 
 $upd = $pdo->prepare(
     "UPDATE tipos_solicitud SET
        area_id = :a, nombre = :n, descripcion = :d, slug = :s,
-       activo = :ac, orden = :o, campos_plantilla = :c, flujo_aprobacion = :f, flujo_areas = :fa, plantilla_pdf = :pp
+       activo = :ac, orden = :o, campos_plantilla = :c, flujo_aprobacion = :f,
+       flujo_areas = :fa, plantilla_pdf = :pp, configuracion_tipo = :ct
      WHERE id = :id"
 );
 $upd->execute([
@@ -69,6 +83,7 @@ $upd->execute([
     ':f'  => is_string($row['flujo_aprobacion']) ? $row['flujo_aprobacion'] : json_encode($row['flujo_aprobacion'], JSON_UNESCAPED_UNICODE),
     ':fa' => isset($row['flujo_areas']) ? (is_string($row['flujo_areas']) ? $row['flujo_areas'] : json_encode($row['flujo_areas'], JSON_UNESCAPED_UNICODE)) : null,
     ':pp' => isset($row['plantilla_pdf']) ? (is_string($row['plantilla_pdf']) ? $row['plantilla_pdf'] : json_encode($row['plantilla_pdf'], JSON_UNESCAPED_UNICODE)) : null,
+    ':ct' => $configTipoRaw,
     ':id' => $id,
 ]);
 
@@ -90,9 +105,11 @@ Response::json([
     'slug'            => $r['slug'],
     'activo'          => (bool)$r['activo'],
     'orden'           => (int)$r['orden'],
-    'camposPlantilla' => json_decode($r['campos_plantilla'] ?? '[]', true) ?: [],
-    'flujoAprobacion' => json_decode($r['flujo_aprobacion'] ?? '[]', true) ?: [],
-    'flujoAreas'      => $r['flujo_areas'] ? (json_decode($r['flujo_areas'], true) ?: null) : null,
-    'plantillaPdf'    => $r['plantilla_pdf'] ? (json_decode($r['plantilla_pdf'], true) ?: null) : null,
-    'creadoEn'        => $r['creado_en'],
+    'camposPlantilla'   => json_decode($r['campos_plantilla'] ?? '[]', true) ?: [],
+    'flujoAprobacion'   => json_decode($r['flujo_aprobacion'] ?? '[]', true) ?: [],
+    'flujoAreas'        => $r['flujo_areas'] ? (json_decode($r['flujo_areas'], true) ?: null) : null,
+    'plantillaPdf'      => $r['plantilla_pdf'] ? (json_decode($r['plantilla_pdf'], true) ?: null) : null,
+    'configuracionTipo' => isset($r['configuracion_tipo']) && $r['configuracion_tipo']
+                            ? (json_decode($r['configuracion_tipo'], true) ?: null) : null,
+    'creadoEn'          => $r['creado_en'],
 ]);

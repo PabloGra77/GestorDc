@@ -135,17 +135,19 @@ $CIUDAD_IATA = [
 /* Formato: nombre → [iata, ciudad_aeropuerto, min_bus, precio_min, precio_max, [empresas]] */
 $MUNICIPIOS_SIN_AEROPUERTO = [
     /* Cesar */
-    'PELAYA'                 => ['VUP','Valledupar',  90, 20000, 28000, ['Copetran','Expreso Brasilia']],
-    'PAILITAS'               => ['VUP','Valledupar', 120, 25000, 35000, ['Copetran','Expreso Brasilia']],
+    /* Cesar — municipios sur (conexión BGA, ruta troncal Magdalena) */
+    'PELAYA'                 => ['BGA','Bucaramanga',240, 38000, 52000, ['Copetran','Expreso Brasilia']],
+    'PAILITAS'               => ['BGA','Bucaramanga',270, 42000, 58000, ['Copetran','Expreso Brasilia']],
     'AGUACHICA'              => ['BGA','Bucaramanga',150, 32000, 45000, ['Copetran','Berlinas del Fonce']],
-    'GAMARRA'                => ['VUP','Valledupar', 150, 30000, 42000, ['Copetran']],
+    'GAMARRA'                => ['BGA','Bucaramanga',210, 36000, 50000, ['Copetran']],
+    'SAN ALBERTO'            => ['BGA','Bucaramanga',180, 38000, 52000, ['Copetran','Berlinas del Fonce']],
+    'AGUACHICA CESAR'        => ['BGA','Bucaramanga',150, 32000, 45000, ['Copetran']],
+    /* Cesar — municipios norte (conexión VUP, más cerca de Valledupar) */
     'LA JAGUA DE IBIRICO'    => ['VUP','Valledupar',  60, 16000, 22000, ['Copetran']],
     'BECERRIL'               => ['VUP','Valledupar', 120, 24000, 34000, ['Copetran']],
     'CHIMICHAGUA'            => ['VUP','Valledupar', 150, 28000, 40000, ['Copetran']],
     'CURUMANI'               => ['VUP','Valledupar', 120, 23000, 32000, ['Copetran']],
     'MANAURE BALCON DEL CESAR'=> ['VUP','Valledupar', 80, 18000, 25000, ['Copetran']],
-    'SAN ALBERTO'            => ['BGA','Bucaramanga',180, 38000, 52000, ['Copetran','Berlinas del Fonce']],
-    'AGUACHICA CESAR'        => ['BGA','Bucaramanga',150, 32000, 45000, ['Copetran']],
     /* Magdalena */
     'EL BANCO'               => ['VUP','Valledupar', 180, 42000, 58000, ['Expreso Brasilia','Copetran']],
     'PLATO'                  => ['SMR','Santa Marta', 120, 28000, 38000, ['Flota Magdalena','Expreso Brasilia']],
@@ -439,7 +441,7 @@ function generarOpciones(
         sort($slots);
         foreach (array_slice($slots, 0, $nB) as $i => $salida) {
             $empresa = $buses[$i % count($buses)];
-            $durVar  = $durB + mt_rand(-15, 35);
+            $durVar  = $durB + mt_rand(-15, 10);
             $opciones[] = [
                 'id'         => "{$pre}_b{$i}",
                 'tipo'       => 'bus',
@@ -722,7 +724,7 @@ if (empty($opcionesIda)) {
             $busesDir    = array_merge($busEmps, ($rutaAerea['rb'] ?? []));
             $slotsBusDir = elegirSlots($SL_BUS, 3); sort($slotsBusDir);
             foreach ($slotsBusDir as $bi => $salida) {
-                $durVar = $durTotalBus + mt_rand(-20, 45);
+                $durVar = $durTotalBus + mt_rand(-20, 15);
                 $opcionesIda[] = [
                     'id'         => "busd_ida_{$bi}",
                     'tipo'       => 'bus',
@@ -774,9 +776,13 @@ if (empty($opcionesIda)) {
     }
 }
 
-// Ordenar final
-usort($opcionesIda,     fn($a, $b) => $a['precio'] - $b['precio']);
-usort($opcionesRegreso, fn($a, $b) => $a['precio'] - $b['precio']);
+// Ordenar final: vuelo primero (más rápido), luego multimodal, luego bus directo
+$tipoOrd = ['vuelo' => 0, 'multimodal' => 1, 'bus' => 2];
+$sortFn  = fn($a, $b) =>
+    ($tipoOrd[$a['tipo']] ?? 2) <=> ($tipoOrd[$b['tipo']] ?? 2)
+    ?: $a['precio'] <=> $b['precio'];
+usort($opcionesIda,     $sortFn);
+usort($opcionesRegreso, $sortFn);
 
 Response::json([
     'opciones'           => $opcionesIda,

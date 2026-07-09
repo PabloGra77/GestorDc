@@ -35,10 +35,12 @@ Response::json(array_map(function ($row) {
         'slug'            => $row['slug'],
         'activo'          => (bool)$row['activo'],
         'orden'           => (int)$row['orden'],
-        'camposPlantilla' => json_decode($row['campos_plantilla'] ?? '[]', true) ?: [],
-        'flujoAprobacion' => json_decode($row['flujo_aprobacion'] ?? '[]', true) ?: [],
-        'flujoAreas'      => $row['flujo_areas'] ? (json_decode($row['flujo_areas'], true) ?: null) : null,
-        'plantillaPdf'    => $row['plantilla_pdf'] ? (json_decode($row['plantilla_pdf'], true) ?: null) : null,
-        'creadoEn'        => $row['creado_en'],
+        'camposPlantilla'   => json_decode($row['campos_plantilla'] ?? '[]', true) ?: [],
+        'flujoAprobacion'   => json_decode($row['flujo_aprobacion'] ?? '[]', true) ?: [],
+        'flujoAreas'        => $row['flujo_areas'] ? (json_decode($row['flujo_areas'], true) ?: null) : null,
+        'plantillaPdf'      => $row['plantilla_pdf'] ? (json_decode($row['plantilla_pdf'], true) ?: null) : null,
+        'configuracionTipo' => isset($row['configuracion_tipo']) && $row['configuracion_tipo']
+                                ? (json_decode($row['configuracion_tipo'], true) ?: null) : null,
+        'creadoEn'          => $row['creado_en'],
     ];
 }, $rows));
