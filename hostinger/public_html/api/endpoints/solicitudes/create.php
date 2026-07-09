@@ -27,9 +27,20 @@ if (!$tipo) Response::error('Tipo de solicitud no encontrado', 404);
 if ((int)$tipo['activo'] !== 1) Response::error('Tipo de solicitud inactivo', 400);
 if ((int)$tipo['area_activo'] !== 1) Response::error('El area esta inactiva', 400);
 
+// Determinar tipo de solicitud antes de validar (afecta qué campos se revisan)
+$esAnticipo     = (($tipo['slug'] ?? '') === 'anticipo');
+$esLegalizacion = (($tipo['slug'] ?? '') === 'legalizacion');
+
 // Validar campos requeridos
 $campos = json_decode($tipo['campos_plantilla'] ?? '[]', true) ?: [];
 $alertas = [];
+
+// Para anticipo: ignorar cualquier campo extra que el admin haya agregado;
+// solo validar los 3 realmente obligatorios del formulario.
+if ($esAnticipo) {
+    $camposValidosAnticipo = ['justificacion', 'valorPesos', 'autorizadoPor'];
+    $campos = array_filter($campos, fn($c) => in_array($c['key'], $camposValidosAnticipo, true) && !empty($c['required']));
+}
 
 // Construir mapa normalizado: snake_case → valor, para cubrir plantillas con claves snake_case
 // cuando el formulario envía camelCase (y viceversa)
@@ -82,17 +93,6 @@ $usuarioId = (int)($jwt['sub'] ?? 0);
 $u = $pdo->prepare("SELECT id, nombre_completo, correo, numero_documento, area_id FROM usuarios WHERE id = :id LIMIT 1");
 $u->execute([':id' => $usuarioId]);
 $usuario = $u->fetch();
-
-// Reglas especiales del tipo "anticipo"
-$esAnticipo      = (($tipo['slug'] ?? '') === 'anticipo');
-$esLegalizacion  = (($tipo['slug'] ?? '') === 'legalizacion');
-
-// Para anticipo: ignorar cualquier campo extra que el admin haya agregado a campos_plantilla
-// y solo validar los 3 realmente obligatorios del nuevo formulario.
-if ($esAnticipo) {
-    $camposValidosAnticipo = ['justificacion', 'valorPesos', 'autorizadoPor'];
-    $campos = array_filter($campos, fn($c) => in_array($c['key'], $camposValidosAnticipo, true) && !empty($c['required']));
-}
 
 // El area de la solicitud: si el tipo está configurado para "todas las áreas",
 // usar el área del solicitante (no la del tipo).
@@ -228,8 +228,7 @@ if ($esLegalizacion) {
 $flujo = json_decode($tipo['flujo_aprobacion'] ?? '[]', true) ?: [];
 usort($flujo, fn($a, $b) => ($a['orden'] ?? 0) <=> ($b['orden'] ?? 0));
 
-// Para legalizaciones: el autorizador del gasto siempre es el primer paso,
-// independientemente de cómo esté configurado el flujo del tipo.
+// Para legalizaciones: el autorizador del gasto siempre es el primer paso.
 if ($esLegalizacion) {
     $autorizadorIdFlujo = (int)($datosFormulario['autorizadorId'] ?? 0);
     if ($autorizadorIdFlujo > 0 && ($flujo[0]['rol'] ?? '') !== 'autorizador_visto_bueno') {
@@ -240,6 +239,22 @@ if ($esLegalizacion) {
         array_unshift($flujo, [
             'rol'   => 'autorizador_visto_bueno',
             'label' => 'Visto bueno del autorizador',
+            'orden' => 1,
+        ]);
+    }
+}
+
+// Para anticipo con autorizador referenciado: ese autorizador debe aprobar/rechazar primero.
+if ($esAnticipo) {
+    $autorizadorIdFlujo = (int)($datosFormulario['autorizadorId'] ?? 0);
+    if ($autorizadorIdFlujo > 0 && ($flujo[0]['rol'] ?? '') !== 'autorizador_visto_bueno') {
+        foreach ($flujo as &$fpaso) {
+            $fpaso['orden'] = (int)($fpaso['orden'] ?? 0) + 1;
+        }
+        unset($fpaso);
+        array_unshift($flujo, [
+            'rol'   => 'autorizador_visto_bueno',
+            'label' => 'Autorización del anticipo',
             'orden' => 1,
         ]);
     }
@@ -326,67 +341,56 @@ if (!empty($usuario['correo'])) {
 // Notificar autorizador si la solicitud lo referencia en los datos
 $autorizadorIdDatos = (int)($datosFormulario['autorizadorId'] ?? 0);
 
-// Para legalizacion: si el primer paso es 'autorizador_visto_bueno', notificar al autorizador (él ES el validador)
-if ($esLegalizacion && ($primerPaso['rol'] ?? '') === 'autorizador_visto_bueno') {
+// Si el primer paso es 'autorizador_visto_bueno' (legalizacion O anticipo): notificar al autorizador
+// para que apruebe o rechace — él ES el primer validador.
+if (($esLegalizacion || $esAnticipo) && ($primerPaso['rol'] ?? '') === 'autorizador_visto_bueno') {
     if ($autorizadorIdDatos > 0) {
         $aCorStmt = $pdo->prepare("SELECT correo, nombre_completo FROM usuarios WHERE id = :id AND activo = 1 LIMIT 1");
         $aCorStmt->execute([':id' => $autorizadorIdDatos]);
         $autorizador = $aCorStmt->fetch();
         if ($autorizador && $autorizador['correo']) {
             try {
+                if ($esAnticipo) {
+                    $valorStr = '$' . number_format((float)($datosFormulario['valorPesos'] ?? 0), 0, ',', '.');
+                    $subjectAuth  = "Debes aprobar o rechazar: anticipo {$numero}";
+                    $bodyText     = "Hola {$autorizador['nombre_completo']},\n\n" .
+                        "{$usuario['nombre_completo']} registró una solicitud de anticipo ({$numero}) por {$valorStr} " .
+                        "y te indicó como autorizador.\n\n" .
+                        "Debes ingresar a PayOPS → Bandeja de validación y APROBAR o RECHAZAR esta solicitud para que continúe el trámite.\n\n" .
+                        "Si no autorizaste este anticipo, recházalo directamente desde la plataforma.";
+                    $bodyHtml     = "Hola {$autorizador['nombre_completo']}:\n\n" .
+                        "{$usuario['nombre_completo']} registró una solicitud de anticipo ({$numero}) por {$valorStr} " .
+                        "y te indicó como autorizador.\n\n" .
+                        "Ingresa a PayOPS → Bandeja de validación y APRUEBA o RECHAZA la solicitud para que continúe el trámite.\n\n" .
+                        "Si no autorizaste este anticipo, recházalo desde la plataforma.";
+                } else {
+                    $subjectAuth  = "Requiere tu visto bueno: legalización {$numero}";
+                    $bodyText     = "Hola {$autorizador['nombre_completo']},\n\n" .
+                        "{$usuario['nombre_completo']} creó una solicitud de legalización ({$numero}) " .
+                        "en la que indicó que tú autorizaste el gasto.\n\n" .
+                        "Ingresa a PayOPS → Bandeja de validación y da tu visto bueno para que pueda continuar el trámite.";
+                    $bodyHtml     = "Hola {$autorizador['nombre_completo']}:\n\n" .
+                        "{$usuario['nombre_completo']} creó una solicitud de legalización ({$numero}) " .
+                        "en la que indicó que tú autorizaste el gasto.\n\n" .
+                        "Ingresa a PayOPS → Bandeja de validación y da tu visto bueno para que el trámite continúe.";
+                }
                 Mailer::send([
                     'to'      => [$autorizador['correo']],
-                    'subject' => "Requiere tu visto bueno: legalización {$numero}",
-                    'text'    => "Hola {$autorizador['nombre_completo']},\n\n" .
-                        "{$usuario['nombre_completo']} creó una solicitud de legalización ({$numero}) " .
-                        "en la que indicó que tú autorizaste el gasto.\n\n" .
-                        "Ingresa a Payops → Bandeja de validación y da tu visto bueno para que pueda continuar el trámite.",
+                    'subject' => $subjectAuth,
+                    'text'    => $bodyText,
                     'html'    => FlujoHelpers::emailHtml(
-                        "Requiere tu visto bueno",
-                        "Hola {$autorizador['nombre_completo']}:\n\n" .
-                        "{$usuario['nombre_completo']} creó una solicitud de legalización ({$numero}) " .
-                        "en la que indicó que tú autorizaste el gasto.\n\n" .
-                        "Ingresa a Payops → Bandeja de validación y da tu visto bueno para que el trámite continúe.",
+                        $subjectAuth,
+                        $bodyHtml,
                         ['numero_radicado' => $numero, 'solicitante_nombre' => $autorizador['nombre_completo']]
                     ),
                 ]);
             } catch (Throwable $eM) {
-                error_log('[create/legalizacion] notif autorizador: ' . $eM->getMessage());
+                error_log('[create/autorizador_vb] notif: ' . $eM->getMessage());
             }
         }
     }
 } else {
     FlujoHelpers::notificarValidadores($pdo, $solNotif, $primerPaso['rol'] ?? null, $areaSolicitud);
-
-    // Para viáticos, anticipo u otros tipos con autorizador en datos: notificar informacionalmente
-    if ($autorizadorIdDatos > 0) {
-        $aStmt = $pdo->prepare("SELECT correo, nombre_completo FROM usuarios WHERE id = :id AND activo = 1 LIMIT 1");
-        $aStmt->execute([':id' => $autorizadorIdDatos]);
-        $autorizadorRow = $aStmt->fetch();
-        if ($autorizadorRow && $autorizadorRow['correo']) {
-            try {
-                $tipoNombreStr = $tipo['nombre'] ?? 'solicitud';
-                Mailer::send([
-                    'to'      => [$autorizadorRow['correo']],
-                    'subject' => "Has sido referenciado como autorizador: {$numero}",
-                    'text'    => "Hola {$autorizadorRow['nombre_completo']},\n\n" .
-                        "{$usuario['nombre_completo']} registró una solicitud de {$tipoNombreStr} ({$numero}) " .
-                        "en la que indicó que tú autorizaste la actividad o gasto.\n\n" .
-                        "La solicitud está en proceso de validación. Si no autorizaste esta actividad, contacta al administrador del sistema.",
-                    'html'    => FlujoHelpers::emailHtml(
-                        "Fuiste referenciado como autorizador",
-                        "Hola {$autorizadorRow['nombre_completo']}:\n\n" .
-                        "{$usuario['nombre_completo']} registró una solicitud de {$tipoNombreStr} ({$numero}) " .
-                        "en la que indicó que tú autorizaste la actividad o gasto.\n\n" .
-                        "La solicitud está en proceso de validación. Si no autorizaste esta actividad, contacta al administrador.",
-                        ['numero_radicado' => $numero, 'solicitante_nombre' => $autorizadorRow['nombre_completo']]
-                    ),
-                ]);
-            } catch (Throwable $eM) {
-                error_log('[create/autorizador] notif: ' . $eM->getMessage());
-            }
-        }
-    }
 }
 
 Response::json([
