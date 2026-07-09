@@ -155,12 +155,28 @@ export function TiposSolicitudPanel() {
     }
   }
 
+  // Tipos "globales" (disponibles para todas las áreas) separados de los de área específica
+  const tiposGlobales = tipos.filter((t) => t.configuracionTipo?.areasVisibles === 'todas');
+  const globalIds = new Set(tiposGlobales.map((t) => t.id));
+
   const porArea = areas.map((a) => ({
     area: a,
-    tipos: tipos.filter((t) => t.areaId === a.id),
+    tipos: tipos.filter((t) => t.areaId === a.id && !globalIds.has(t.id)),
   })).filter((g) => g.tipos.length > 0);
 
-  const sinArea = tipos.filter((t) => !areas.find((a) => a.id === t.areaId));
+  const sinArea = tipos.filter((t) => !areas.find((a) => a.id === t.areaId) && !globalIds.has(t.id));
+
+  function tipoRowProps(t: TipoSolicitud) {
+    return {
+      tipo: t, areas,
+      editando: editId === t.id,
+      onAbrir: () => { setEditId(t.id); setMsg(''); setErr(''); },
+      onCancelar: () => setEditId(null),
+      onGuardar: guardarTipo,
+      onToggle: () => toggleActivo(t),
+      guardando,
+    };
+  }
 
   return (
     <div className="tipos-panel">
@@ -212,45 +228,36 @@ export function TiposSolicitudPanel() {
         </div>
       ) : (
         <div className="tipos-lista">
+          {/* Tipos globales: disponibles para cualquier área */}
+          {tiposGlobales.length > 0 && (
+            <div className="tipos-grupo">
+              <div className="tipos-grupo-header">
+                <span className="tipos-grupo-area">🌐 Tipos globales</span>
+                <span className="tipos-grupo-count" style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>
+                  disponibles para todas las áreas · {tiposGlobales.length} tipo{tiposGlobales.length !== 1 ? 's' : ''}
+                </span>
+              </div>
+              {tiposGlobales.map((t) => <TipoRow key={t.id} {...tipoRowProps(t)} />)}
+            </div>
+          )}
+
+          {/* Tipos de área específica */}
           {porArea.map(({ area, tipos: tiposArea }) => (
             <div key={area.id} className="tipos-grupo">
               <div className="tipos-grupo-header">
                 <span className="tipos-grupo-area">{area.nombre}</span>
                 <span className="tipos-grupo-count">{tiposArea.length} tipo{tiposArea.length !== 1 ? 's' : ''}</span>
               </div>
-              {tiposArea.map((t) => (
-                <TipoRow
-                  key={t.id}
-                  tipo={t}
-                  areas={areas}
-                  editando={editId === t.id}
-                  onAbrir={() => { setEditId(t.id); setMsg(''); setErr(''); }}
-                  onCancelar={() => setEditId(null)}
-                  onGuardar={guardarTipo}
-                  onToggle={() => toggleActivo(t)}
-                  guardando={guardando}
-                />
-              ))}
+              {tiposArea.map((t) => <TipoRow key={t.id} {...tipoRowProps(t)} />)}
             </div>
           ))}
+
           {sinArea.length > 0 && (
             <div className="tipos-grupo">
               <div className="tipos-grupo-header">
                 <span className="tipos-grupo-area">Sin área asignada</span>
               </div>
-              {sinArea.map((t) => (
-                <TipoRow
-                  key={t.id}
-                  tipo={t}
-                  areas={areas}
-                  editando={editId === t.id}
-                  onAbrir={() => { setEditId(t.id); setMsg(''); setErr(''); }}
-                  onCancelar={() => setEditId(null)}
-                  onGuardar={guardarTipo}
-                  onToggle={() => toggleActivo(t)}
-                  guardando={guardando}
-                />
-              ))}
+              {sinArea.map((t) => <TipoRow key={t.id} {...tipoRowProps(t)} />)}
             </div>
           )}
         </div>
