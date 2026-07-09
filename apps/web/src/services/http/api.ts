@@ -29,11 +29,14 @@ api.interceptors.request.use((config) => {
 	return config;
 });
 
-/* Sesión expirada: limpiar storage y redirigir al login */
+/* Sesión expirada: limpiar storage y redirigir al login.
+   Excluir /auth/login para que el formulario pueda mostrar el error de credenciales. */
 api.interceptors.response.use(
 	(r) => r,
 	(error) => {
-		if (error?.response?.status === 401) {
+		const url: string = error?.config?.url ?? '';
+		const isLoginCall = url.includes('/auth/login') || url.includes('/auth/register');
+		if (error?.response?.status === 401 && !isLoginCall) {
 			localStorage.removeItem(AUTH_STORAGE_KEY);
 			window.location.href = '/';
 		}
