@@ -10201,6 +10201,159 @@ textarea {
 .ops-resumen-grid strong { color: var(--text-primary); }
 [data-theme="light"] .ops-resumen { background: #F8F9FC; border-color: rgba(212,175,55,0.4); }
 
+/* ── Atenciones por sede (cuenta cobro OPS) ── */
+.ops-atenciones-section {
+  background: var(--bg-surface, rgba(255,255,255,0.03));
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+.ops-seccion-titulo {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--gold, #D4AF37);
+  margin: 0 0 4px;
+}
+.ops-seccion-check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  margin: 0;
+}
+.ops-seccion-check input[type=checkbox] {
+  width: 16px; height: 16px;
+  accent-color: var(--gold, #D4AF37);
+  flex-shrink: 0;
+}
+.ops-atencion-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  margin-bottom: 10px;
+  padding: 10px 12px;
+  background: var(--bg-surface2, rgba(255,255,255,0.02));
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+}
+.ops-atencion-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  background: rgba(212,175,55,0.15);
+  color: var(--gold, #D4AF37);
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
+  margin-bottom: 2px;
+}
+.ops-atencion-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  flex: 1;
+  align-items: flex-end;
+}
+.ops-rm-btn {
+  padding: 6px 10px;
+  font-size: 12px;
+  flex-shrink: 0;
+  align-self: flex-end;
+  margin-bottom: 2px;
+}
+
+/* ── Verificación de datos personales ── */
+.ops-verify-card {
+  background: var(--bg-surface, rgba(255,255,255,0.04));
+  border: 1.5px solid rgba(212,175,55,0.3);
+  border-radius: 12px;
+  padding: 16px 18px;
+  margin-bottom: 16px;
+}
+.ops-verify-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 10px;
+}
+.ops-verify-section {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 120px;
+}
+.ops-verify-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  opacity: 0.55;
+  font-weight: 600;
+}
+.ops-verify-toggle {
+  margin-top: 14px;
+  background: none;
+  border: 1px solid var(--border-soft);
+  border-radius: 6px;
+  padding: 6px 14px;
+  font-size: 12px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  transition: border-color 0.2s;
+}
+.ops-verify-toggle:hover { border-color: var(--gold, #D4AF37); color: var(--gold, #D4AF37); }
+.ops-verify-edit {
+  border-top: 1px solid var(--border-soft);
+  padding-top: 16px;
+  margin-top: 4px;
+}
+
+/* Confirmación obligatoria */
+.ops-confirm-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  cursor: pointer;
+  padding: 14px;
+  border: 1.5px solid rgba(212,175,55,0.25);
+  border-radius: 10px;
+  background: rgba(212,175,55,0.04);
+  margin-bottom: 8px;
+}
+.ops-confirm-check input[type=checkbox] {
+  width: 18px; height: 18px;
+  accent-color: var(--gold, #D4AF37);
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+/* Documentos */
+.ops-docs-grupo-titulo {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--gold, #D4AF37);
+  margin: 16px 0 4px;
+}
+.ops-perfil-badge {
+  font-size: 11px;
+  background: rgba(212,175,55,0.12);
+  color: var(--gold, #D4AF37);
+  border-radius: 5px;
+  padding: 1px 6px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  text-transform: none;
+}
+.ops-doc-ok {
+  border-color: var(--success, #2ecc71) !important;
+  color: var(--success, #2ecc71) !important;
+}
+
 /* Radio group inline (tipo de cuenta) */
 .leg-radio-group { display: flex; gap: 16px; align-items: center; padding: 6px 0; }
 .leg-radio-item {
