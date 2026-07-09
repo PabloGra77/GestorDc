@@ -1,4 +1,5 @@
 import jsPDF from 'jspdf';
+import { numeroAPesosEnLetras } from '../../utils/numeroALetras';
 
 interface CampoPlantilla {
   key: string;
@@ -644,6 +645,45 @@ export async function descargarPreviewPlantilla(
   await generarPdfPlantilla(sintetica, plantilla, filename);
 }
 
+function formatFechaBullet(dateStr: string): string {
+  if (!dateStr) return '';
+  const d = new Date(dateStr + 'T00:00:00');
+  if (isNaN(d.getTime())) return dateStr;
+  const MESES = ['ENERO','FEBRERO','MARZO','ABRIL','MAYO','JUNIO','JULIO','AGOSTO','SEPTIEMBRE','OCTUBRE','NOVIEMBRE','DICIEMBRE'];
+  return `${d.getDate()} de ${MESES[d.getMonth()]} de ${d.getFullYear()}`;
+}
+
+function drawInfoGrid(
+  doc: jsPDF,
+  items: Array<[string, string]>,
+  margin: number,
+  pageWidth: number,
+  startY: number,
+): number {
+  let y = startY;
+  const cols = 2;
+  const colW = (pageWidth - margin * 2) / cols;
+  for (let i = 0; i < items.length; i += cols) {
+    const row = items.slice(i, i + cols);
+    let maxH = 0;
+    row.forEach(([label, val], ci) => {
+      const x = margin + ci * colW;
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(7.5);
+      doc.setTextColor(120, 120, 140);
+      doc.text(label.toUpperCase(), x, y);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9.5);
+      doc.setTextColor(15, 23, 42);
+      const lines = doc.splitTextToSize(val || '—', colW - 4);
+      doc.text(lines, x, y + 4.5);
+      maxH = Math.max(maxH, lines.length * 4.5 + 7);
+    });
+    y += maxH;
+  }
+  return y;
+}
+
 function _generarPdfEspecial(s: SolicitudParaPdf, opts?: { bloburl?: boolean }): string | void {
   const esLegalizacion = s.tipoSlug === 'legalizacion'
     || typeof s.datosFormulario['gastos'] === 'string';
@@ -682,43 +722,30 @@ function _generarPdfEspecial(s: SolicitudParaPdf, opts?: { bloburl?: boolean }):
   doc.setTextColor(200, 206, 224);
   doc.text(new Date().toLocaleString('es-CO'), pageWidth - margin, 25, { align: 'right' });
 
-  y = 38;
+  y = 36;
 
-  // Numero de radicado
-  doc.setTextColor(15, 23, 42);
-  doc.setFontSize(11);
-  doc.setFont('helvetica', 'bold');
-  doc.text('Radicado:', margin, y);
-  doc.setFont('helvetica', 'normal');
-  doc.text(s.numeroRadicado, margin + 28, y);
+  // Info grid (radicado, tipo, área, estado, fechas)
+  const fechaCreacion = (() => {
+    try { return new Date(s.creadoEn.replace(' ', 'T') + 'Z').toLocaleDateString('es-CO', { year:'numeric', month:'long', day:'numeric' }); }
+    catch { return s.creadoEn; }
+  })();
+  const infoItems: Array<[string, string]> = [
+    ['Radicado', s.numeroRadicado],
+    ['Estado', s.estado.toUpperCase()],
+    ['Tipo de solicitud', s.tipoNombre],
+    ['Fecha de radicación', fechaCreacion],
+    ['Área', s.areaNombre || '—'],
+    ...(s.aprobadoEn ? [['Aprobado el', new Date(s.aprobadoEn.replace(' ','T')+'Z').toLocaleDateString('es-CO')] as [string,string]] : []),
+  ];
+  doc.setFillColor(245, 246, 250);
+  const infoBoxH = Math.ceil(infoItems.length / 2) * 11 + 6;
+  doc.rect(margin, y, pageWidth - margin * 2, infoBoxH, 'F');
+  doc.setDrawColor(220, 220, 230);
+  doc.setLineWidth(0.3);
+  doc.rect(margin, y, pageWidth - margin * 2, infoBoxH);
   y += 5;
-  doc.setFont('helvetica', 'bold');
-  doc.text('Tipo:', margin, y);
-  doc.setFont('helvetica', 'normal');
-  doc.text(s.tipoNombre, margin + 28, y);
-  y += 5;
-  doc.setFont('helvetica', 'bold');
-  doc.text('Area:', margin, y);
-  doc.setFont('helvetica', 'normal');
-  doc.text(s.areaNombre, margin + 28, y);
-  y += 5;
-  doc.setFont('helvetica', 'bold');
-  doc.text('Estado:', margin, y);
-  doc.setFont('helvetica', 'normal');
-  doc.text(s.estado.toUpperCase(), margin + 28, y);
-  y += 5;
-  doc.setFont('helvetica', 'bold');
-  doc.text('Creado:', margin, y);
-  doc.setFont('helvetica', 'normal');
-  doc.text(new Date(s.creadoEn.replace(' ', 'T') + 'Z').toLocaleString('es-CO'), margin + 28, y);
-  if (s.aprobadoEn) {
-    y += 5;
-    doc.setFont('helvetica', 'bold');
-    doc.text('Aprobado:', margin, y);
-    doc.setFont('helvetica', 'normal');
-    doc.text(new Date(s.aprobadoEn.replace(' ', 'T') + 'Z').toLocaleString('es-CO'), margin + 28, y);
-  }
-  y += 8;
+  y = drawInfoGrid(doc, infoItems, margin + 2, pageWidth - 2, y);
+  y += 4;
 
   // Título principal centrado
   if (esLegalizacion || esViaticos || esAnticipo || esCuentaCobroOps) {
@@ -742,29 +769,24 @@ function _generarPdfEspecial(s: SolicitudParaPdf, opts?: { bloburl?: boolean }):
     y += 8;
   }
 
-  // Solicitante
-  doc.setDrawColor(212, 175, 55);
-  doc.setLineWidth(0.5);
-  doc.line(margin, y, pageWidth - margin, y);
-  y += 5;
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(184, 144, 31);
-  doc.setFontSize(11);
-  doc.text('DATOS DEL SOLICITANTE', margin, y);
-  y += 6;
-  doc.setFontSize(10);
-  doc.setTextColor(15, 23, 42);
-  doc.setFont('helvetica', 'normal');
-  if (s.solicitanteNombre) {
-    doc.text(`Nombre: ${s.solicitanteNombre}`, margin, y); y += 5;
+  // Solicitante (omitir para CuentaCobroOps que tiene su propia sección detallada)
+  if (!esCuentaCobroOps) {
+    doc.setDrawColor(212, 175, 55);
+    doc.setLineWidth(0.5);
+    doc.line(margin, y, pageWidth - margin, y);
+    y += 5;
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(184, 144, 31);
+    doc.setFontSize(11);
+    doc.text('DATOS DEL SOLICITANTE', margin, y);
+    y += 6;
+    const solItems: Array<[string, string]> = [];
+    if (s.solicitanteNombre) solItems.push(['Nombre completo', s.solicitanteNombre]);
+    if (s.solicitanteDocumento) solItems.push(['Documento', s.solicitanteDocumento]);
+    if (s.solicitanteCorreo) solItems.push(['Correo electrónico', s.solicitanteCorreo]);
+    y = drawInfoGrid(doc, solItems, margin, pageWidth, y);
+    y += 4;
   }
-  if (s.solicitanteCorreo) {
-    doc.text(`Correo: ${s.solicitanteCorreo}`, margin, y); y += 5;
-  }
-  if (s.solicitanteDocumento) {
-    doc.text(`Documento: ${s.solicitanteDocumento}`, margin, y); y += 5;
-  }
-  y += 4;
 
   // Párrafo narrativo de legalización
   if (esLegalizacion) {
@@ -839,47 +861,49 @@ function _generarPdfEspecial(s: SolicitudParaPdf, opts?: { bloburl?: boolean }):
       const gastosArr = JSON.parse(rawGastos) as Record<string, string>[];
       if (Array.isArray(gastosArr) && gastosArr.length > 0) {
         if (y > 240) { doc.addPage(); y = margin; }
-        doc.setDrawColor(212, 175, 55);
-        doc.line(margin, y, pageWidth - margin, y);
-        y += 5;
+        // Encabezado de sección
+        doc.setFillColor(7, 11, 29);
+        doc.rect(margin, y, pageWidth - margin * 2, 7, 'F');
         doc.setFont('helvetica', 'bold');
-        doc.setTextColor(184, 144, 31);
-        doc.setFontSize(11);
-        doc.text('LEGALIZACIÓN DE GASTOS', margin, y);
-        y += 5;
+        doc.setTextColor(212, 175, 55);
+        doc.setFontSize(9);
+        doc.text('RELACIÓN DE GASTOS LEGALIZADOS', margin + 3, y + 5);
+        y += 10;
+        // Info grid: concepto, período, autorizador
         const concepto = String(s.datosFormulario['concepto'] || '');
         const periodo = String(s.datosFormulario['fechaPeriodo'] || '');
         const autorizador = String(s.datosFormulario['autorizadorNombre'] || '');
-        doc.setFontSize(9);
-        doc.setTextColor(15, 23, 42);
-        doc.setFont('helvetica', 'normal');
-        if (concepto) { doc.text(`Concepto: ${concepto}`, margin, y); y += 4; }
-        if (periodo) { doc.text(`Período: ${periodo}`, margin, y); y += 4; }
-        if (autorizador) { doc.text(`Autorizó: ${autorizador}`, margin, y); y += 4; }
-        y += 2;
+        const infoItems: Array<[string, string]> = [];
+        if (concepto) infoItems.push(['Concepto', concepto]);
+        if (periodo) infoItems.push(['Período', periodo]);
+        if (autorizador) infoItems.push(['Autorizado por', autorizador]);
+        if (infoItems.length > 0) {
+          y = drawInfoGrid(doc, infoItems, margin, pageWidth, y);
+          y += 3;
+        }
         // Tabla de gastos
         const cols = ['#', 'Categoría', 'Descripción', 'Fecha', 'Valor', 'Proveedor'];
-        const colW = [(pageWidth - margin * 2) * 0.04, 0.14, 0.22, 0.10, 0.12, 0.16];
-        const absW = colW.map((r) => (pageWidth - margin * 2) * r);
+        const absW = [0.05, 0.14, 0.30, 0.11, 0.13, 0.27].map((r) => (pageWidth - margin * 2) * r);
         // Header row
         doc.setFillColor(212, 175, 55);
-        doc.rect(margin, y, pageWidth - margin * 2, 5, 'F');
+        doc.rect(margin, y, pageWidth - margin * 2, 5.5, 'F');
         doc.setTextColor(7, 11, 29);
         doc.setFont('helvetica', 'bold');
-        doc.setFontSize(7);
+        doc.setFontSize(7.5);
         let cx = margin;
         cols.forEach((col, i) => {
-          doc.text(col, cx + 1, y + 3.5);
+          doc.text(col, cx + 1, y + 3.8);
           cx += absW[i];
         });
-        y += 5;
+        y += 5.5;
         doc.setFont('helvetica', 'normal');
         doc.setTextColor(15, 23, 42);
-        let total = 0;
+        doc.setFontSize(8);
+        let totalLegal = 0;
         gastosArr.forEach((g, idx) => {
           if (y > 275) { doc.addPage(); y = margin; }
           const valor = Number(String(g.valor || '0').replace(/[^0-9]/g, ''));
-          total += valor;
+          totalLegal += valor;
           const vals = [
             String(idx + 1),
             g.categoria || '',
@@ -888,44 +912,67 @@ function _generarPdfEspecial(s: SolicitudParaPdf, opts?: { bloburl?: boolean }):
             `$${valor.toLocaleString('es-CO')}`,
             g.nombreProveedor || '',
           ];
-          const bg = idx % 2 === 0 ? [245, 245, 248] : [255, 255, 255];
+          const bg = idx % 2 === 0 ? [245, 245, 248] as [number,number,number] : [255, 255, 255] as [number,number,number];
           doc.setFillColor(bg[0], bg[1], bg[2]);
-          doc.rect(margin, y, pageWidth - margin * 2, 4.5, 'F');
+          doc.rect(margin, y, pageWidth - margin * 2, 5, 'F');
           cx = margin;
           vals.forEach((v, i) => {
-            const txt = doc.splitTextToSize(v, absW[i] - 1);
-            doc.text(txt[0] || '', cx + 1, y + 3.2);
+            const txt = doc.splitTextToSize(v, absW[i] - 1.5);
+            doc.text(txt[0] || '', cx + 1, y + 3.5);
             cx += absW[i];
           });
-          y += 4.5;
-          if (g._factura) {
-            doc.setTextColor(100, 100, 100);
+          y += 5;
+          if (g._factura || g.numeroFactura || g.nitProveedor) {
+            doc.setTextColor(100, 100, 120);
             doc.setFontSize(6.5);
-            doc.text(`  Factura: ${g._factura}${g.numeroFactura ? ' · N°' + g.numeroFactura : ''}${g.nitProveedor ? ' · NIT ' + g.nitProveedor : ''}`, margin + 6, y + 1.5);
-            doc.setFontSize(7);
+            const factLine = [`Factura: ${g._factura || ''}`, g.numeroFactura ? `N° ${g.numeroFactura}` : '', g.nitProveedor ? `NIT ${g.nitProveedor}` : ''].filter(Boolean).join(' · ');
+            doc.text(`  ${factLine}`, margin + 6, y + 1.5);
+            doc.setFontSize(8);
             doc.setTextColor(15, 23, 42);
-            y += 3;
+            y += 3.5;
           }
         });
         // Total row
         doc.setFillColor(7, 11, 29);
-        doc.rect(margin, y, pageWidth - margin * 2, 5, 'F');
+        doc.rect(margin, y, pageWidth - margin * 2, 6, 'F');
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(9.5);
+        doc.setTextColor(212, 175, 55);
+        doc.text('TOTAL LEGALIZADO', margin + 1, y + 4.2);
+        doc.text(`$ ${totalLegal.toLocaleString('es-CO')}`, pageWidth - margin - 1, y + 4.2, { align: 'right' });
+        y += 8;
+        // Valor en letras
+        if (totalLegal > 0) {
+          if (y > 272) { doc.addPage(); y = margin; }
+          doc.setFont('helvetica', 'italic');
+          doc.setFontSize(8.5);
+          doc.setTextColor(80, 80, 100);
+          const letrasL = `(${numeroAPesosEnLetras(String(totalLegal))})`;
+          const letrasLLines = doc.splitTextToSize(letrasL, pageWidth - margin * 2);
+          doc.text(letrasLLines, margin, y);
+          y += letrasLLines.length * 4.5 + 3;
+          doc.setTextColor(15, 23, 42);
+        }
+        // Datos bancarios
+        if (y > 265) { doc.addPage(); y = margin; }
+        doc.setFillColor(7, 11, 29);
+        doc.rect(margin, y, pageWidth - margin * 2, 7, 'F');
         doc.setFont('helvetica', 'bold');
         doc.setTextColor(212, 175, 55);
-        doc.text('TOTAL', margin + 1, y + 3.5);
-        doc.text(`$${total.toLocaleString('es-CO')}`, margin + absW[0] + absW[1] + absW[2] + absW[3] + 1, y + 3.5);
-        y += 7;
-        // Cuenta bancaria
-        const banco = String(s.datosFormulario['banco'] || '');
-        const nroCuenta = String(s.datosFormulario['numeroCuenta'] || '');
-        const titular = String(s.datosFormulario['titularCuenta'] || '');
-        if (banco || nroCuenta) {
-          doc.setFont('helvetica', 'normal');
-          doc.setFontSize(9);
-          doc.setTextColor(15, 23, 42);
-          doc.text(`Cuenta para pago: ${banco} ${String(s.datosFormulario['tipoCuenta'] || '')} — ${nroCuenta} (${titular})`, margin, y);
-          y += 6;
-        }
+        doc.setFontSize(9);
+        doc.text('DATOS BANCARIOS PARA EL PAGO', margin + 3, y + 5);
+        y += 10;
+        const bancoL = String(s.datosFormulario['banco'] || '');
+        const nroCtaL = String(s.datosFormulario['numeroCuenta'] || '');
+        const titularL = String(s.datosFormulario['titularCuenta'] || '');
+        const tipoCtaL = String(s.datosFormulario['tipoCuenta'] || '');
+        y = drawInfoGrid(doc, [
+          ['Banco', bancoL || '—'],
+          ['Tipo de cuenta', tipoCtaL || '—'],
+          ['Número de cuenta', nroCtaL || '—'],
+          ['Titular', titularL || '—'],
+        ], margin, pageWidth, y);
+        y += 4;
       }
     } catch { /* no era gastos válidos */ }
   }
@@ -937,44 +984,55 @@ function _generarPdfEspecial(s: SolicitudParaPdf, opts?: { bloburl?: boolean }):
       const tIda = JSON.parse(rawTiqueteIda) as Record<string, string>;
       const rawVuelta = String(s.datosFormulario['tiqueteVuelta'] || '');
       const tVuelta: Record<string, string> | null = rawVuelta ? JSON.parse(rawVuelta) : null;
-      const fmt = (v: string) => { const n = Number(String(v || '0').replace(/[^0-9]/g, '')); return n ? `$${n.toLocaleString('es-CO')}` : '—'; };
+      const fmt = (v: string) => { const n = Number(String(v || '0').replace(/[^0-9]/g, '')); return n ? `$ ${n.toLocaleString('es-CO')}` : '—'; };
 
-      if (y > 240) { doc.addPage(); y = margin; }
-      doc.setDrawColor(212, 175, 55);
-      doc.line(margin, y, pageWidth - margin, y);
-      y += 5;
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(184, 144, 31);
-      doc.setFontSize(11);
-      doc.text('DETALLES DEL VIAJE', margin, y);
-      y += 5;
+      const seccionViat = (titulo: string) => {
+        if (y > 255) { doc.addPage(); y = margin; }
+        y += 2;
+        doc.setFillColor(7, 11, 29);
+        doc.rect(margin, y, pageWidth - margin * 2, 7, 'F');
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(212, 175, 55);
+        doc.setFontSize(9);
+        doc.text(titulo, margin + 3, y + 5);
+        y += 10;
+        doc.setFontSize(9);
+        doc.setTextColor(15, 23, 42);
+        doc.setFont('helvetica', 'normal');
+      };
 
+      // Encabezado info viaje
+      seccionViat('1. INFORMACIÓN DEL VIAJE');
       const ciudadOrigen = String(s.datosFormulario['ciudadOrigen'] || '');
       const ciudadDestino = String(s.datosFormulario['ciudadDestino'] || '');
       const fechaIda = String(s.datosFormulario['fechaIda'] || '');
       const fechaRegreso = String(s.datosFormulario['fechaRegreso'] || '');
-      const autorizador = String(s.datosFormulario['autorizadorNombre'] || '');
-      doc.setFontSize(9);
-      doc.setTextColor(15, 23, 42);
-      doc.setFont('helvetica', 'normal');
-      if (ciudadOrigen && ciudadDestino) { doc.text(`Ruta: ${ciudadOrigen} → ${ciudadDestino}`, margin, y); y += 4; }
-      if (fechaIda) { doc.text(`Fecha ida: ${fechaIda}${fechaRegreso ? '   ·   Regreso: ' + fechaRegreso : ''}`, margin, y); y += 4; }
-      if (autorizador) { doc.text(`Autorizó: ${autorizador}`, margin, y); y += 4; }
-      y += 2;
+      const autorizadorViat = String(s.datosFormulario['autorizadorNombre'] || '');
+      const viatInfoItems: Array<[string, string]> = [];
+      if (ciudadOrigen && ciudadDestino) viatInfoItems.push(['Ruta', `${ciudadOrigen} → ${ciudadDestino}`]);
+      if (fechaIda) viatInfoItems.push(['Fecha de ida', fechaIda]);
+      if (fechaRegreso) viatInfoItems.push(['Fecha de regreso', fechaRegreso]);
+      if (autorizadorViat) viatInfoItems.push(['Autorizado por', autorizadorViat]);
+      if (viatInfoItems.length > 0) {
+        y = drawInfoGrid(doc, viatInfoItems, margin, pageWidth, y);
+        y += 3;
+      }
 
       // Tabla de tiquetes
+      seccionViat('2. TIQUETES DE TRANSPORTE');
       const tCols = ['Trayecto', 'Tipo', 'Empresa', 'N° vuelo/tiquete', 'Salida', 'Llegada', 'Valor'];
-      const tW = [0.10, 0.10, 0.16, 0.18, 0.10, 0.10, 0.14].map((r) => (pageWidth - margin * 2) * r);
+      const tW = [0.10, 0.09, 0.16, 0.19, 0.10, 0.10, 0.14].map((r) => (pageWidth - margin * 2) * r);
       if (y > 265) { doc.addPage(); y = margin; }
       doc.setFillColor(212, 175, 55);
-      doc.rect(margin, y, pageWidth - margin * 2, 5, 'F');
+      doc.rect(margin, y, pageWidth - margin * 2, 5.5, 'F');
       doc.setTextColor(7, 11, 29);
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(7);
+      doc.setFontSize(7.5);
       let cx = margin;
-      tCols.forEach((col, i) => { doc.text(col, cx + 1, y + 3.5); cx += tW[i]; });
-      y += 5;
+      tCols.forEach((col, i) => { doc.text(col, cx + 1, y + 3.8); cx += tW[i]; });
+      y += 5.5;
       doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
       doc.setTextColor(15, 23, 42);
       const tRows = [['Ida', tIda], ...(tVuelta ? [['Vuelta', tVuelta]] : [])] as [string, Record<string, string>][];
       tRows.forEach(([label, t], idx) => {
@@ -988,48 +1046,45 @@ function _generarPdfEspecial(s: SolicitudParaPdf, opts?: { bloburl?: boolean }):
           t.horaLlegada || '',
           fmt(t.valor),
         ];
-        const bg = idx % 2 === 0 ? [245, 245, 248] : [255, 255, 255];
+        const bg = idx % 2 === 0 ? [245, 245, 248] as [number,number,number] : [255, 255, 255] as [number,number,number];
         doc.setFillColor(bg[0], bg[1], bg[2]);
-        doc.rect(margin, y, pageWidth - margin * 2, 4.5, 'F');
+        doc.rect(margin, y, pageWidth - margin * 2, 5, 'F');
         cx = margin;
-        vals.forEach((v, i) => { doc.text(doc.splitTextToSize(v, tW[i] - 1)[0] || '', cx + 1, y + 3.2); cx += tW[i]; });
-        y += 4.5;
+        vals.forEach((v, i) => { doc.text(doc.splitTextToSize(v, tW[i] - 1)[0] || '', cx + 1, y + 3.5); cx += tW[i]; });
+        y += 5;
       });
       const totalTransporte = String(s.datosFormulario['totalTransporte'] || '');
       if (Number(totalTransporte) > 0) {
         doc.setFillColor(7, 11, 29);
-        doc.rect(margin, y, pageWidth - margin * 2, 5, 'F');
+        doc.rect(margin, y, pageWidth - margin * 2, 5.5, 'F');
         doc.setFont('helvetica', 'bold');
+        doc.setFontSize(9);
         doc.setTextColor(212, 175, 55);
-        doc.text('TOTAL TRANSPORTE', margin + 1, y + 3.5);
-        doc.text(fmt(totalTransporte), pageWidth - margin - 1, y + 3.5, { align: 'right' });
+        doc.text('SUBTOTAL TRANSPORTE', margin + 1, y + 3.8);
+        doc.text(fmt(totalTransporte), pageWidth - margin - 1, y + 3.8, { align: 'right' });
         y += 7;
       }
 
       // Hospedaje
       const tieneHospedaje = String(s.datosFormulario['tieneHospedaje'] || '') === 'true';
       if (tieneHospedaje) {
+        seccionViat('3. ALOJAMIENTO');
         const hotelNombre = String(s.datosFormulario['hotelNombre'] || '');
         const hotelEntrada = String(s.datosFormulario['hotelEntrada'] || '');
         const hotelSalida = String(s.datosFormulario['hotelSalida'] || '');
         const hotelNoches = String(s.datosFormulario['hotelNoches'] || '');
         const hotelValorNoche = String(s.datosFormulario['hotelValorNoche'] || '');
         const totalHospedaje = String(s.datosFormulario['totalHospedaje'] || '');
-        if (y > 240) { doc.addPage(); y = margin; }
-        doc.setDrawColor(212, 175, 55);
-        doc.line(margin, y, pageWidth - margin, y);
-        y += 5;
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(184, 144, 31);
-        doc.setFontSize(11);
-        doc.text('ALOJAMIENTO', margin, y);
-        y += 5;
-        doc.setFontSize(9);
-        doc.setTextColor(15, 23, 42);
-        doc.setFont('helvetica', 'normal');
-        doc.text(`Hotel / Alojamiento: ${hotelNombre}`, margin, y); y += 4;
-        doc.text(`Entrada: ${hotelEntrada}   ·   Salida: ${hotelSalida}   ·   Noches: ${hotelNoches}`, margin, y); y += 4;
-        doc.text(`Valor por noche: ${fmt(hotelValorNoche)}   ·   Total hospedaje: ${fmt(totalHospedaje)}`, margin, y); y += 6;
+        const hospItems: Array<[string, string]> = [
+          ['Hotel / Alojamiento', hotelNombre || '—'],
+          ['Noches', hotelNoches || '—'],
+          ['Fecha entrada', hotelEntrada || '—'],
+          ['Fecha salida', hotelSalida || '—'],
+          ['Valor por noche', fmt(hotelValorNoche)],
+          ['Total alojamiento', fmt(totalHospedaje)],
+        ];
+        y = drawInfoGrid(doc, hospItems, margin, pageWidth, y);
+        y += 3;
       }
 
       // Alimentación
@@ -1040,26 +1095,20 @@ function _generarPdfEspecial(s: SolicitudParaPdf, opts?: { bloburl?: boolean }):
       const diasC = parseInt(String(s.datosFormulario['diasCena'] || '0')) || 0;
       const valC = parseInt(String(s.datosFormulario['valorCena'] || '0')) || 0;
       if (diasD + diasA + diasC > 0) {
-        if (y > 240) { doc.addPage(); y = margin; }
-        doc.setDrawColor(212, 175, 55);
-        doc.line(margin, y, pageWidth - margin, y);
-        y += 5;
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(184, 144, 31);
-        doc.setFontSize(11);
-        doc.text('ALIMENTACIÓN', margin, y);
-        y += 5;
-        const aCols = ['Tipo', 'Días', 'Valor/día', 'Total'];
+        seccionViat('4. ALIMENTACIÓN');
+        const aCols = ['Tipo de comida', 'N° días', 'Valor por día', 'Total'];
         const aW = [0.30, 0.20, 0.25, 0.25].map((r) => (pageWidth - margin * 2) * r);
+        if (y > 260) { doc.addPage(); y = margin; }
         doc.setFillColor(212, 175, 55);
-        doc.rect(margin, y, pageWidth - margin * 2, 5, 'F');
+        doc.rect(margin, y, pageWidth - margin * 2, 5.5, 'F');
         doc.setTextColor(7, 11, 29);
         doc.setFont('helvetica', 'bold');
-        doc.setFontSize(7);
+        doc.setFontSize(7.5);
         cx = margin;
-        aCols.forEach((col, i) => { doc.text(col, cx + 1, y + 3.5); cx += aW[i]; });
-        y += 5;
+        aCols.forEach((col, i) => { doc.text(col, cx + 1, y + 3.8); cx += aW[i]; });
+        y += 5.5;
         doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8.5);
         doc.setTextColor(15, 23, 42);
         const comidas = [
           ...(diasD > 0 ? [['Desayuno', String(diasD), fmt(String(valD)), fmt(String(diasD * valD))]] : []),
@@ -1068,21 +1117,22 @@ function _generarPdfEspecial(s: SolicitudParaPdf, opts?: { bloburl?: boolean }):
         ];
         comidas.forEach((row, idx) => {
           if (y > 275) { doc.addPage(); y = margin; }
-          const bg = idx % 2 === 0 ? [245, 245, 248] : [255, 255, 255];
+          const bg = idx % 2 === 0 ? [245, 245, 248] as [number,number,number] : [255, 255, 255] as [number,number,number];
           doc.setFillColor(bg[0], bg[1], bg[2]);
-          doc.rect(margin, y, pageWidth - margin * 2, 4.5, 'F');
+          doc.rect(margin, y, pageWidth - margin * 2, 5, 'F');
           cx = margin;
-          row.forEach((v, i) => { doc.text(v, cx + 1, y + 3.2); cx += aW[i]; });
-          y += 4.5;
+          row.forEach((v, i) => { doc.text(v, cx + 1, y + 3.5); cx += aW[i]; });
+          y += 5;
         });
         const totalComidas = String(s.datosFormulario['totalComidas'] || '');
         if (Number(totalComidas) > 0) {
           doc.setFillColor(7, 11, 29);
-          doc.rect(margin, y, pageWidth - margin * 2, 5, 'F');
+          doc.rect(margin, y, pageWidth - margin * 2, 5.5, 'F');
           doc.setFont('helvetica', 'bold');
+          doc.setFontSize(9);
           doc.setTextColor(212, 175, 55);
-          doc.text('TOTAL ALIMENTACIÓN', margin + 1, y + 3.5);
-          doc.text(fmt(totalComidas), pageWidth - margin - 1, y + 3.5, { align: 'right' });
+          doc.text('SUBTOTAL ALIMENTACIÓN', margin + 1, y + 3.8);
+          doc.text(fmt(totalComidas), pageWidth - margin - 1, y + 3.8, { align: 'right' });
           y += 7;
         }
       }
@@ -1092,13 +1142,26 @@ function _generarPdfEspecial(s: SolicitudParaPdf, opts?: { bloburl?: boolean }):
       if (Number(totalGeneral) > 0) {
         if (y > 260) { doc.addPage(); y = margin; }
         doc.setFillColor(7, 11, 29);
-        doc.rect(margin, y, pageWidth - margin * 2, 7, 'F');
+        doc.rect(margin, y, pageWidth - margin * 2, 8, 'F');
         doc.setFont('helvetica', 'bold');
-        doc.setFontSize(10);
+        doc.setFontSize(10.5);
         doc.setTextColor(212, 175, 55);
-        doc.text('TOTAL GENERAL VIÁTICOS', margin + 2, y + 5);
-        doc.text(fmt(totalGeneral), pageWidth - margin - 2, y + 5, { align: 'right' });
+        doc.text('TOTAL GENERAL VIÁTICOS', margin + 3, y + 5.5);
+        doc.text(fmt(totalGeneral), pageWidth - margin - 3, y + 5.5, { align: 'right' });
         y += 10;
+        // Valor en letras
+        const totalViatNum = parseInt(totalGeneral.replace(/[^0-9]/g, '')) || 0;
+        if (totalViatNum > 0) {
+          if (y > 272) { doc.addPage(); y = margin; }
+          doc.setFont('helvetica', 'italic');
+          doc.setFontSize(8.5);
+          doc.setTextColor(80, 80, 100);
+          const letrasV = `(${numeroAPesosEnLetras(String(totalViatNum))})`;
+          const letrasVLines = doc.splitTextToSize(letrasV, pageWidth - margin * 2);
+          doc.text(letrasVLines, margin, y);
+          y += letrasVLines.length * 4.5 + 3;
+          doc.setTextColor(15, 23, 42);
+        }
       }
     } catch { /* datos de viáticos no válidos */ }
   }
@@ -1211,6 +1274,18 @@ function _generarPdfEspecial(s: SolicitudParaPdf, opts?: { bloburl?: boolean }):
         doc.text('TOTAL ANTICIPO', margin + 1, y + 3.5);
         doc.text(`$${totalAnticipo.toLocaleString('es-CO')}`, pageWidth - margin - 1, y + 3.5, { align: 'right' });
         y += 7;
+        // Valor en letras
+        if (totalAnticipo > 0) {
+          if (y > 272) { doc.addPage(); y = margin; }
+          doc.setFont('helvetica', 'italic');
+          doc.setFontSize(8.5);
+          doc.setTextColor(80, 80, 100);
+          const letras = `(${numeroAPesosEnLetras(String(totalAnticipo))})`;
+          const letrasLines = doc.splitTextToSize(letras, pageWidth - margin * 2);
+          doc.text(letrasLines, margin, y);
+          y += letrasLines.length * 4.5 + 3;
+          doc.setTextColor(15, 23, 42);
+        }
         // Cuenta bancaria
         const bancoA = String(s.datosFormulario['banco'] || '');
         const cuentaA = String(s.datosFormulario['numeroCuenta'] || '');
@@ -1232,23 +1307,25 @@ function _generarPdfEspecial(s: SolicitudParaPdf, opts?: { bloburl?: boolean }):
     const get = (k: string) => String(d[k] ?? '');
     const fmt$ = (v: string) => {
       const n = Number(v.replace(/[^0-9]/g, ''));
-      return n ? `$${n.toLocaleString('es-CO')}` : (v || '—');
+      return n ? `$ ${n.toLocaleString('es-CO')}` : (v || '—');
     };
-    const seccion = (titulo: string) => {
+
+    const seccionOps = (titulo: string) => {
       if (y > 255) { doc.addPage(); y = margin; }
-      doc.setDrawColor(212, 175, 55);
-      doc.setLineWidth(0.5);
-      doc.line(margin, y, pageWidth - margin, y);
-      y += 5;
+      y += 2;
+      doc.setFillColor(7, 11, 29);
+      doc.rect(margin, y, pageWidth - margin * 2, 7, 'F');
       doc.setFont('helvetica', 'bold');
-      doc.setTextColor(184, 144, 31);
-      doc.setFontSize(10);
-      doc.text(titulo, margin, y);
-      y += 6;
+      doc.setTextColor(212, 175, 55);
       doc.setFontSize(9);
+      doc.text(titulo, margin + 3, y + 5);
+      y += 10;
+      doc.setFontSize(9.5);
       doc.setTextColor(15, 23, 42);
+      doc.setFont('helvetica', 'normal');
     };
-    const fila = (etiq: string, val: string, etiqR?: string, valR?: string) => {
+
+    const filaOps = (etiq: string, val: string, etiqR?: string, valR?: string) => {
       if (y > 272) { doc.addPage(); y = margin; }
       const fw = pageWidth - margin * 2;
       const col = etiqR != null ? fw / 2 - 3 : fw;
@@ -1273,80 +1350,171 @@ function _generarPdfEspecial(s: SolicitudParaPdf, opts?: { bloburl?: boolean }):
       }
     };
 
-    // 1. Datos del contrato
-    seccion('1. DATOS DEL CONTRATO / OPS');
-    fila('N° Contrato u OPS', get('numeroContrato'), 'Valor total del contrato', fmt$(get('valorTotalContrato')));
-    fila('Fecha inicio', get('fechaInicioContrato'), 'Fecha fin', get('fechaFinContrato'));
-    const objContrato = get('objetoContrato');
-    if (objContrato) {
-      if (y > 265) { doc.addPage(); y = margin; }
-      doc.setFont('helvetica', 'bold');
+    // ── 1. Datos del profesional ──
+    seccionOps('1. DATOS DEL PROFESIONAL OPS');
+    const tipoDocP = get('tipoDocumento') || get('tipo_documento');
+    const numDocP  = get('numeroDocumento') || get('numero_documento') || s.solicitanteDocumento || '';
+    const nombreProf = [
+      get('primerNombre') || get('primer_nombre'),
+      get('segundoNombre') || get('segundo_nombre'),
+      get('primerApellido') || get('primer_apellido'),
+      get('segundoApellido') || get('segundo_apellido'),
+    ].filter(Boolean).join(' ') || s.solicitanteNombre || '';
+    const epsValP  = get('eps') || get('entidadSalud');
+    const telValP  = get('telefono');
+    filaOps('Nombre completo', nombreProf || '—', tipoDocP ? tipoDocP : 'Documento', numDocP || '—');
+    if (epsValP || telValP) filaOps('EPS / Entidad de salud', epsValP || '—', 'Teléfono', telValP || '—');
+    filaOps('Correo electrónico', s.solicitanteCorreo || get('correoElectronico') || '—');
+    y += 2;
+
+    // ── 2. Período y valor ──
+    seccionOps('2. PERÍODO Y VALOR DEL COBRO');
+    const periodoIni = get('periodoInicio');
+    const periodoFin = get('periodoFin');
+    const fecIni = get('fechaInicioContrato');
+    const fecFin = get('fechaFinContrato');
+    filaOps(
+      'Período cobrado',
+      periodoIni && periodoFin ? `${periodoIni}  al  ${periodoFin}` : (periodoIni || periodoFin || '—'),
+      'Valor a cobrar', fmt$(get('valorCobrar')),
+    );
+    if (fecIni || fecFin) {
+      filaOps('Vigencia del contrato', fecIni && fecFin ? `${fecIni} — ${fecFin}` : (fecIni || fecFin));
+    }
+    // Valor en letras
+    const valorCobrarNum = parseInt(get('valorCobrar').replace(/[^0-9]/g, '')) || 0;
+    if (valorCobrarNum > 0) {
+      if (y > 272) { doc.addPage(); y = margin; }
+      doc.setFont('helvetica', 'italic');
+      doc.setFontSize(8.5);
+      doc.setTextColor(80, 80, 100);
+      doc.text(`(${numeroAPesosEnLetras(String(valorCobrarNum))})`, margin, y);
+      y += 5;
+      doc.setTextColor(15, 23, 42);
+    }
+    y += 2;
+
+    // ── 3. Relación de atenciones ──
+    seccionOps('3. RELACIÓN DE ATENCIONES REALIZADAS POR SEDE');
+    const atencionesRaw = get('atencionesJson');
+    let totalHC = 0;
+    let mostroAtenciones = false;
+    if (atencionesRaw) {
+      try {
+        const atenciones = JSON.parse(atencionesRaw) as Array<{ regional: string; sede: string; fecha: string; hc: string }>;
+        if (Array.isArray(atenciones) && atenciones.length > 0) {
+          mostroAtenciones = true;
+          // Agrupar por sede para visualización más limpia
+          const porSede = new Map<string, Array<{ fecha: string; hc: number }>>();
+          atenciones.forEach((a) => {
+            const key = a.sede || a.regional;
+            if (!porSede.has(key)) porSede.set(key, []);
+            porSede.get(key)!.push({ fecha: a.fecha, hc: parseInt(a.hc) || 0 });
+          });
+          porSede.forEach((dias, sede) => {
+            dias.forEach(({ fecha, hc }) => {
+              if (y > 275) { doc.addPage(); y = margin; }
+              totalHC += hc;
+              const linea = `• ${formatFechaBullet(fecha)} ${sede} (${hc})`;
+              doc.setFont('helvetica', 'normal');
+              doc.setFontSize(9.5);
+              doc.setTextColor(15, 23, 42);
+              const split = doc.splitTextToSize(linea, pageWidth - margin * 2 - 6);
+              doc.text(split, margin + 3, y);
+              y += split.length * 4.8 + 0.5;
+            });
+          });
+          y += 3;
+          // Total HC
+          if (y > 275) { doc.addPage(); y = margin; }
+          doc.setFillColor(212, 175, 55);
+          doc.rect(margin, y, pageWidth - margin * 2, 6.5, 'F');
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(9);
+          doc.setTextColor(7, 11, 29);
+          doc.text('TOTAL DE HISTORIAS CLÍNICAS REGISTRADAS:', margin + 3, y + 4.5);
+          doc.text(String(totalHC), pageWidth - margin - 3, y + 4.5, { align: 'right' });
+          y += 10;
+        }
+      } catch { /* JSON inválido */ }
+    }
+    if (!mostroAtenciones) {
+      doc.setFont('helvetica', 'italic');
       doc.setFontSize(9);
-      doc.text('Objeto del contrato:', margin, y);
-      y += 4.5;
-      doc.setFont('helvetica', 'normal');
-      const oc = doc.splitTextToSize(objContrato, pageWidth - margin * 2 - 4);
-      doc.text(oc, margin + 4, y);
-      y += oc.length * 4.5 + 2;
+      doc.setTextColor(120, 120, 120);
+      doc.text('No se registraron atenciones por sede en este período.', margin, y);
+      y += 8;
     }
-    y += 2;
 
-    // 2. Datos del cobro
-    seccion('2. DATOS DEL COBRO');
-    fila('N° Cuenta de cobro', get('numeroCuentaCobro'), 'Valor a cobrar', fmt$(get('valorCobrar')));
-    fila('Período desde', get('periodoInicio'), 'Período hasta', get('periodoFin'));
-    y += 2;
-
-    // 3. Actividades realizadas
-    seccion('3. ACTIVIDADES REALIZADAS EN EL PERÍODO');
-    const actividades = get('actividadesRealizadas');
-    if (actividades) {
-      const al = doc.splitTextToSize(actividades, pageWidth - margin * 2);
-      if (y + al.length * 4.5 > 275) { doc.addPage(); y = margin; }
-      doc.setFont('helvetica', 'normal');
-      doc.text(al, margin, y);
-      y += al.length * 4.5 + 3;
-    } else {
-      doc.setFont('helvetica', 'normal');
-      doc.text('—', margin, y);
-      y += 6;
+    // ── 4. Notas aclaratorias (opcional) ──
+    if (get('conNotasAclaratorias') === 'si') {
+      const notasRaw = get('notasAclaratorias');
+      if (notasRaw) {
+        try {
+          const notas = JSON.parse(notasRaw) as Array<{ sede: string; regional: string; fecha: string; hc: string; descripcion: string }>;
+          if (Array.isArray(notas) && notas.length > 0) {
+            seccionOps('4. NOTAS ACLARATORIAS');
+            let totalHCNotas = 0;
+            notas.forEach((n) => {
+              if (y > 275) { doc.addPage(); y = margin; }
+              const hcNum = parseInt(n.hc) || 0;
+              totalHCNotas += hcNum;
+              const linea = `• ${formatFechaBullet(n.fecha)} ${n.sede || n.regional}${hcNum ? ` (${hcNum})` : ''}${n.descripcion ? ` — ${n.descripcion}` : ''}`;
+              doc.setFont('helvetica', 'normal');
+              doc.setFontSize(9.5);
+              doc.setTextColor(15, 23, 42);
+              const split = doc.splitTextToSize(linea, pageWidth - margin * 2 - 6);
+              doc.text(split, margin + 3, y);
+              y += split.length * 4.8 + 0.5;
+            });
+            if (totalHCNotas > 0) {
+              y += 3;
+              if (y > 275) { doc.addPage(); y = margin; }
+              doc.setFillColor(212, 175, 55);
+              doc.rect(margin, y, pageWidth - margin * 2, 6.5, 'F');
+              doc.setFont('helvetica', 'bold');
+              doc.setFontSize(9);
+              doc.setTextColor(7, 11, 29);
+              doc.text('TOTAL HC ACLARATORIAS:', margin + 3, y + 4.5);
+              doc.text(String(totalHCNotas), pageWidth - margin - 3, y + 4.5, { align: 'right' });
+              y += 10;
+            }
+          }
+        } catch { /* skip */ }
+      }
     }
+
+    // ── 5. Comentarios adicionales (opcional) ──
+    const comentarios = get('actividadesRealizadas') || get('comentariosAdicionales');
+    if (comentarios.trim()) {
+      seccionOps('5. COMENTARIOS ADICIONALES');
+      const cLines = doc.splitTextToSize(comentarios, pageWidth - margin * 2);
+      if (y + cLines.length * 5 > 275) { doc.addPage(); y = margin; }
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9.5);
+      doc.setTextColor(15, 23, 42);
+      doc.text(cLines, margin, y);
+      y += cLines.length * 5 + 4;
+    }
+
+    // ── 6. Datos bancarios ──
+    seccionOps('6. DATOS BANCARIOS PARA EL PAGO');
+    filaOps('Banco', get('banco'), 'Tipo de cuenta', get('tipoCuenta'));
+    filaOps('N° de cuenta', get('numeroCuenta'), 'Titular de la cuenta', get('titularCuenta'));
     y += 2;
 
-    // 4. Datos bancarios
-    seccion('4. DATOS BANCARIOS PARA EL PAGO');
-    fila('Banco', get('banco'), 'Tipo de cuenta', get('tipoCuenta'));
-    fila('N° de cuenta', get('numeroCuenta'), 'Titular de la cuenta', get('titularCuenta'));
-    const epsVal = get('eps') || get('entidadSalud');
-    if (epsVal) fila('EPS / Entidad de salud', epsVal);
-    y += 2;
-
-    // 5. Declaraciones
-    if (y > 255) { doc.addPage(); y = margin; }
-    doc.setDrawColor(212, 175, 55);
-    doc.setLineWidth(0.5);
-    doc.line(margin, y, pageWidth - margin, y);
-    y += 5;
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(184, 144, 31);
-    doc.setFontSize(10);
-    doc.text('5. DECLARACIONES DEL PROFESIONAL', margin, y);
-    y += 6;
-    doc.setFontSize(9);
-    doc.setTextColor(15, 23, 42);
-
-    const check = (v: string) => (v === 'si' || v === 'true' || v === '1') ? '[✓]' : '[ ]';
-    const declAlDia = get('opsAlDia');
-    const declNuevo = get('esNuevoColaborador');
-
-    const d1 = `${check(declAlDia)} OPS al día: certifico que no tengo cuentas de cobro de meses anteriores pendientes por radicar.`;
-    const d2 = `${check(declNuevo)} Nuevo(a) colaborador(a): es mi primera radicación en esta institución.`;
-    const certTexto = 'Quien suscribe certifica que los servicios descritos fueron efectivamente prestados durante el período indicado, que la información suministrada es verídica y que acepta la responsabilidad correspondiente.';
-
-    [d1, d2, certTexto].forEach((txt) => {
+    // ── 7. Declaraciones ──
+    seccionOps('7. DECLARACIONES DEL PROFESIONAL');
+    const chk = (v: string) => (v === 'si' || v === 'true' || v === '1') ? '[✓]' : '[ ]';
+    const decl1 = `${chk(get('opsAlDia'))} Certifico que no tengo cuentas de cobro de períodos anteriores pendientes por radicar en esta institución.`;
+    const decl2 = `${chk(get('esNuevoColaborador'))} Soy colaborador(a) nuevo(a): es mi primera radicación en esta institución.`;
+    const certTexto = 'Quien suscribe certifica que los servicios descritos en el presente documento fueron efectivamente prestados durante el período indicado, que la información suministrada es verídica y que acepta la responsabilidad legal correspondiente ante cualquier irregularidad que se compruebe.';
+    [decl1, decl2, certTexto].forEach((txt, i) => {
+      if (y > 272) { doc.addPage(); y = margin; }
       const lines = doc.splitTextToSize(txt, pageWidth - margin * 2);
-      if (y + lines.length * 4.5 > 272) { doc.addPage(); y = margin; }
-      doc.setFont('helvetica', txt === certTexto ? 'italic' : 'normal');
+      doc.setFont('helvetica', i === 2 ? 'italic' : 'normal');
+      doc.setFontSize(i === 2 ? 8.5 : 9.5);
+      doc.setTextColor(i === 2 ? 80 : 15, i === 2 ? 80 : 23, i === 2 ? 100 : 42);
       doc.text(lines, margin, y);
       y += lines.length * 4.5 + 3;
     });
