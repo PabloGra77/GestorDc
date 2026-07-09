@@ -23,9 +23,20 @@ api.interceptors.request.use((config) => {
 				config.headers['Authorization'] = `Bearer ${session.token}`;
 			}
 		} catch {
-			// Sesión corrompida — se ignora sin romper la petición
 			localStorage.removeItem(AUTH_STORAGE_KEY);
 		}
 	}
 	return config;
 });
+
+/* Sesión expirada: limpiar storage y redirigir al login */
+api.interceptors.response.use(
+	(r) => r,
+	(error) => {
+		if (error?.response?.status === 401) {
+			localStorage.removeItem(AUTH_STORAGE_KEY);
+			window.location.href = '/';
+		}
+		return Promise.reject(error);
+	}
+);

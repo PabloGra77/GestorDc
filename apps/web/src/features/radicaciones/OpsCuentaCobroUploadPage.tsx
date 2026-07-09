@@ -67,7 +67,8 @@ const TOKEN_CAMPOS: Record<string, { key: string; label: string; type: string }>
 // formulario público PREGUNTE todo lo que el documento necesita aunque no se
 // haya agregado manualmente como dato. (Mismo criterio que el panel interno.)
 function camposCompletos(campos: CampoPlantilla[], plantillaPdf?: PlantillaPdfMin | null): CampoPlantilla[] {
-  const vistos = new Set(campos.map((c) => c.key));
+  const safeArr = Array.isArray(campos) ? campos : [];
+  const vistos = new Set(safeArr.map((c) => c.key));
   const extra: CampoPlantilla[] = [];
   const bloques = (plantillaPdf?.bloques || []) as BloqueCampoMin[];
   for (const b of bloques) {
@@ -93,7 +94,7 @@ function camposCompletos(campos: CampoPlantilla[], plantillaPdf?: PlantillaPdfMi
       }
     }
   }
-  return [...campos, ...extra];
+  return [...safeArr, ...extra];
 }
 
 interface TipoPub {
@@ -418,7 +419,7 @@ function RealizarPublica() {
       return;
     }
     setDocs((p) => ({ ...p, [key]: file.name }));
-    const campo = tipoSel?.camposPlantilla.find((c) => c.key === key);
+    const campo = (Array.isArray(tipoSel?.camposPlantilla) ? tipoSel!.camposPlantilla : []).find((c) => c.key === key);
     if (!campo?.ocr_target) return;
     setOcrCampoActivo(key);
     const ocr = await procesarArchivo(file);
@@ -599,7 +600,7 @@ function RealizarPublica() {
               <button key={t.id} type="button" className="nueva-sol-card" onClick={() => { setTipoSel(t); setPaso(3); setDatos({}); setDocs({}); setOcrPorCampo({}); }}>
                 <strong>{t.nombre}</strong>
                 <p>{t.descripcion || 'Sin descripcion'}</p>
-                <small>{t.camposPlantilla.length} campo(s)</small>
+                <small>{(Array.isArray(t.camposPlantilla) ? t.camposPlantilla : []).length} campo(s)</small>
               </button>
             ))}
           </div>

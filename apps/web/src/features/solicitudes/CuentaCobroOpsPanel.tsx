@@ -57,14 +57,22 @@ export function CuentaCobroOpsPanel({ onCreada, tipoSolicitudId, areaId }: Cuent
   const [eps, setEps] = useState('');
 
   // Paso 4 – Documentos adjuntos
-  const [docInformeId, setDocInformeId] = useState('');
-  const [docInformeNombre, setDocInformeNombre] = useState('');
+  const [docCertServiciosId, setDocCertServiciosId] = useState('');
+  const [docCertServiciosNombre, setDocCertServiciosNombre] = useState('');
+  const [docCartaEpsId, setDocCartaEpsId] = useState('');
+  const [docCartaEpsNombre, setDocCartaEpsNombre] = useState('');
   const [docAfiliacionesId, setDocAfiliacionesId] = useState('');
   const [docAfiliacionesNombre, setDocAfiliacionesNombre] = useState('');
-  const [docDocumentoId, setDocDocumentoId] = useState('');
-  const [docDocumentoNombre, setDocDocumentoNombre] = useState('');
+  const [docPanaceaId, setDocPanaceaId] = useState('');
+  const [docPanaceaNombre, setDocPanaceaNombre] = useState('');
   const [docCuentaId, setDocCuentaId] = useState('');
   const [docCuentaNombre, setDocCuentaNombre] = useState('');
+  const [docDocumentoId, setDocDocumentoId] = useState('');
+  const [docDocumentoNombre, setDocDocumentoNombre] = useState('');
+  const [docRutId, setDocRutId] = useState('');
+  const [docRutNombre, setDocRutNombre] = useState('');
+  const [opsAlDia, setOpsAlDia] = useState(false);
+  const [esNuevo, setEsNuevo] = useState(false);
   const [subiendoDoc, setSubiendoDoc] = useState<string | null>(null);
 
   // Paso 5 – Firma
@@ -112,8 +120,10 @@ export function CuentaCobroOpsPanel({ onCreada, tipoSolicitudId, areaId }: Cuent
       // EPS y documentos pre-guardados en perfil
       if (r.data.eps) setEps(r.data.eps);
       if (r.data.archivoEpsId) { setDocAfiliacionesId(r.data.archivoEpsId); setDocAfiliacionesNombre(r.data.archivoEpsNombre || 'Certificado EPS (perfil)'); }
+      if (r.data.archivoCartaEpsId) { setDocCartaEpsId(r.data.archivoCartaEpsId); setDocCartaEpsNombre(r.data.archivoCartaEpsNombre || 'Carta EPS (perfil)'); }
       if (r.data.archivoDocumentoId) { setDocDocumentoId(r.data.archivoDocumentoId); setDocDocumentoNombre(r.data.archivoDocumentoNombre || 'Doc. identidad (perfil)'); }
       if (r.data.archivoCuentaId) { setDocCuentaId(r.data.archivoCuentaId); setDocCuentaNombre(r.data.archivoCuentaNombre || 'Cert. bancario (perfil)'); }
+      if (r.data.archivoRutId) { setDocRutId(r.data.archivoRutId); setDocRutNombre(r.data.archivoRutNombre || 'RUT (perfil)'); }
     }).catch(() => {});
   }, []);
 
@@ -123,10 +133,14 @@ export function CuentaCobroOpsPanel({ onCreada, tipoSolicitudId, areaId }: Cuent
       const fd = new FormData();
       fd.append('archivo', file);
       const r = await api.post<{ id: string }>('/archivos', fd, { headers: { 'Content-Type': undefined } });
-      if (campo === 'informe') { setDocInformeId(r.data.id); setDocInformeNombre(file.name); }
-      else if (campo === 'afiliaciones') { setDocAfiliacionesId(r.data.id); setDocAfiliacionesNombre(file.name); }
-      else if (campo === 'documento') { setDocDocumentoId(r.data.id); setDocDocumentoNombre(file.name); }
-      else { setDocCuentaId(r.data.id); setDocCuentaNombre(file.name); }
+      const id = r.data.id; const nom = file.name;
+      if (campo === 'certServicios') { setDocCertServiciosId(id); setDocCertServiciosNombre(nom); }
+      else if (campo === 'cartaEps')  { setDocCartaEpsId(id);     setDocCartaEpsNombre(nom); }
+      else if (campo === 'afiliaciones') { setDocAfiliacionesId(id); setDocAfiliacionesNombre(nom); }
+      else if (campo === 'panacea')   { setDocPanaceaId(id);      setDocPanaceaNombre(nom); }
+      else if (campo === 'cuenta')    { setDocCuentaId(id);       setDocCuentaNombre(nom); }
+      else if (campo === 'documento') { setDocDocumentoId(id);    setDocDocumentoNombre(nom); }
+      else if (campo === 'rut')       { setDocRutId(id);          setDocRutNombre(nom); }
     } catch {
       setErr('No se pudo subir el archivo. Máx 10 MB, formatos: PDF, JPG, PNG.');
     } finally {
@@ -152,6 +166,13 @@ export function CuentaCobroOpsPanel({ onCreada, tipoSolicitudId, areaId }: Cuent
       if (!banco) return 'Selecciona el banco';
       if (!numeroCuenta.trim()) return 'Ingresa el número de cuenta bancaria';
       if (!titularCuenta.trim()) return 'Ingresa el titular de la cuenta';
+    }
+    if (paso === 4) {
+      if (!docCertServiciosId) return 'Debes adjuntar el Certificado de prestación de servicios';
+      if (!docPanaceaId) return 'Debes adjuntar la constancia de cargue en Panacea o 360';
+      if (!opsAlDia) return 'Debes marcar la Certificación de OPS al día para continuar';
+      if (esNuevo && !docDocumentoId) return 'Para colaboradores nuevos debes adjuntar la copia del documento de identidad';
+      if (esNuevo && !docRutId) return 'Para colaboradores nuevos debes adjuntar la copia del RUT';
     }
     if (paso === 5) {
       if (!firma) return 'La firma es obligatoria';
@@ -208,12 +229,18 @@ export function CuentaCobroOpsPanel({ onCreada, tipoSolicitudId, areaId }: Cuent
           banco, tipoCuenta, numeroCuenta, titularCuenta,
           // EPS
           eps, entidadSalud: eps,
+          // Declaraciones
+          opsAlDia: opsAlDia ? 'si' : 'no',
+          esNuevoColaborador: esNuevo ? 'si' : 'no',
         },
         documentos: {
-          ...(docInformeId ? { informeActividades: { nombre: docInformeNombre, archivoId: docInformeId } } : {}),
-          ...(docAfiliacionesId ? { certificadoAfiliaciones: { nombre: docAfiliacionesNombre, archivoId: docAfiliacionesId } } : {}),
-          ...(docDocumentoId ? { copiaDocumentoIdentidad: { nombre: docDocumentoNombre, archivoId: docDocumentoId } } : {}),
+          ...(docCertServiciosId ? { certificadoPrestacionServicios: { nombre: docCertServiciosNombre, archivoId: docCertServiciosId } } : {}),
+          ...(docCartaEpsId ? { cartaEps: { nombre: docCartaEpsNombre, archivoId: docCartaEpsId } } : {}),
+          ...(docAfiliacionesId ? { certificadoEpsAdres: { nombre: docAfiliacionesNombre, archivoId: docAfiliacionesId } } : {}),
+          ...(docPanaceaId ? { constanciaPanacea360: { nombre: docPanaceaNombre, archivoId: docPanaceaId } } : {}),
           ...(docCuentaId ? { certificadoCuentaBancaria: { nombre: docCuentaNombre, archivoId: docCuentaId } } : {}),
+          ...(docDocumentoId ? { copiaDocumentoIdentidad: { nombre: docDocumentoNombre, archivoId: docDocumentoId } } : {}),
+          ...(docRutId ? { copiaRut: { nombre: docRutNombre, archivoId: docRutId } } : {}),
         },
         firmas: { profesional: firma },
       };
@@ -236,7 +263,7 @@ export function CuentaCobroOpsPanel({ onCreada, tipoSolicitudId, areaId }: Cuent
         <p>{msg}</p>
         <p className="leg-nota">Puedes hacer seguimiento en <strong>Mis solicitudes</strong>.</p>
         <button type="button" className="admin-primary-button"
-          onClick={() => { setMsg(''); setPaso(1); setNumeroContrato(''); setObjetoContrato(''); setValorCobrar(''); setActividadesRealizadas(''); setFirma(''); }}>
+          onClick={() => { setMsg(''); setPaso(1); setNumeroContrato(''); setObjetoContrato(''); setValorCobrar(''); setActividadesRealizadas(''); setFirma(''); setDocCertServiciosId(''); setDocCertServiciosNombre(''); setDocCartaEpsId(''); setDocCartaEpsNombre(''); setDocPanaceaId(''); setDocPanaceaNombre(''); setOpsAlDia(false); setEsNuevo(false); setDocRutId(''); setDocRutNombre(''); }}>
           Nueva cuenta de cobro
         </button>
       </div>
@@ -492,85 +519,184 @@ export function CuentaCobroOpsPanel({ onCreada, tipoSolicitudId, areaId }: Cuent
       {paso === 4 && (
         <div className="leg-form card-surface">
           <h3>Documentos adjuntos</h3>
-          <p className="leg-nota">Adjunta los soportes requeridos para el pago. Formatos aceptados: PDF, JPG, PNG (máx. 10 MB).</p>
+          <p className="leg-nota">Adjunta los soportes requeridos. Los marcados con <strong>✦</strong> se cargan automáticamente desde tu perfil. PDF, JPG o PNG · máx. 10 MB.</p>
 
+          {/* ── Grupo 1: Documentos del período (subir cada vez) ── */}
+          <h4 style={{ marginTop: 16, marginBottom: 8, fontSize: 12, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Documentos del período</h4>
+
+          {/* 1. Certificado de prestación de servicios */}
           <div className="leg-field">
-            <label>Informe de actividades</label>
-            <p className="leg-nota" style={{ marginBottom: 6 }}>
-              Documento con descripción detallada de las actividades realizadas en el período.
-            </p>
+            <label>Certificado de prestación de servicios *</label>
+            <p className="leg-nota" style={{ marginBottom: 6 }}>Documento que certifica los servicios prestados durante el período cobrado.</p>
             <div className="leg-factura-actions" style={{ display: 'flex', gap: 8 }}>
-              {subiendoDoc === 'informe' ? (
-                <span className="leg-validando">Subiendo…</span>
-              ) : (
+              {subiendoDoc === 'certServicios' ? <span className="leg-validando">Subiendo…</span> : (
                 <label className="admin-ghost-button" style={{ cursor: 'pointer' }}>
-                  {docInformeNombre ? `✓ ${docInformeNombre}` : '+ Adjuntar informe'}
+                  {docCertServiciosNombre ? `✓ ${docCertServiciosNombre}` : '+ Adjuntar certificado'}
                   <input type="file" accept="application/pdf,image/*" style={{ display: 'none' }}
-                    onChange={(e) => { const f = e.target.files?.[0]; if (f) subirDoc(f, 'informe'); e.target.value = ''; }} />
+                    onChange={(e) => { const f = e.target.files?.[0]; if (f) subirDoc(f, 'certServicios'); e.target.value = ''; }} />
                 </label>
+              )}
+              {docCertServiciosNombre && subiendoDoc !== 'certServicios' && (
+                <button type="button" className="admin-ghost-button" style={{ fontSize: 12 }} onClick={() => { setDocCertServiciosId(''); setDocCertServiciosNombre(''); }}>✕</button>
               )}
             </div>
           </div>
 
-          <div className="leg-field" style={{ marginTop: 16 }}>
-            <label>Certificación de afiliaciones (EPS / ARL / Pensión)</label>
+          {/* 2. Cargue en Panacea o 360 */}
+          <div className="leg-field" style={{ marginTop: 14 }}>
+            <label>Cargue en Panacea o 360 *</label>
+            <p className="leg-nota" style={{ marginBottom: 6 }}>Constancia del registro del servicio prestado en el sistema Panacea o 360 (pantallazo o reporte).</p>
+            <div className="leg-factura-actions" style={{ display: 'flex', gap: 8 }}>
+              {subiendoDoc === 'panacea' ? <span className="leg-validando">Subiendo…</span> : (
+                <label className="admin-ghost-button" style={{ cursor: 'pointer' }}>
+                  {docPanaceaNombre ? `✓ ${docPanaceaNombre}` : '+ Adjuntar constancia Panacea / 360'}
+                  <input type="file" accept="application/pdf,image/*" style={{ display: 'none' }}
+                    onChange={(e) => { const f = e.target.files?.[0]; if (f) subirDoc(f, 'panacea'); e.target.value = ''; }} />
+                </label>
+              )}
+              {docPanaceaNombre && subiendoDoc !== 'panacea' && (
+                <button type="button" className="admin-ghost-button" style={{ fontSize: 12 }} onClick={() => { setDocPanaceaId(''); setDocPanaceaNombre(''); }}>✕</button>
+              )}
+            </div>
+          </div>
+
+          {/* 3. Declaración OPS al día */}
+          <div className="leg-field" style={{ marginTop: 14 }}>
+            <label className="leg-check-label" style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer' }}>
+              <input type="checkbox" checked={opsAlDia} onChange={(e) => setOpsAlDia(e.target.checked)}
+                style={{ marginTop: 3, width: 16, height: 16, accentColor: 'var(--accent)', flexShrink: 0 }} />
+              <span>
+                <strong>Certificación de OPS al día *</strong><br />
+                <span className="leg-nota">Declaro bajo la gravedad de juramento que no tengo cuentas de cobro de períodos anteriores pendientes por radicar en esta institución.</span>
+              </span>
+            </label>
+          </div>
+
+          {/* ── Grupo 2: Documentos del profesional (desde perfil) ── */}
+          <h4 style={{ marginTop: 20, marginBottom: 8, fontSize: 12, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Documentos del profesional ✦ desde perfil</h4>
+
+          {/* 4. Carta EPS */}
+          <div className="leg-field">
+            <label>Carta informando EPS a la que está afiliado{docCartaEpsNombre.includes('perfil') ? ' ✦' : ''}</label>
             <p className="leg-nota" style={{ marginBottom: 6 }}>
-              Certificado actualizado que acredite las afiliaciones al sistema de seguridad social.
-              {docAfiliacionesId && docAfiliacionesNombre.includes('perfil') ? ' (cargado desde tu perfil)' : ''}
+              Carta o constancia que informa a qué EPS está afiliado.
+              {docCartaEpsId && docCartaEpsNombre.includes('perfil') ? ' Cargado desde tu perfil.' : ''}
             </p>
             <div className="leg-factura-actions" style={{ display: 'flex', gap: 8 }}>
-              {subiendoDoc === 'afiliaciones' ? (
-                <span className="leg-validando">Subiendo…</span>
-              ) : (
+              {subiendoDoc === 'cartaEps' ? <span className="leg-validando">Subiendo…</span> : (
                 <label className="admin-ghost-button" style={{ cursor: 'pointer' }}>
-                  {docAfiliacionesNombre ? `✓ ${docAfiliacionesNombre}` : '+ Adjuntar certificado'}
+                  {docCartaEpsNombre ? `✓ ${docCartaEpsNombre}` : '+ Adjuntar carta EPS'}
+                  <input type="file" accept="application/pdf,image/*" style={{ display: 'none' }}
+                    onChange={(e) => { const f = e.target.files?.[0]; if (f) subirDoc(f, 'cartaEps'); e.target.value = ''; }} />
+                </label>
+              )}
+              {docCartaEpsNombre && subiendoDoc !== 'cartaEps' && (
+                <button type="button" className="admin-ghost-button" style={{ fontSize: 12 }} onClick={() => { setDocCartaEpsId(''); setDocCartaEpsNombre(''); }}>✕</button>
+              )}
+            </div>
+          </div>
+
+          {/* 5. Certificado de EPS / ADRES */}
+          <div className="leg-field" style={{ marginTop: 14 }}>
+            <label>Certificado de EPS o consulta ADRES{docAfiliacionesNombre.includes('perfil') ? ' ✦' : ''}</label>
+            <p className="leg-nota" style={{ marginBottom: 6 }}>
+              Certificado que evidencia que está activo en EPS (afiliaciones EPS / ARL / Pensión o consulta ADRES).
+              {docAfiliacionesId && docAfiliacionesNombre.includes('perfil') ? ' Cargado desde tu perfil.' : ''}
+            </p>
+            <div className="leg-factura-actions" style={{ display: 'flex', gap: 8 }}>
+              {subiendoDoc === 'afiliaciones' ? <span className="leg-validando">Subiendo…</span> : (
+                <label className="admin-ghost-button" style={{ cursor: 'pointer' }}>
+                  {docAfiliacionesNombre ? `✓ ${docAfiliacionesNombre}` : '+ Adjuntar certificado EPS / ADRES'}
                   <input type="file" accept="application/pdf,image/*" style={{ display: 'none' }}
                     onChange={(e) => { const f = e.target.files?.[0]; if (f) subirDoc(f, 'afiliaciones'); e.target.value = ''; }} />
                 </label>
               )}
-              {docAfiliacionesNombre && <button type="button" className="admin-ghost-button" style={{ fontSize: 12 }} onClick={() => { setDocAfiliacionesId(''); setDocAfiliacionesNombre(''); }}>✕</button>}
-            </div>
-          </div>
-
-          <div className="leg-field" style={{ marginTop: 16 }}>
-            <label>Copia del documento de identidad</label>
-            <p className="leg-nota" style={{ marginBottom: 6 }}>
-              Copia legible de la cédula u otro documento de identidad.
-              {docDocumentoId && docDocumentoNombre.includes('perfil') ? ' (cargado desde tu perfil)' : ''}
-            </p>
-            <div className="leg-factura-actions" style={{ display: 'flex', gap: 8 }}>
-              {subiendoDoc === 'documento' ? (
-                <span className="leg-validando">Subiendo…</span>
-              ) : (
-                <label className="admin-ghost-button" style={{ cursor: 'pointer' }}>
-                  {docDocumentoNombre ? `✓ ${docDocumentoNombre}` : '+ Adjuntar copia del documento'}
-                  <input type="file" accept="application/pdf,image/*" style={{ display: 'none' }}
-                    onChange={(e) => { const f = e.target.files?.[0]; if (f) subirDoc(f, 'documento'); e.target.value = ''; }} />
-                </label>
+              {docAfiliacionesNombre && subiendoDoc !== 'afiliaciones' && (
+                <button type="button" className="admin-ghost-button" style={{ fontSize: 12 }} onClick={() => { setDocAfiliacionesId(''); setDocAfiliacionesNombre(''); }}>✕</button>
               )}
-              {docDocumentoNombre && <button type="button" className="admin-ghost-button" style={{ fontSize: 12 }} onClick={() => { setDocDocumentoId(''); setDocDocumentoNombre(''); }}>✕</button>}
             </div>
           </div>
 
-          <div className="leg-field" style={{ marginTop: 16 }}>
-            <label>Certificado de cuenta bancaria</label>
+          {/* 6. Certificación bancaria */}
+          <div className="leg-field" style={{ marginTop: 14 }}>
+            <label>Copia de certificación bancaria{docCuentaNombre.includes('perfil') ? ' ✦' : ''}</label>
             <p className="leg-nota" style={{ marginBottom: 6 }}>
-              Certificado del banco que acredite la cuenta para el pago.
-              {docCuentaId && docCuentaNombre.includes('perfil') ? ' (cargado desde tu perfil)' : ''}
+              Certificado del banco que acredita la cuenta para el pago.
+              {docCuentaId && docCuentaNombre.includes('perfil') ? ' Cargado desde tu perfil.' : ''}
             </p>
             <div className="leg-factura-actions" style={{ display: 'flex', gap: 8 }}>
-              {subiendoDoc === 'cuenta' ? (
-                <span className="leg-validando">Subiendo…</span>
-              ) : (
+              {subiendoDoc === 'cuenta' ? <span className="leg-validando">Subiendo…</span> : (
                 <label className="admin-ghost-button" style={{ cursor: 'pointer' }}>
                   {docCuentaNombre ? `✓ ${docCuentaNombre}` : '+ Adjuntar certificado bancario'}
                   <input type="file" accept="application/pdf,image/*" style={{ display: 'none' }}
                     onChange={(e) => { const f = e.target.files?.[0]; if (f) subirDoc(f, 'cuenta'); e.target.value = ''; }} />
                 </label>
               )}
-              {docCuentaNombre && <button type="button" className="admin-ghost-button" style={{ fontSize: 12 }} onClick={() => { setDocCuentaId(''); setDocCuentaNombre(''); }}>✕</button>}
+              {docCuentaNombre && subiendoDoc !== 'cuenta' && (
+                <button type="button" className="admin-ghost-button" style={{ fontSize: 12 }} onClick={() => { setDocCuentaId(''); setDocCuentaNombre(''); }}>✕</button>
+              )}
             </div>
           </div>
+
+          {/* ── Grupo 3: Colaborador nuevo (condicional) ── */}
+          <h4 style={{ marginTop: 20, marginBottom: 8, fontSize: 12, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Primera radicación</h4>
+
+          <div className="leg-field">
+            <label className="leg-check-label" style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer' }}>
+              <input type="checkbox" checked={esNuevo} onChange={(e) => setEsNuevo(e.target.checked)}
+                style={{ marginTop: 3, width: 16, height: 16, accentColor: 'var(--accent)', flexShrink: 0 }} />
+              <span>
+                <strong>Soy colaborador nuevo / es mi primera radicación en la IPS</strong><br />
+                <span className="leg-nota">Si marcas esta opción debes adjuntar copia del RUT y del documento de identidad.</span>
+              </span>
+            </label>
+          </div>
+
+          {esNuevo && (
+            <>
+              {/* 7. Copia del documento de identidad */}
+              <div className="leg-field" style={{ marginTop: 14 }}>
+                <label>Copia del documento de identidad *{docDocumentoNombre.includes('perfil') ? ' ✦' : ''}</label>
+                <p className="leg-nota" style={{ marginBottom: 6 }}>
+                  Copia legible de la cédula u otro documento de identidad.
+                  {docDocumentoId && docDocumentoNombre.includes('perfil') ? ' Cargado desde tu perfil.' : ''}
+                </p>
+                <div className="leg-factura-actions" style={{ display: 'flex', gap: 8 }}>
+                  {subiendoDoc === 'documento' ? <span className="leg-validando">Subiendo…</span> : (
+                    <label className="admin-ghost-button" style={{ cursor: 'pointer' }}>
+                      {docDocumentoNombre ? `✓ ${docDocumentoNombre}` : '+ Adjuntar copia del documento'}
+                      <input type="file" accept="application/pdf,image/*" style={{ display: 'none' }}
+                        onChange={(e) => { const f = e.target.files?.[0]; if (f) subirDoc(f, 'documento'); e.target.value = ''; }} />
+                    </label>
+                  )}
+                  {docDocumentoNombre && subiendoDoc !== 'documento' && (
+                    <button type="button" className="admin-ghost-button" style={{ fontSize: 12 }} onClick={() => { setDocDocumentoId(''); setDocDocumentoNombre(''); }}>✕</button>
+                  )}
+                </div>
+              </div>
+
+              {/* 8. Copia del RUT */}
+              <div className="leg-field" style={{ marginTop: 14 }}>
+                <label>Copia del RUT *{docRutNombre.includes('perfil') ? ' ✦' : ''}</label>
+                <p className="leg-nota" style={{ marginBottom: 6 }}>
+                  Registro Único Tributario actualizado.
+                  {docRutId && docRutNombre.includes('perfil') ? ' Cargado desde tu perfil.' : ''}
+                </p>
+                <div className="leg-factura-actions" style={{ display: 'flex', gap: 8 }}>
+                  {subiendoDoc === 'rut' ? <span className="leg-validando">Subiendo…</span> : (
+                    <label className="admin-ghost-button" style={{ cursor: 'pointer' }}>
+                      {docRutNombre ? `✓ ${docRutNombre}` : '+ Adjuntar RUT'}
+                      <input type="file" accept="application/pdf,image/*" style={{ display: 'none' }}
+                        onChange={(e) => { const f = e.target.files?.[0]; if (f) subirDoc(f, 'rut'); e.target.value = ''; }} />
+                    </label>
+                  )}
+                  {docRutNombre && subiendoDoc !== 'rut' && (
+                    <button type="button" className="admin-ghost-button" style={{ fontSize: 12 }} onClick={() => { setDocRutId(''); setDocRutNombre(''); }}>✕</button>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
 
           <div className="leg-actions">
             <button type="button" className="admin-ghost-button" onClick={anterior}>← Atrás</button>

@@ -105,8 +105,8 @@ Response::json([
     'slug'            => $r['slug'],
     'activo'          => (bool)$r['activo'],
     'orden'           => (int)$r['orden'],
-    'camposPlantilla'   => json_decode($r['campos_plantilla'] ?? '[]', true) ?: [],
-    'flujoAprobacion'   => json_decode($r['flujo_aprobacion'] ?? '[]', true) ?: [],
+    'camposPlantilla'   => (function($v){ $d = json_decode($v ?? '[]', true); return (is_array($d) && array_is_list($d)) ? $d : []; })($r['campos_plantilla']),
+    'flujoAprobacion'   => (function($v){ $d = json_decode($v ?? '[]', true); return (is_array($d) && array_is_list($d)) ? $d : []; })($r['flujo_aprobacion']),
     'flujoAreas'        => $r['flujo_areas'] ? (json_decode($r['flujo_areas'], true) ?: null) : null,
     'plantillaPdf'      => $r['plantilla_pdf'] ? (json_decode($r['plantilla_pdf'], true) ?: null) : null,
     'configuracionTipo' => isset($r['configuracion_tipo']) && $r['configuracion_tipo']

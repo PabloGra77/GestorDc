@@ -35,8 +35,8 @@ Response::json(array_map(function ($row) {
         'slug'            => $row['slug'],
         'activo'          => (bool)$row['activo'],
         'orden'           => (int)$row['orden'],
-        'camposPlantilla'   => json_decode($row['campos_plantilla'] ?? '[]', true) ?: [],
-        'flujoAprobacion'   => json_decode($row['flujo_aprobacion'] ?? '[]', true) ?: [],
+        'camposPlantilla'   => (function($v){ $d = json_decode($v ?? '[]', true); return (is_array($d) && array_is_list($d)) ? $d : []; })($row['campos_plantilla']),
+        'flujoAprobacion'   => (function($v){ $d = json_decode($v ?? '[]', true); return (is_array($d) && array_is_list($d)) ? $d : []; })($row['flujo_aprobacion']),
         'flujoAreas'        => $row['flujo_areas'] ? (json_decode($row['flujo_areas'], true) ?: null) : null,
         'plantillaPdf'      => $row['plantilla_pdf'] ? (json_decode($row['plantilla_pdf'], true) ?: null) : null,
         'configuracionTipo' => isset($row['configuracion_tipo']) && $row['configuracion_tipo']

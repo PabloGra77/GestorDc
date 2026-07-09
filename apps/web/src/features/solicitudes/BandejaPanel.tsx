@@ -728,7 +728,7 @@ export function BandejaPanel() {
 
                     <h4>Datos diligenciados</h4>
                     <div className="bandeja-datos">
-                      {detalle.camposPlantilla
+                      {(Array.isArray(detalle.camposPlantilla) ? detalle.camposPlantilla : [])
                         .filter((c) => c.type !== 'file')
                         .map((c) => {
                           if (c.type === 'tabla-items') {
@@ -804,16 +804,16 @@ export function BandejaPanel() {
 
                     <h4>Documentos adjuntos</h4>
                     <ul className="bandeja-docs">
-                      {detalle.camposPlantilla.filter((c) => c.type === 'file').length === 0 ? (
+                      {(Array.isArray(detalle.camposPlantilla) ? detalle.camposPlantilla : []).filter((c) => c.type === 'file').length === 0 ? (
                         <li><em className="admin-help-text">Este tipo de solicitud no pide documentos adjuntos.</em></li>
                       ) : null}
-                      {detalle.camposPlantilla
+                      {(Array.isArray(detalle.camposPlantilla) ? detalle.camposPlantilla : [])
                         .filter((c) => c.type === 'file')
                         .map((c) => {
                           const doc = formatearDocumento(detalle.documentos[c.key]);
                           // Comparación: dato que la IA debe verificar dentro del adjunto
                           const campoDato = c.validar_contra
-                            ? detalle.camposPlantilla.find((d) => d.key === c.validar_contra)
+                            ? (Array.isArray(detalle.camposPlantilla) ? detalle.camposPlantilla : []).find((d) => d.key === c.validar_contra)
                             : undefined;
                           const valorEsperado = campoDato
                             ? formatearValor(campoDato, detalle.datosFormulario[campoDato.key]).texto
@@ -841,7 +841,7 @@ export function BandejaPanel() {
                                   🔎 La IA debe verificar que <strong>{campoDato.label}</strong> ("{valorEsperado}") aparezca en este adjunto.
                                 </div>
                               ) : null}
-                              {detalle.camposPlantilla
+                              {(Array.isArray(detalle.camposPlantilla) ? detalle.camposPlantilla : [])
                                 .filter((d) => d.comparar_contra === c.key)
                                 .map((d) => {
                                   const val = formatearValor(d, detalle.datosFormulario[d.key]).texto;

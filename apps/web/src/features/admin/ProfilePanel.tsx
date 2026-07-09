@@ -29,6 +29,10 @@ interface PerfilData {
   archivoDocumentoNombre?: string | null;
   archivoCuentaId?: string | null;
   archivoCuentaNombre?: string | null;
+  archivoRutId?: string | null;
+  archivoRutNombre?: string | null;
+  archivoCartaEpsId?: string | null;
+  archivoCartaEpsNombre?: string | null;
   rol: { nombre: string };
   areaId?: number | null;
   nivelAprobacion?: string | null;
@@ -68,11 +72,17 @@ export function ProfilePanel() {
   const [archivoDocumentoNombre, setArchivoDocumentoNombre] = useState('');
   const [archivoCuentaId, setArchivoCuentaId] = useState('');
   const [archivoCuentaNombre, setArchivoCuentaNombre] = useState('');
+  const [archivoRutId, setArchivoRutId] = useState('');
+  const [archivoRutNombre, setArchivoRutNombre] = useState('');
+  const [archivoCartaEpsId, setArchivoCartaEpsId] = useState('');
+  const [archivoCartaEpsNombre, setArchivoCartaEpsNombre] = useState('');
   const [subiendoDoc, setSubiendoDoc] = useState<string | null>(null);
   const [errDoc, setErrDoc] = useState('');
   const epsInputRef = useRef<HTMLInputElement>(null);
   const docInputRef = useRef<HTMLInputElement>(null);
   const cuentaInputRef = useRef<HTMLInputElement>(null);
+  const rutInputRef = useRef<HTMLInputElement>(null);
+  const cartaEpsInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     api.get<PerfilData>('/usuarios/perfil').then((r) => {
@@ -103,6 +113,10 @@ export function ProfilePanel() {
       setArchivoDocumentoNombre(p.archivoDocumentoNombre || '');
       setArchivoCuentaId(p.archivoCuentaId || '');
       setArchivoCuentaNombre(p.archivoCuentaNombre || '');
+      setArchivoRutId(p.archivoRutId || '');
+      setArchivoRutNombre(p.archivoRutNombre || '');
+      setArchivoCartaEpsId(p.archivoCartaEpsId || '');
+      setArchivoCartaEpsNombre(p.archivoCartaEpsNombre || '');
     }).catch(() => {
       setErr('No se pudo cargar el perfil.');
     }).finally(() => setLoading(false));
@@ -160,7 +174,7 @@ export function ProfilePanel() {
     }
   }
 
-  async function subirDocPerfil(file: File, tipo: 'eps' | 'documento' | 'cuenta') {
+  async function subirDocPerfil(file: File, tipo: 'eps' | 'documento' | 'cuenta' | 'rut' | 'carta_eps') {
     setErrDoc('');
     setSubiendoDoc(tipo);
     try {
@@ -169,13 +183,19 @@ export function ProfilePanel() {
       const r = await api.post<{ id: string }>('/archivos', fd, { headers: { 'Content-Type': undefined } });
       const id = r.data.id;
       const nombre = file.name;
-      const patch: Record<string, string> = {};
+      const patch: Record<string, string | null> = {};
       if (tipo === 'eps') {
         setArchivoEpsId(id); setArchivoEpsNombre(nombre);
         patch.archivoEpsId = id; patch.archivoEpsNombre = nombre;
       } else if (tipo === 'documento') {
         setArchivoDocumentoId(id); setArchivoDocumentoNombre(nombre);
         patch.archivoDocumentoId = id; patch.archivoDocumentoNombre = nombre;
+      } else if (tipo === 'rut') {
+        setArchivoRutId(id); setArchivoRutNombre(nombre);
+        patch.archivoRutId = id; patch.archivoRutNombre = nombre;
+      } else if (tipo === 'carta_eps') {
+        setArchivoCartaEpsId(id); setArchivoCartaEpsNombre(nombre);
+        patch.archivoCartaEpsId = id; patch.archivoCartaEpsNombre = nombre;
       } else {
         setArchivoCuentaId(id); setArchivoCuentaNombre(nombre);
         patch.archivoCuentaId = id; patch.archivoCuentaNombre = nombre;
@@ -515,6 +535,60 @@ export function ProfilePanel() {
                 {archivoCuentaNombre && subiendoDoc !== 'cuenta' && (
                   <button type="button" className="admin-ghost-button" style={{ fontSize: 12 }}
                     onClick={() => { setArchivoCuentaId(''); setArchivoCuentaNombre(''); api.patch('/usuarios/perfil', { archivoCuentaId: null, archivoCuentaNombre: null }); }}>
+                    ✕ Quitar
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div style={{ marginTop: 12 }}>
+              <label className="profile-label">Carta informando EPS a la que está afiliado</label>
+              <p className="admin-help-text" style={{ marginTop: 2, marginBottom: 4 }}>Carta o constancia que informa a qué EPS está afiliado. Se adjunta automáticamente en cada radicación.</p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 4 }}>
+                {subiendoDoc === 'carta_eps' ? (
+                  <span className="admin-help-text">Subiendo…</span>
+                ) : (
+                  <label className="admin-ghost-button" style={{ cursor: 'pointer', fontSize: 13 }}>
+                    {archivoCartaEpsNombre ? `✓ ${archivoCartaEpsNombre}` : '+ Adjuntar carta EPS'}
+                    <input
+                      ref={cartaEpsInputRef}
+                      type="file"
+                      accept="application/pdf,image/*"
+                      style={{ display: 'none' }}
+                      onChange={(e) => { const f = e.target.files?.[0]; if (f) subirDocPerfil(f, 'carta_eps'); e.target.value = ''; }}
+                    />
+                  </label>
+                )}
+                {archivoCartaEpsNombre && subiendoDoc !== 'carta_eps' && (
+                  <button type="button" className="admin-ghost-button" style={{ fontSize: 12 }}
+                    onClick={() => { setArchivoCartaEpsId(''); setArchivoCartaEpsNombre(''); api.patch('/usuarios/perfil', { archivoCartaEpsId: null, archivoCartaEpsNombre: null }); }}>
+                    ✕ Quitar
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div style={{ marginTop: 12 }}>
+              <label className="profile-label">Copia del RUT</label>
+              <p className="admin-help-text" style={{ marginTop: 2, marginBottom: 4 }}>Requerido para colaboradores nuevos. Se adjunta automáticamente si está guardado aquí.</p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 4 }}>
+                {subiendoDoc === 'rut' ? (
+                  <span className="admin-help-text">Subiendo…</span>
+                ) : (
+                  <label className="admin-ghost-button" style={{ cursor: 'pointer', fontSize: 13 }}>
+                    {archivoRutNombre ? `✓ ${archivoRutNombre}` : '+ Adjuntar RUT'}
+                    <input
+                      ref={rutInputRef}
+                      type="file"
+                      accept="application/pdf,image/*"
+                      style={{ display: 'none' }}
+                      onChange={(e) => { const f = e.target.files?.[0]; if (f) subirDocPerfil(f, 'rut'); e.target.value = ''; }}
+                    />
+                  </label>
+                )}
+                {archivoRutNombre && subiendoDoc !== 'rut' && (
+                  <button type="button" className="admin-ghost-button" style={{ fontSize: 12 }}
+                    onClick={() => { setArchivoRutId(''); setArchivoRutNombre(''); api.patch('/usuarios/perfil', { archivoRutId: null, archivoRutNombre: null }); }}>
                     ✕ Quitar
                   </button>
                 )}

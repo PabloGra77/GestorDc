@@ -539,7 +539,8 @@ export async function generarFormatoBlobUrl(s: SolicitudParaPdf): Promise<string
     || typeof s.datosFormulario['tiqueteIda'] === 'string';
   const esAnticipo = s.tipoSlug === 'anticipo'
     || typeof s.datosFormulario['items'] === 'string';
-  if (esLegalizacion || esViaticos || esAnticipo) {
+  const esCuentaCobroOpsB = s.tipoSlug === 'cuenta-cobro-ops';
+  if (esLegalizacion || esViaticos || esAnticipo || esCuentaCobroOpsB) {
     const url = _generarPdfEspecial(s, { bloburl: true });
     return typeof url === 'string' ? url : null;
   }
@@ -648,6 +649,9 @@ function _generarPdfEspecial(s: SolicitudParaPdf, opts?: { bloburl?: boolean }):
     || typeof s.datosFormulario['gastos'] === 'string';
   const esViaticos = s.tipoSlug === 'viaticos'
     || typeof s.datosFormulario['tiqueteIda'] === 'string';
+  const esAnticipo = s.tipoSlug === 'anticipo'
+    || typeof s.datosFormulario['items'] === 'string';
+  const esCuentaCobroOps = s.tipoSlug === 'cuenta-cobro-ops';
 
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -716,17 +720,20 @@ function _generarPdfEspecial(s: SolicitudParaPdf, opts?: { bloburl?: boolean }):
   }
   y += 8;
 
-  // Título principal centrado (para legalizaciones y viáticos, usa encabezado propio)
-  if (esLegalizacion || esViaticos) {
+  // Título principal centrado
+  if (esLegalizacion || esViaticos || esAnticipo || esCuentaCobroOps) {
     doc.setDrawColor(212, 175, 55);
     doc.setLineWidth(0.8);
     doc.line(margin, y, pageWidth - margin, y);
     y += 6;
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(14);
+    doc.setFontSize(13);
     doc.setTextColor(7, 11, 29);
     doc.text(
-      esLegalizacion ? 'SOLICITUD DE LEGALIZACIÓN DE GASTOS' : 'SOLICITUD DE VIÁTICOS',
+      esLegalizacion ? 'SOLICITUD DE LEGALIZACIÓN DE GASTOS'
+      : esViaticos ? 'SOLICITUD DE VIÁTICOS'
+      : esAnticipo ? 'SOLICITUD DE ANTICIPO DE GASTOS'
+      : 'CUENTA DE COBRO — CONTRATO DE PRESTACIÓN DE SERVICIOS OPS',
       pageWidth / 2, y, { align: 'center' },
     );
     y += 5;
@@ -1097,8 +1104,6 @@ function _generarPdfEspecial(s: SolicitudParaPdf, opts?: { bloburl?: boolean }):
   }
 
   // Bloque especial: anticipo de gastos (datosFormulario.items = JSON string)
-  const esAnticipo = s.tipoSlug === 'anticipo'
-    || typeof s.datosFormulario['items'] === 'string';
   const rawItems = s.datosFormulario['items'];
   if (esAnticipo && rawItems && typeof rawItems === 'string') {
     try {
@@ -1125,7 +1130,43 @@ function _generarPdfEspecial(s: SolicitudParaPdf, opts?: { bloburl?: boolean }):
         doc.setFont('helvetica', 'normal');
         const splitNarr = doc.splitTextToSize(narrativa, pageWidth - margin * 2);
         doc.text(splitNarr, margin, y);
-        y += splitNarr.length * 5 + 6;
+        y += splitNarr.length * 5 + 5;
+
+        // Autorización del gasto
+        const autorizadorAnticipo = String(s.datosFormulario['autorizadorNombre'] || s.datosFormulario['autorizador'] || s.datosFormulario['autorizadoPor'] || '');
+        const propositoAnticipo = String(s.datosFormulario['propositoGasto'] || s.datosFormulario['paraque'] || s.datosFormulario['justificacion'] || '');
+        if (autorizadorAnticipo || propositoAnticipo) {
+          if (y > 245) { doc.addPage(); y = margin; }
+          const boxH = (autorizadorAnticipo ? 8 : 0) + (propositoAnticipo ? 8 : 0) + 4;
+          doc.setFillColor(253, 246, 220);
+          doc.setDrawColor(212, 175, 55);
+          doc.setLineWidth(0.5);
+          doc.rect(margin, y, pageWidth - margin * 2, boxH, 'FD');
+          let by = y + 5;
+          if (autorizadorAnticipo) {
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(8);
+            doc.setTextColor(120, 85, 0);
+            doc.text('AUTORIZADO POR:', margin + 3, by);
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(10);
+            doc.setTextColor(15, 23, 42);
+            doc.text(autorizadorAnticipo, margin + 42, by);
+            by += 8;
+          }
+          if (propositoAnticipo) {
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(8);
+            doc.setTextColor(120, 85, 0);
+            doc.text('PROPÓSITO DEL GASTO:', margin + 3, by);
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(9);
+            doc.setTextColor(15, 23, 42);
+            const pLines = doc.splitTextToSize(propositoAnticipo, pageWidth - margin * 2 - 55);
+            doc.text(pLines, margin + 52, by);
+          }
+          y += boxH + 5;
+        }
 
         // Tabla de ítems
         if (y > 240) { doc.addPage(); y = margin; }
@@ -1185,9 +1226,136 @@ function _generarPdfEspecial(s: SolicitudParaPdf, opts?: { bloburl?: boolean }):
     } catch { /* datos inválidos */ }
   }
 
+  // ── Cuenta de Cobro OPS ──────────────────────────────────────────────────
+  if (esCuentaCobroOps) {
+    const d = s.datosFormulario;
+    const get = (k: string) => String(d[k] ?? '');
+    const fmt$ = (v: string) => {
+      const n = Number(v.replace(/[^0-9]/g, ''));
+      return n ? `$${n.toLocaleString('es-CO')}` : (v || '—');
+    };
+    const seccion = (titulo: string) => {
+      if (y > 255) { doc.addPage(); y = margin; }
+      doc.setDrawColor(212, 175, 55);
+      doc.setLineWidth(0.5);
+      doc.line(margin, y, pageWidth - margin, y);
+      y += 5;
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(184, 144, 31);
+      doc.setFontSize(10);
+      doc.text(titulo, margin, y);
+      y += 6;
+      doc.setFontSize(9);
+      doc.setTextColor(15, 23, 42);
+    };
+    const fila = (etiq: string, val: string, etiqR?: string, valR?: string) => {
+      if (y > 272) { doc.addPage(); y = margin; }
+      const fw = pageWidth - margin * 2;
+      const col = etiqR != null ? fw / 2 - 3 : fw;
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      const ew = doc.getTextWidth(etiq + ':  ');
+      doc.text(etiq + ':', margin, y);
+      doc.setFont('helvetica', 'normal');
+      const lns = doc.splitTextToSize(val || '—', col - ew);
+      doc.text(lns, margin + ew, y);
+      if (etiqR != null) {
+        const rx = margin + fw / 2 + 3;
+        doc.setFont('helvetica', 'bold');
+        const rew = doc.getTextWidth(etiqR + ':  ');
+        doc.text(etiqR + ':', rx, y);
+        doc.setFont('helvetica', 'normal');
+        const rlns = doc.splitTextToSize(valR || '—', col - rew);
+        doc.text(rlns, rx + rew, y);
+        y += Math.max(lns.length, rlns.length) * 4.5 + 2;
+      } else {
+        y += lns.length * 4.5 + 2;
+      }
+    };
+
+    // 1. Datos del contrato
+    seccion('1. DATOS DEL CONTRATO / OPS');
+    fila('N° Contrato u OPS', get('numeroContrato'), 'Valor total del contrato', fmt$(get('valorTotalContrato')));
+    fila('Fecha inicio', get('fechaInicioContrato'), 'Fecha fin', get('fechaFinContrato'));
+    const objContrato = get('objetoContrato');
+    if (objContrato) {
+      if (y > 265) { doc.addPage(); y = margin; }
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      doc.text('Objeto del contrato:', margin, y);
+      y += 4.5;
+      doc.setFont('helvetica', 'normal');
+      const oc = doc.splitTextToSize(objContrato, pageWidth - margin * 2 - 4);
+      doc.text(oc, margin + 4, y);
+      y += oc.length * 4.5 + 2;
+    }
+    y += 2;
+
+    // 2. Datos del cobro
+    seccion('2. DATOS DEL COBRO');
+    fila('N° Cuenta de cobro', get('numeroCuentaCobro'), 'Valor a cobrar', fmt$(get('valorCobrar')));
+    fila('Período desde', get('periodoInicio'), 'Período hasta', get('periodoFin'));
+    y += 2;
+
+    // 3. Actividades realizadas
+    seccion('3. ACTIVIDADES REALIZADAS EN EL PERÍODO');
+    const actividades = get('actividadesRealizadas');
+    if (actividades) {
+      const al = doc.splitTextToSize(actividades, pageWidth - margin * 2);
+      if (y + al.length * 4.5 > 275) { doc.addPage(); y = margin; }
+      doc.setFont('helvetica', 'normal');
+      doc.text(al, margin, y);
+      y += al.length * 4.5 + 3;
+    } else {
+      doc.setFont('helvetica', 'normal');
+      doc.text('—', margin, y);
+      y += 6;
+    }
+    y += 2;
+
+    // 4. Datos bancarios
+    seccion('4. DATOS BANCARIOS PARA EL PAGO');
+    fila('Banco', get('banco'), 'Tipo de cuenta', get('tipoCuenta'));
+    fila('N° de cuenta', get('numeroCuenta'), 'Titular de la cuenta', get('titularCuenta'));
+    const epsVal = get('eps') || get('entidadSalud');
+    if (epsVal) fila('EPS / Entidad de salud', epsVal);
+    y += 2;
+
+    // 5. Declaraciones
+    if (y > 255) { doc.addPage(); y = margin; }
+    doc.setDrawColor(212, 175, 55);
+    doc.setLineWidth(0.5);
+    doc.line(margin, y, pageWidth - margin, y);
+    y += 5;
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(184, 144, 31);
+    doc.setFontSize(10);
+    doc.text('5. DECLARACIONES DEL PROFESIONAL', margin, y);
+    y += 6;
+    doc.setFontSize(9);
+    doc.setTextColor(15, 23, 42);
+
+    const check = (v: string) => (v === 'si' || v === 'true' || v === '1') ? '[✓]' : '[ ]';
+    const declAlDia = get('opsAlDia');
+    const declNuevo = get('esNuevoColaborador');
+
+    const d1 = `${check(declAlDia)} OPS al día: certifico que no tengo cuentas de cobro de meses anteriores pendientes por radicar.`;
+    const d2 = `${check(declNuevo)} Nuevo(a) colaborador(a): es mi primera radicación en esta institución.`;
+    const certTexto = 'Quien suscribe certifica que los servicios descritos fueron efectivamente prestados durante el período indicado, que la información suministrada es verídica y que acepta la responsabilidad correspondiente.';
+
+    [d1, d2, certTexto].forEach((txt) => {
+      const lines = doc.splitTextToSize(txt, pageWidth - margin * 2);
+      if (y + lines.length * 4.5 > 272) { doc.addPage(); y = margin; }
+      doc.setFont('helvetica', txt === certTexto ? 'italic' : 'normal');
+      doc.text(lines, margin, y);
+      y += lines.length * 4.5 + 3;
+    });
+    y += 4;
+  }
+
   // Datos por grupo
   const grupos = new Map<string, CampoPlantilla[]>();
-  s.camposPlantilla.forEach((c) => {
+  (Array.isArray(s.camposPlantilla) ? s.camposPlantilla : []).forEach((c) => {
     const g = c.group || 'Datos';
     if (!grupos.has(g)) grupos.set(g, []);
     grupos.get(g)!.push(c);
@@ -1318,6 +1486,10 @@ function _generarPdfEspecial(s: SolicitudParaPdf, opts?: { bloburl?: boolean }):
     drawFirma('', autorizadorNombre || autorizadorLabel, autorizadorLabel, 1);
     drawFirma(firmas.analista || firmas.coordinador || '', aprobacionPorPaso['analista'] || aprobacionPorPaso['coordinador'] || 'Analista / Coordinador', 'Validó', 2);
     drawFirma(firmas.contabilidad || '', aprobacionPorPaso['contabilidad'] || aprobacionPorPaso['director'] || 'Área final', 'Aprobó', 3);
+  } else if (esCuentaCobroOps) {
+    drawFirma(firmas.profesional || '', s.solicitanteNombre || 'Profesional OPS', 'Firma del profesional', 0);
+    drawFirma(firmas.coordinador || '', aprobacionPorPaso['coordinador'] || aprobacionPorPaso['analista'] || 'Supervisor / Coordinador', 'Revisó y avaló', 1);
+    drawFirma(firmas.contabilidad || '', aprobacionPorPaso['contabilidad'] || 'Contabilidad / Tesorería', 'Aprobó pago', 2);
   } else {
     drawFirma(firmas.profesional || firmas.analista || '', 'Profesional solicitante', 'Diligenciamiento', 0);
     drawFirma(firmas.coordinador || '', 'Coordinador', 'Validación', 1);
@@ -1351,7 +1523,8 @@ export function generarPdfFormato(s: SolicitudParaPdf): void {
     || typeof s.datosFormulario['tiqueteIda'] === 'string';
   const esAnticipo = s.tipoSlug === 'anticipo'
     || typeof s.datosFormulario['items'] === 'string';
-  if (s.plantillaPdf && !esLegalizacion && !esViaticos && !esAnticipo) {
+  const esCCO = s.tipoSlug === 'cuenta-cobro-ops';
+  if (s.plantillaPdf && !esLegalizacion && !esViaticos && !esAnticipo && !esCCO) {
     void generarPdfPlantilla(s, s.plantillaPdf);
     return;
   }
