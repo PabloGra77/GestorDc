@@ -2134,6 +2134,9 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
 .radicaciones-overlay {
   display: none;
 }
+/* Card menu y volver: solo móvil, ocultos en desktop */
+.rad-movil-cardmenu { display: none; }
+.rad-movil-volver   { display: none; }
 
 .radicaciones-nav {
   display: inline-flex;
@@ -2927,81 +2930,144 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
     height: 38px !important;
   }
 
-  /* ── Radicaciones: nav horizontal tabs en vez de sidebar lateral ── */
+  /* ── Radicaciones: sistema de tarjetas en móvil ── */
   .radicaciones-menu-btn { display: none !important; }
   .radicaciones-overlay  { display: none !important; }
 
-  /* El módulo pierde su padding general */
+  /* Módulo sin padding lateral propio */
   .radicaciones-module { padding: 0 !important; overflow: hidden; }
 
-  /* Cabecera del módulo: compacta */
+  /* Cabecera: compacta con botón volver */
   .radicaciones-head {
-    padding: 12px 14px 10px !important;
+    display: flex !important;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px !important;
     border-bottom: 1px solid rgba(212,175,55,0.15);
     background: rgba(0,0,0,0.2);
+    min-height: 46px;
   }
-  .radicaciones-head h3 { font-size: 14px !important; letter-spacing: 0.08em; margin: 0 0 2px !important; }
+  .rad-head-titulo { flex: 1; min-width: 0; }
+  .radicaciones-head h3 { font-size: 13px !important; letter-spacing: 0.07em; margin: 0 !important; }
   .radicaciones-head p { display: none !important; }
 
-  /* Layout en columna */
-  .radicaciones-layout { flex-direction: column !important; gap: 0; }
-
-  /* Nav: barra horizontal scrolleable con fondo negro */
-  .radicaciones-nav {
-    position: static !important;
-    left: auto !important; top: auto !important; bottom: auto !important;
-    width: 100% !important; max-width: none !important;
-    flex-direction: row !important;
-    overflow-x: auto !important; overflow-y: hidden !important;
-    gap: 4px !important;
-    padding: 8px 12px !important;
-    border-right: none !important;
-    border-bottom: 2px solid rgba(212,175,55,0.15) !important;
-    border-radius: 0 !important;
-    box-shadow: none !important;
-    transition: none !important;
-    background: #0A0A0A !important;
-    scrollbar-width: none;
-    -webkit-overflow-scrolling: touch;
-  }
-  .radicaciones-nav::-webkit-scrollbar { display: none; }
-
-  /* Items de nav como tabs underline, no pills */
-  .radicaciones-nav-item {
-    flex: 0 0 auto !important;
+  /* Botón volver — oculto cuando movilMenu=true (.rad-cards-active) */
+  .rad-movil-volver {
+    display: none;
+    align-items: center;
+    gap: 5px;
+    background: none;
+    border: none;
+    color: rgba(255,255,255,0.65) !important;
+    font-size: 12px;
+    padding: 4px 0;
     width: auto !important;
-    padding: 8px 14px !important;
-    font-size: 12px !important;
-    font-weight: 500 !important;
-    white-space: nowrap !important;
-    border-radius: 0 !important;
-    border: none !important;
-    color: rgba(255,255,255,0.5) !important;
-    background: transparent !important;
-    position: relative;
-    transition: color 0.15s !important;
+    min-height: 0 !important;
+    flex-shrink: 0;
+    cursor: pointer;
   }
-  .radicaciones-nav-item::after {
-    content: '';
-    position: absolute;
-    bottom: -2px; left: 8px; right: 8px;
-    height: 2px;
-    background: transparent;
-    border-radius: 1px;
-    transition: background 0.15s;
+  /* Mostrar volver solo cuando estamos en vista de contenido */
+  .radicaciones-module:not(.rad-cards-active) .rad-movil-volver { display: flex !important; }
+  /* Ocultar volver en menu de tarjetas */
+  .rad-cards-active .rad-movil-volver { display: none !important; }
+
+  /* ── Tarjetas de módulo (móvil) ── */
+  .rad-movil-cardmenu {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    padding: 14px;
   }
-  .radicaciones-nav-item.active {
-    background: transparent !important;
+  /* Cuando estamos en contenido (no en tarjetas), ocultar el card menu */
+  .radicaciones-module:not(.rad-cards-active) .rad-movil-cardmenu { display: none !important; }
+
+  .rad-card-item {
+    display: flex !important;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 16px 10px 14px !important;
+    background: rgba(255,255,255,0.04) !important;
+    border: 1px solid rgba(212,175,55,0.2) !important;
+    border-radius: 14px !important;
+    color: rgba(255,255,255,0.75) !important;
+    font-size: 0;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+    width: auto !important;
+    min-height: 0 !important;
+  }
+  .rad-card-item.rad-card-active {
+    background: rgba(212,175,55,0.1) !important;
+    border-color: #D4AF37 !important;
     color: #D4AF37 !important;
-    font-weight: 700 !important;
-    border: none !important;
   }
-  .radicaciones-nav-item.active::after {
-    background: #D4AF37;
+  .rad-card-icon { color: inherit; display: flex; }
+  .rad-card-l1 {
+    font-size: 12px !important;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: inherit;
+    line-height: 1.2;
+  }
+  .rad-card-l2 {
+    font-size: 10.5px !important;
+    color: rgba(255,255,255,0.5);
+    line-height: 1.2;
+  }
+  .rad-card-active .rad-card-l2 { color: rgba(212,175,55,0.7); }
+
+  /* Cuando movilMenu=true: ocultar el layout con tabs y contenido */
+  .rad-cards-active .radicaciones-layout { display: none !important; }
+
+  /* Cuando movilMenu=false: mostrar layout, ocultar sidebar nav (ya manejado) */
+  .radicaciones-module:not(.rad-cards-active) .radicaciones-nav { display: none !important; }
+  .radicaciones-module:not(.rad-cards-active) .radicaciones-layout { display: block !important; }
+  .radicaciones-content { padding: 12px 12px 8px !important; }
+
+  /* ── Admin panel: nav en cuadrícula 2 columnas en vez de scroll horizontal ── */
+  .admin-module-nav {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    width: 100% !important;
+    overflow: visible !important;
+    flex-wrap: unset !important;
+    gap: 6px !important;
+    padding: 0 !important;
+    border: none !important;
+    background: transparent !important;
+    border-radius: 0 !important;
+  }
+  .admin-module-item {
+    width: 100% !important;
+    height: auto !important;
+    min-height: 40px !important;
+    padding: 9px 8px !important;
+    font-size: 11.5px !important;
+    border-radius: 10px !important;
+    text-align: center !important;
+    white-space: normal !important;
+    line-height: 1.3 !important;
+    border: 1px solid rgba(212,175,55,0.2) !important;
+    color: rgba(255,255,255,0.65) !important;
+    background: rgba(255,255,255,0.04) !important;
+  }
+  .admin-module-item.active {
+    background: rgba(212,175,55,0.1) !important;
+    border-color: #D4AF37 !important;
+    color: #D4AF37 !important;
   }
 
-  /* Contenido del módulo */
-  .radicaciones-content { padding: 12px 12px 8px !important; }
+  /* ── Perfil: contenido scrollable sin desbordar ── */
+  .profile-panel {
+    max-height: calc(100dvh - 180px);
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .profile-panel::-webkit-scrollbar { display: none; }
 
   /* ── Inicio: compactar y definir mejor visualmente ── */
   .inicio-layout { gap: 12px; }

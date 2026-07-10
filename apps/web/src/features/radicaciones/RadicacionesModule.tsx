@@ -32,12 +32,37 @@ const VISTAS_LABELS: Record<Vista, string> = {
   tablero: 'Tablero general',
 };
 
+function RadCardIcon({ k }: { k: Vista }) {
+  const s = 30;
+  if (k === 'bandeja') return (
+    <svg width={s} height={s} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+      <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5v-3h3.56c.69 1.19 1.98 2 3.45 2s2.75-.81 3.45-2H19v3zm0-5h-4c0 1.1-.9 2-2 2s-2-.9-2-2H5V5h14v9z" />
+    </svg>
+  );
+  if (k === 'misSolicitudes') return (
+    <svg width={s} height={s} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+      <path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 7V3.5L18.5 9H13zM8 14h8v2H8v-2zm0-4h5v2H8v-2z" />
+    </svg>
+  );
+  if (k === 'nueva') return (
+    <svg width={s} height={s} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm5 11h-4v4h-2v-4H7v-2h4V7h2v4h4v2z" />
+    </svg>
+  );
+  return (
+    <svg width={s} height={s} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+      <path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z" />
+    </svg>
+  );
+}
+
 export function RadicacionesModule() {
   const [vista, setVista] = useState<Vista>('bandeja');
   const [items, setItems] = useState<SolicitudResumen[]>([]);
   const [loading, setLoading] = useState(false);
   const [borrando, setBorrando] = useState<number | null>(null);
   const [menuMovil, setMenuMovil] = useState(false);
+  const [movilMenu, setMovilMenu] = useState(true);
   const isAdmin = (getAuthSession()?.usuario?.rol?.nombre || '').toLowerCase() === 'administrador';
 
   const eliminarSolicitud = useCallback(async (it: SolicitudResumen) => {
@@ -84,13 +109,20 @@ export function RadicacionesModule() {
     return cont;
   }, [items]);
 
-  function irA(v: Vista) { setVista(v); setMenuMovil(false); }
+  function irA(v: Vista) { setVista(v); setMenuMovil(false); setMovilMenu(false); }
 
   return (
-    <section className="card-surface radicaciones-module">
+    <section className={`card-surface radicaciones-module${movilMenu ? ' rad-cards-active' : ''}`}>
       <header className="radicaciones-head">
-        <div>
-          <h3>RADICACIONES</h3>
+        {/* Botón volver — solo en móvil cuando hay contenido activo */}
+        <button type="button" className="rad-movil-volver" onClick={() => setMovilMenu(true)}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+            <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z" />
+          </svg>
+          Módulos
+        </button>
+        <div className="rad-head-titulo">
+          <h3>{movilMenu ? 'RADICACIONES' : VISTAS_LABELS[vista]}</h3>
           <p>
             Flujo legal de validación documental por niveles. Cada solicitud pasa por los
             pasos definidos en su tipo (analista → coordinador → contabilidad).
@@ -98,7 +130,28 @@ export function RadicacionesModule() {
         </div>
       </header>
 
-      {/* Selector de vista — solo visible en móvil */}
+      {/* Tarjetas de módulo — solo en móvil, cuando movilMenu=true */}
+      <div className="rad-movil-cardmenu">
+        {([
+          ['bandeja',        'Bandeja',  'de validación'],
+          ['misSolicitudes', 'Mis',      'solicitudes'],
+          ['nueva',          'Nueva',    'solicitud'],
+          ['tablero',        'Tablero',  'general'],
+        ] as [Vista, string, string][]).map(([key, l1, l2]) => (
+          <button
+            key={key}
+            type="button"
+            className={`rad-card-item${vista === key ? ' rad-card-active' : ''}`}
+            onClick={() => irA(key)}
+          >
+            <span className="rad-card-icon"><RadCardIcon k={key} /></span>
+            <span className="rad-card-l1">{l1}</span>
+            <span className="rad-card-l2">{l2}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* Selector de vista — solo visible en móvil (drawer antiguo, ya oculto por CSS) */}
       <button
         type="button"
         className="radicaciones-menu-btn"
