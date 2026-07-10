@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { api } from '../../services/http/api';
 import { getAuthSession, saveAuthSession } from '../auth/auth.service';
 
+interface Area { id: number; nombre: string; activo: boolean; }
+
 interface PerfilData {
   id: number;
   primerNombre?: string | null;
@@ -64,6 +66,10 @@ export function ProfilePanel() {
   const [numeroCuenta, setNumeroCuenta] = useState('');
   const [titularCuenta, setTitularCuenta] = useState('');
 
+  // Área organizacional
+  const [areas, setAreas] = useState<Area[]>([]);
+  const [areaId, setAreaId] = useState<number | null>(null);
+
   // Documentos OPS
   const [eps, setEps] = useState('');
   const [archivoEpsId, setArchivoEpsId] = useState('');
@@ -85,9 +91,11 @@ export function ProfilePanel() {
   const cartaEpsInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    api.get<Area[]>('/areas').then((r) => setAreas(r.data.filter((a) => a.activo))).catch(() => {});
     api.get<PerfilData>('/usuarios/perfil').then((r) => {
       const p = r.data;
       setPerfil(p);
+      setAreaId(p.areaId ?? null);
       const partes = p.nombreCompleto.split(' ');
       setPrimerNombre(p.primerNombre || partes[0] || '');
       setSegundoNombre(p.segundoNombre || '');
@@ -147,6 +155,7 @@ export function ProfilePanel() {
         ...(numeroCuenta.trim() ? { numeroCuenta: numeroCuenta.trim() } : { numeroCuenta: null }),
         ...(titularCuenta.trim() ? { titularCuenta: titularCuenta.trim() } : { titularCuenta: null }),
         ...(eps.trim() ? { eps: eps.trim() } : { eps: null }),
+        areaId: areaId ?? null,
       });
       setPerfil(r.data);
       setMsg('Perfil actualizado correctamente.');
@@ -230,6 +239,9 @@ export function ProfilePanel() {
             <div className="profile-avatar-circle">{inicial}</div>
             <p className="profile-nombre-display">{perfil.nombreCompleto}</p>
             <p className="admin-help-text">{perfil.rol?.nombre}</p>
+            {areaId && areas.length > 0 ? (
+              <p className="admin-help-text">{areas.find((a) => a.id === areaId)?.nombre ?? ''}</p>
+            ) : null}
             {perfil.nivelAprobacion ? (
               <p className="admin-help-text">Nivel: {perfil.nivelAprobacion}</p>
             ) : null}
@@ -389,6 +401,24 @@ export function ProfilePanel() {
                 placeholder="Ej: Cra 10 #25-30, Bogotá"
                 maxLength={255}
               />
+            </div>
+
+            <h4 style={{ marginTop: 16 }}>Área organizacional</h4>
+            <div>
+              <label className="profile-label">Área a la que perteneces</label>
+              <select
+                className="admin-input"
+                value={areaId ?? ''}
+                onChange={(e) => setAreaId(e.target.value ? Number(e.target.value) : null)}
+              >
+                <option value="">Sin área asignada</option>
+                {areas.map((a) => (
+                  <option key={a.id} value={a.id}>{a.nombre}</option>
+                ))}
+              </select>
+              <p className="admin-help-text" style={{ marginTop: 3 }}>
+                Define qué área aparece en tus solicitudes y quién las valida primero.
+              </p>
             </div>
 
             <h4 style={{ marginTop: 16 }}>Cuenta bancaria para pagos</h4>

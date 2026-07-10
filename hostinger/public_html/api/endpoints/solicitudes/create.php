@@ -320,10 +320,19 @@ try {
 
 // Notificaciones (no bloquean la respuesta si fallan)
 require_once __DIR__ . '/_flujo.php';
+
+// Nombre real del área de la solicitud (puede diferir del área del tipo cuando es global)
+$areaNombreReal = $tipo['area_nombre'] ?? '';
+if ($areaSolicitud !== (int)($tipo['area_id'] ?? 0)) {
+    $aNomStmt = $pdo->prepare("SELECT nombre FROM areas WHERE id = :id LIMIT 1");
+    $aNomStmt->execute([':id' => $areaSolicitud]);
+    $areaNombreReal = $aNomStmt->fetchColumn() ?: $areaNombreReal;
+}
+
 $solNotif = [
     'numero_radicado'    => $numero,
     'tipo_nombre'        => $tipo['nombre'] ?? '',
-    'area_nombre'        => $tipo['area_nombre'] ?? '',
+    'area_nombre'        => $areaNombreReal,
     'solicitante_nombre' => $usuario['nombre_completo'] ?? '',
     'solicitante_correo' => $usuario['correo'] ?? '',
 ];
@@ -333,7 +342,7 @@ if (!empty($usuario['correo'])) {
         "Solicitud {$numero} creada",
         "Tu solicitud fue creada correctamente y entró al flujo de validación.\n\n" .
         "Tipo: {$tipo['nombre']}\n" .
-        "Área: {$tipo['area_nombre']}\n" .
+        "Área: {$areaNombreReal}\n" .
         "En revisión por: " . ($primerPaso['label'] ?? 'el primer paso del flujo') . "\n\n" .
         "Te avisaremos por este medio cuando avance."
     );

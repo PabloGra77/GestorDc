@@ -147,6 +147,17 @@ if (array_key_exists('lugarExpedicion', $body)) {
     $le = trim((string)($body['lugarExpedicion'] ?? ''));
     $camposExtra['lugar_expedicion'] = $le ?: null;
 }
+// Área del usuario (el propio usuario puede seleccionar su área)
+if (array_key_exists('areaId', $body)) {
+    $areaIdNuevo = $body['areaId'] !== null ? (int)$body['areaId'] : null;
+    if ($areaIdNuevo !== null && $areaIdNuevo > 0) {
+        // Verificar que el área exista y esté activa
+        $aChk = $pdo->prepare("SELECT id FROM areas WHERE id = :id AND activo = 1 LIMIT 1");
+        $aChk->execute([':id' => $areaIdNuevo]);
+        if (!$aChk->fetch()) Response::error('Área no encontrada o inactiva', 400);
+    }
+    $camposExtra['area_id'] = $areaIdNuevo ?: null;
+}
 // Campos OPS
 if (array_key_exists('eps', $body)) $camposExtra['eps'] = trim((string)($body['eps'] ?? '')) ?: null;
 if (array_key_exists('archivoEpsId', $body)) $camposExtra['archivo_eps_id'] = $body['archivoEpsId'] ?: null;
