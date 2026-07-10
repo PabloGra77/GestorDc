@@ -593,6 +593,25 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
 .admin-drawer-usuario  { display: none; }
 .admin-drawer-logout   { display: none; }
 
+/* ── Campana: gris sin notifs, dorada con animación cuando hay ── */
+@keyframes bellShake {
+  0%, 100% { transform: rotate(0deg); }
+  10%, 30%, 50% { transform: rotate(-12deg); }
+  20%, 40%, 60% { transform: rotate(12deg); }
+  70% { transform: rotate(0deg); }
+}
+
+.admin-movil-topbar-btn .admin-movil-bell-svg {
+  color: rgba(255, 255, 255, 0.55);
+  transition: color 0.3s ease;
+}
+.admin-movil-topbar-btn.has-notif .admin-movil-bell-svg {
+  color: #D4AF37;
+  animation: bellShake 2s ease-in-out infinite;
+  transform-origin: top center;
+  filter: drop-shadow(0 0 6px rgba(212, 175, 55, 0.7));
+}
+
 /* ── Nueva topbar móvil (campana | PAYOPS | perfil) ── */
 .admin-movil-topbar {
   position: fixed;
@@ -2886,8 +2905,19 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
     font-size: 9.5px !important;
   }
 
-  /* ── Header de sección: ocultar completamente en mobile (nav está en topbar+bottom) ── */
-  .admin-header { display: none !important; }
+  /* ── Header: solo mostrar bienvenido+logo, ocultar acciones (logout está en Mi Perfil) ── */
+  .admin-header-actions { display: none !important; }
+  .admin-header {
+    padding: 10px 14px 8px !important;
+    flex-direction: row !important;
+    align-items: center;
+  }
+  .admin-header-brand { gap: 8px; }
+  .admin-header-logo { width: 36px !important; max-height: 28px !important; }
+  .admin-header-label { font-size: 9px !important; letter-spacing: 0.1em; }
+  .admin-header h1 { font-size: 15px !important; margin-top: 1px !important; }
+  /* Ocultar header en secciones que no son Inicio (compact header solo tiene acciones) */
+  .admin-header.admin-header-compact { display: none !important; }
 
   /* ── Theme toggle: subir para no quedar detrás del bottom nav ── */
   .payops-theme-toggle {
@@ -2897,45 +2927,81 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
     height: 38px !important;
   }
 
-  /* ── Radicaciones: nav horizontal en vez de sidebar lateral ── */
+  /* ── Radicaciones: nav horizontal tabs en vez de sidebar lateral ── */
   .radicaciones-menu-btn { display: none !important; }
   .radicaciones-overlay  { display: none !important; }
-  .radicaciones-layout   { flex-direction: column !important; gap: 0; }
+
+  /* El módulo pierde su padding general */
+  .radicaciones-module { padding: 0 !important; overflow: hidden; }
+
+  /* Cabecera del módulo: compacta */
+  .radicaciones-head {
+    padding: 12px 14px 10px !important;
+    border-bottom: 1px solid rgba(212,175,55,0.15);
+    background: rgba(0,0,0,0.2);
+  }
+  .radicaciones-head h3 { font-size: 14px !important; letter-spacing: 0.08em; margin: 0 0 2px !important; }
+  .radicaciones-head p { display: none !important; }
+
+  /* Layout en columna */
+  .radicaciones-layout { flex-direction: column !important; gap: 0; }
+
+  /* Nav: barra horizontal scrolleable con fondo negro */
   .radicaciones-nav {
     position: static !important;
     left: auto !important; top: auto !important; bottom: auto !important;
     width: 100% !important; max-width: none !important;
     flex-direction: row !important;
     overflow-x: auto !important; overflow-y: hidden !important;
-    gap: 6px !important;
-    padding: 10px 14px !important;
+    gap: 4px !important;
+    padding: 8px 12px !important;
     border-right: none !important;
-    border-bottom: 1px solid rgba(212, 175, 55, 0.2) !important;
+    border-bottom: 2px solid rgba(212,175,55,0.15) !important;
     border-radius: 0 !important;
     box-shadow: none !important;
     transition: none !important;
-    background: #000 !important;
+    background: #0A0A0A !important;
     scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
   }
   .radicaciones-nav::-webkit-scrollbar { display: none; }
+
+  /* Items de nav como tabs underline, no pills */
   .radicaciones-nav-item {
     flex: 0 0 auto !important;
     width: auto !important;
-    padding: 7px 14px !important;
+    padding: 8px 14px !important;
     font-size: 12px !important;
+    font-weight: 500 !important;
     white-space: nowrap !important;
-    border-radius: 20px !important;
-    border: 1px solid rgba(212, 175, 55, 0.25) !important;
-    color: rgba(255, 255, 255, 0.65) !important;
+    border-radius: 0 !important;
+    border: none !important;
+    color: rgba(255,255,255,0.5) !important;
     background: transparent !important;
+    position: relative;
+    transition: color 0.15s !important;
+  }
+  .radicaciones-nav-item::after {
+    content: '';
+    position: absolute;
+    bottom: -2px; left: 8px; right: 8px;
+    height: 2px;
+    background: transparent;
+    border-radius: 1px;
+    transition: background 0.15s;
   }
   .radicaciones-nav-item.active {
-    background: #D4AF37 !important;
-    color: #000 !important;
-    border-color: #D4AF37 !important;
+    background: transparent !important;
+    color: #D4AF37 !important;
     font-weight: 700 !important;
+    border: none !important;
   }
-  .radicaciones-content { padding: 14px 14px 8px !important; }
+  .radicaciones-nav-item.active::after {
+    background: #D4AF37;
+  }
+
+  /* Contenido del módulo */
+  .radicaciones-content { padding: 12px 12px 8px !important; }
 
   /* ── Inicio: compactar y definir mejor visualmente ── */
   .inicio-layout { gap: 12px; }
