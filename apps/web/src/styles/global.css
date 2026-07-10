@@ -2972,13 +2972,19 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
   .rad-cards-active .rad-movil-volver { display: none !important; }
 
   /* ── Tarjetas de módulo (móvil) ── */
+  /* Fondo oscuro forzado en todo el módulo de radicaciones */
+  .radicaciones-module {
+    background: #0A0A0A !important;
+    min-height: calc(100dvh - 52px - 62px - env(safe-area-inset-bottom, 0px)) !important;
+  }
+
+  /* Grid 2×2: tarjetas grandes que llenan el espacio */
   .rad-movil-cardmenu {
     display: grid !important;
     grid-template-columns: 1fr 1fr;
-    gap: 10px;
-    padding: 14px;
+    gap: 14px;
+    padding: 16px;
   }
-  /* Cuando estamos en contenido (no en tarjetas), ocultar el card menu */
   .radicaciones-module:not(.rad-cards-active) .rad-movil-cardmenu { display: none !important; }
 
   .rad-card-item {
@@ -2986,37 +2992,39 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 6px;
-    padding: 16px 10px 14px !important;
-    background: rgba(255,255,255,0.04) !important;
-    border: 1px solid rgba(212,175,55,0.2) !important;
-    border-radius: 14px !important;
-    color: rgba(255,255,255,0.75) !important;
-    font-size: 0;
+    gap: 10px;
+    padding: 26px 12px 24px !important;
+    background: rgba(255,255,255,0.05) !important;
+    border: 1.5px solid rgba(212,175,55,0.28) !important;
+    border-radius: 18px !important;
+    color: rgba(255,255,255,0.8) !important;
     cursor: pointer;
     transition: border-color 0.15s, background 0.15s;
-    width: auto !important;
-    min-height: 0 !important;
+    width: 100% !important;
+    min-height: 130px !important;
+    aspect-ratio: 1 / 1;
   }
   .rad-card-item.rad-card-active {
-    background: rgba(212,175,55,0.1) !important;
+    background: rgba(212,175,55,0.13) !important;
     border-color: #D4AF37 !important;
     color: #D4AF37 !important;
   }
   .rad-card-icon { color: inherit; display: flex; }
   .rad-card-l1 {
-    font-size: 12px !important;
+    font-size: 13px !important;
     font-weight: 700;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.03em;
     color: inherit;
     line-height: 1.2;
+    text-align: center;
   }
   .rad-card-l2 {
-    font-size: 10.5px !important;
-    color: rgba(255,255,255,0.5);
+    font-size: 11px !important;
+    color: rgba(255,255,255,0.45);
     line-height: 1.2;
+    text-align: center;
   }
-  .rad-card-active .rad-card-l2 { color: rgba(212,175,55,0.7); }
+  .rad-card-active .rad-card-l2 { color: rgba(212,175,55,0.6); }
 
   /* Cuando movilMenu=true: ocultar el layout con tabs y contenido */
   .rad-cards-active .radicaciones-layout { display: none !important; }
@@ -3025,39 +3033,6 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
   .radicaciones-module:not(.rad-cards-active) .radicaciones-nav { display: none !important; }
   .radicaciones-module:not(.rad-cards-active) .radicaciones-layout { display: block !important; }
   .radicaciones-content { padding: 12px 12px 8px !important; }
-
-  /* ── Admin panel: nav en cuadrícula 2 columnas en vez de scroll horizontal ── */
-  .admin-module-nav {
-    display: grid !important;
-    grid-template-columns: repeat(2, 1fr) !important;
-    width: 100% !important;
-    overflow: visible !important;
-    flex-wrap: unset !important;
-    gap: 6px !important;
-    padding: 0 !important;
-    border: none !important;
-    background: transparent !important;
-    border-radius: 0 !important;
-  }
-  .admin-module-item {
-    width: 100% !important;
-    height: auto !important;
-    min-height: 40px !important;
-    padding: 9px 8px !important;
-    font-size: 11.5px !important;
-    border-radius: 10px !important;
-    text-align: center !important;
-    white-space: normal !important;
-    line-height: 1.3 !important;
-    border: 1px solid rgba(212,175,55,0.2) !important;
-    color: rgba(255,255,255,0.65) !important;
-    background: rgba(255,255,255,0.04) !important;
-  }
-  .admin-module-item.active {
-    background: rgba(212,175,55,0.1) !important;
-    border-color: #D4AF37 !important;
-    color: #D4AF37 !important;
-  }
 
   /* ── Perfil: contenido scrollable sin desbordar ── */
   .profile-panel {
@@ -3117,6 +3092,11 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
   }
 
   /* ── Panel administrador: diseño móvil negro/dorado ── */
+  /* Evitar overflow horizontal en toda el área del panel */
+  .admin-panel,
+  .admin-forms-panel,
+  .admin-form-grid { overflow-x: hidden !important; }
+
   .admin-forms-panel { padding: 0 !important; }
   .admin-panel-head { padding: 14px 14px 0 !important; }
   .admin-panel-head h3 { font-size: 17px; }
@@ -3132,39 +3112,55 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
   .admin-kpi-card span { font-size: 11px !important; }
   .admin-kpi-card strong { font-size: 26px !important; color: #D4AF37 !important; }
 
+  /* Nav como cuadrícula 2×N — sin scroll lateral */
   .admin-module-nav {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
     width: calc(100% - 28px) !important;
     margin: 0 14px 14px !important;
-    background: rgba(0,0,0,0.4) !important;
-    border: 1px solid rgba(212,175,55,0.2) !important;
-    scrollbar-width: none;
-    border-radius: 10px !important;
-    padding: 5px !important;
-    gap: 4px !important;
-  }
-  .admin-module-nav::-webkit-scrollbar { display: none; }
-  .admin-module-item {
-    padding: 0 10px !important;
-    height: 30px !important;
-    font-size: 11px !important;
-    border-radius: 6px !important;
+    overflow: visible !important;
+    gap: 5px !important;
+    padding: 0 !important;
+    border: none !important;
     background: transparent !important;
-    border: 1px solid transparent !important;
-    color: rgba(255,255,255,0.6) !important;
+    border-radius: 0 !important;
+    flex-wrap: unset !important;
+  }
+  .admin-module-item {
+    width: 100% !important;
+    height: auto !important;
+    min-height: 38px !important;
+    padding: 8px 6px !important;
+    font-size: 11px !important;
+    border-radius: 8px !important;
+    text-align: center !important;
+    white-space: normal !important;
+    line-height: 1.3 !important;
+    background: rgba(255,255,255,0.04) !important;
+    border: 1px solid rgba(212,175,55,0.2) !important;
+    color: rgba(255,255,255,0.65) !important;
   }
   .admin-module-item.active {
-    background: #D4AF37 !important;
-    color: #000 !important;
+    background: rgba(212,175,55,0.12) !important;
     border-color: #D4AF37 !important;
+    color: #D4AF37 !important;
     font-weight: 700 !important;
   }
-  .admin-module-item:hover:not(.active) {
-    color: rgba(255,255,255,0.9) !important;
-    border-color: rgba(212,175,55,0.35) !important;
-  }
 
-  .admin-form-grid { padding: 0 14px 14px !important; }
-  .admin-form { border-radius: 10px !important; }
+  /* Forzar columna única en grids del form y en el de áreas */
+  .admin-form-grid { padding: 0 14px 14px !important; grid-template-columns: 1fr !important; }
+  .admin-areas-panel .admin-form-grid { grid-template-columns: 1fr !important; }
+  .admin-form { border-radius: 10px !important; overflow-x: hidden !important; }
+
+  /* Tabla de usuarios: scroll solo horizontal en su propio contenedor */
+  .admin-panel table { display: block; overflow-x: auto; max-width: 100%; }
+
+  /* Perfil: evitar overflow horizontal */
+  .profile-panel { overflow-x: hidden !important; }
+  .profile-form,
+  .profile-layout { overflow-x: hidden !important; }
+  /* Forzar columna única en grids inline del perfil */
+  .profile-form [style*="grid-template-columns"] { grid-template-columns: 1fr !important; }
 
   /* ── Panel de perfil: diseño móvil negro/dorado ── */
   .profile-layout {

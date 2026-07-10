@@ -12,22 +12,22 @@
   "categories": ["business", "productivity", "medical"],
   "icons": [
     {
-      "src": "/logo-pestana.png",
-      "sizes": "1254x1254",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "/logo-pestana.png",
+      "src": "/Logo_MobileyPC.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/logo-pestana.png",
+      "src": "/Logo_MobileyPC.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
+    },
+    {
+      "src": "/Logo_MobileyPC.png",
+      "sizes": "any",
+      "type": "image/png",
+      "purpose": "any"
     }
   ],
   "shortcuts": [
