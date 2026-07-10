@@ -60,7 +60,7 @@ if ($frontendChanged.Count -gt 0) {
     Write-Host "[$step] Subiendo frontend..." -ForegroundColor Cyan
     $distPath = "$RepoRoot\apps\web\dist"
 
-    foreach ($rootFile in @("index.html", "sw.js", "manifest.webmanifest")) {
+    foreach ($rootFile in @("index.html", "sw.js", "manifest.webmanifest", "Logo_MobileyPC.png", "logo-pestana.png")) {
         $f = "$distPath\$rootFile"
         if (Test-Path $f) { Write-Host "  $rootFile"; SCP-Put $f $rootFile }
     }
