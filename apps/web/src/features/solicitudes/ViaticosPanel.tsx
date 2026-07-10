@@ -256,7 +256,7 @@ function TiqueteForm({
 }
 
 /* ─── Panel Viáticos ────────────────────────────────────────── */
-export function ViaticosPanel({ onCreada }: { onCreada?: (info: { id: number; numeroRadicado: string }) => void }) {
+export function ViaticosPanel({ onCreada, areaId }: { onCreada?: (info: { id: number; numeroRadicado: string }) => void; areaId?: number }) {
   const [paso, setPaso] = useState<1 | 2 | 3 | 4 | 5>(1);
 
   /* Paso 1 */
@@ -538,6 +538,7 @@ export function ViaticosPanel({ onCreada }: { onCreada?: (info: { id: number; nu
 
       const r = await api.post<{ id: number; numeroRadicado: string }>('/solicitudes', {
         tipoSolicitudId: tipo.id,
+        ...(areaId ? { areaSeleccionadaId: areaId } : {}),
         datos: {
           tipoViatico,
           motivoViaje,

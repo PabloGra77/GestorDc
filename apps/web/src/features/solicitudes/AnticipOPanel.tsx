@@ -9,6 +9,7 @@ import type { CiudadCO } from './colombiaData';
 
 interface AnticipoPanelProps {
   onCreada?: (info: { id: number; numeroRadicado: string }) => void;
+  areaId?: number;
 }
 
 interface TipoInfo {
@@ -130,7 +131,7 @@ function normTxt(s: string) {
   return (s ?? '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]/g, '');
 }
 
-export function AnticipOPanel({ onCreada }: AnticipoPanelProps) {
+export function AnticipOPanel({ onCreada, areaId }: AnticipoPanelProps) {
   const session = getAuthSession();
   const nombreSesion = session?.usuario?.nombreCompleto || '';
 
@@ -434,6 +435,7 @@ export function AnticipOPanel({ onCreada }: AnticipoPanelProps) {
       const mesAnioActual = new Date().toLocaleString('es-CO', { month: 'long', year: 'numeric' });
       await api.post<{ id: number; numeroRadicado: string }>('/solicitudes', {
         tipoSolicitudId: tipo.id,
+        ...(areaId ? { areaSeleccionadaId: areaId } : {}),
         datos: {
           proposito,
           justificacion: proposito,

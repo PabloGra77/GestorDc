@@ -95,11 +95,14 @@ $u->execute([':id' => $usuarioId]);
 $usuario = $u->fetch();
 
 // El area de la solicitud: si el tipo está configurado para "todas las áreas",
-// usar el área del solicitante (no la del tipo).
+// usar el área seleccionada por el usuario en el formulario, luego la de su perfil,
+// y solo como último recurso el área del tipo.
 $configTipo = json_decode($tipo['configuracion_tipo'] ?? '{}', true) ?: [];
 $areasVisiblesConfig = $configTipo['areasVisibles'] ?? null;
 if ($areasVisiblesConfig === 'todas') {
-    $areaSolicitud = (int)($usuario['area_id'] ?? 0) ?: (int)$tipo['area_id'];
+    $areaSeleccionadaId = (int)($body['areaSeleccionadaId'] ?? 0);
+    $areaUsuarioId      = (int)($usuario['area_id'] ?? 0);
+    $areaSolicitud      = $areaSeleccionadaId ?: ($areaUsuarioId ?: (int)$tipo['area_id']);
 } else {
     $areaSolicitud = (int)$tipo['area_id'];
 }
@@ -244,17 +247,19 @@ if ($esLegalizacion) {
     }
 }
 
-// Para anticipo con autorizador referenciado: ese autorizador debe aprobar/rechazar primero.
-if ($esAnticipo) {
+// Para cualquier tipo con autorizador en datos (anticipo, viáticos, etc.):
+// ese autorizador debe aprobar/rechazar como primer paso.
+if (!$esLegalizacion) {
     $autorizadorIdFlujo = (int)($datosFormulario['autorizadorId'] ?? 0);
     if ($autorizadorIdFlujo > 0 && ($flujo[0]['rol'] ?? '') !== 'autorizador_visto_bueno') {
         foreach ($flujo as &$fpaso) {
             $fpaso['orden'] = (int)($fpaso['orden'] ?? 0) + 1;
         }
         unset($fpaso);
+        $labelAutorizacion = $esAnticipo ? 'Autorización del anticipo' : 'Autorización de la solicitud';
         array_unshift($flujo, [
             'rol'   => 'autorizador_visto_bueno',
-            'label' => 'Autorización del anticipo',
+            'label' => $labelAutorizacion,
             'orden' => 1,
         ]);
     }
@@ -350,38 +355,38 @@ if (!empty($usuario['correo'])) {
 // Notificar autorizador si la solicitud lo referencia en los datos
 $autorizadorIdDatos = (int)($datosFormulario['autorizadorId'] ?? 0);
 
-// Si el primer paso es 'autorizador_visto_bueno' (legalizacion O anticipo): notificar al autorizador
+// Si el primer paso es 'autorizador_visto_bueno' (cualquier tipo): notificar al autorizador
 // para que apruebe o rechace — él ES el primer validador.
-if (($esLegalizacion || $esAnticipo) && ($primerPaso['rol'] ?? '') === 'autorizador_visto_bueno') {
+if (($primerPaso['rol'] ?? '') === 'autorizador_visto_bueno') {
     if ($autorizadorIdDatos > 0) {
         $aCorStmt = $pdo->prepare("SELECT correo, nombre_completo FROM usuarios WHERE id = :id AND activo = 1 LIMIT 1");
         $aCorStmt->execute([':id' => $autorizadorIdDatos]);
         $autorizador = $aCorStmt->fetch();
         if ($autorizador && $autorizador['correo']) {
             try {
-                if ($esAnticipo) {
-                    $valorStr = '$' . number_format((float)($datosFormulario['valorPesos'] ?? 0), 0, ',', '.');
-                    $subjectAuth  = "Debes aprobar o rechazar: anticipo {$numero}";
-                    $bodyText     = "Hola {$autorizador['nombre_completo']},\n\n" .
-                        "{$usuario['nombre_completo']} registró una solicitud de anticipo ({$numero}) por {$valorStr} " .
-                        "y te indicó como autorizador.\n\n" .
-                        "Debes ingresar a PayOPS → Bandeja de validación y APROBAR o RECHAZAR esta solicitud para que continúe el trámite.\n\n" .
-                        "Si no autorizaste este anticipo, recházalo directamente desde la plataforma.";
-                    $bodyHtml     = "Hola {$autorizador['nombre_completo']}:\n\n" .
-                        "{$usuario['nombre_completo']} registró una solicitud de anticipo ({$numero}) por {$valorStr} " .
-                        "y te indicó como autorizador.\n\n" .
-                        "Ingresa a PayOPS → Bandeja de validación y APRUEBA o RECHAZA la solicitud para que continúe el trámite.\n\n" .
-                        "Si no autorizaste este anticipo, recházalo desde la plataforma.";
-                } else {
-                    $subjectAuth  = "Requiere tu visto bueno: legalización {$numero}";
-                    $bodyText     = "Hola {$autorizador['nombre_completo']},\n\n" .
+                $tipoNombreNotif = $tipo['nombre'] ?? 'solicitud';
+                if ($esLegalizacion) {
+                    $subjectAuth = "Requiere tu visto bueno: legalización {$numero}";
+                    $bodyText    = "Hola {$autorizador['nombre_completo']},\n\n" .
                         "{$usuario['nombre_completo']} creó una solicitud de legalización ({$numero}) " .
                         "en la que indicó que tú autorizaste el gasto.\n\n" .
                         "Ingresa a PayOPS → Bandeja de validación y da tu visto bueno para que pueda continuar el trámite.";
-                    $bodyHtml     = "Hola {$autorizador['nombre_completo']}:\n\n" .
+                    $bodyHtml    = "Hola {$autorizador['nombre_completo']}:\n\n" .
                         "{$usuario['nombre_completo']} creó una solicitud de legalización ({$numero}) " .
                         "en la que indicó que tú autorizaste el gasto.\n\n" .
                         "Ingresa a PayOPS → Bandeja de validación y da tu visto bueno para que el trámite continúe.";
+                } else {
+                    $subjectAuth = "Debes aprobar o rechazar: {$tipoNombreNotif} {$numero}";
+                    $bodyText    = "Hola {$autorizador['nombre_completo']},\n\n" .
+                        "{$usuario['nombre_completo']} registró una solicitud de {$tipoNombreNotif} ({$numero}) " .
+                        "y te indicó como autorizador.\n\n" .
+                        "Debes ingresar a PayOPS → Bandeja de validacion y APROBAR o RECHAZAR esta solicitud para que continue el tramite.\n\n" .
+                        "Si no autorizaste esta solicitud, rechazala directamente desde la plataforma.";
+                    $bodyHtml    = "Hola {$autorizador['nombre_completo']}:\n\n" .
+                        "{$usuario['nombre_completo']} registró una solicitud de {$tipoNombreNotif} ({$numero}) " .
+                        "y te indicó como autorizador.\n\n" .
+                        "Ingresa a PayOPS → Bandeja de validacion y APRUEBA o RECHAZA la solicitud para que continúe el trámite.\n\n" .
+                        "Si no autorizaste esta solicitud, rechazala desde la plataforma.";
                 }
                 Mailer::send([
                     'to'      => [$autorizador['correo']],

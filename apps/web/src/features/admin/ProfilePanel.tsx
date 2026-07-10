@@ -172,6 +172,7 @@ export function ProfilePanel() {
             primerApellido: r.data.primerApellido ?? undefined,
             tipoDocumento: r.data.tipoDocumento ?? undefined,
             numeroDocumento: r.data.numeroDocumento ?? undefined,
+            areaId: r.data.areaId ?? undefined,
           },
         });
       }

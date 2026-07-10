@@ -1009,7 +1009,7 @@ function _generarPdfEspecial(s: SolicitudParaPdf, opts?: { bloburl?: boolean }):
       const fechaRegreso = String(s.datosFormulario['fechaRegreso'] || '');
       const autorizadorViat = String(s.datosFormulario['autorizadorNombre'] || '');
       const viatInfoItems: Array<[string, string]> = [];
-      if (ciudadOrigen && ciudadDestino) viatInfoItems.push(['Ruta', `${ciudadOrigen} → ${ciudadDestino}`]);
+      if (ciudadOrigen && ciudadDestino) viatInfoItems.push(['Ruta', `${ciudadOrigen} - ${ciudadDestino}`]);
       if (fechaIda) viatInfoItems.push(['Fecha de ida', fechaIda]);
       if (fechaRegreso) viatInfoItems.push(['Fecha de regreso', fechaRegreso]);
       if (autorizadorViat) viatInfoItems.push(['Autorizado por', autorizadorViat]);

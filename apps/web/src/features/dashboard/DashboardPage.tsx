@@ -91,6 +91,10 @@ export function DashboardPage() {
 	const [perfilBannerDismissed, setPerfilBannerDismissed] = useState(() => {
 		try { return localStorage.getItem('payops:perfil:banner:' + (session?.usuario.correo ?? '')) === '1'; } catch { return false; }
 	});
+	const [bienvenidaVista, setBienvenidaVista] = useState(() => {
+		try { return localStorage.getItem('payops:bienvenida:v1:' + (session?.usuario.correo ?? '')) === '1'; } catch { return true; }
+	});
+	const [datosAutorizados, setDatosAutorizados] = useState(false);
 	const [isLoadingAdminData, setIsLoadingAdminData] = useState(false);
 	const [roles, setRoles] = useState<Role[]>([]);
 	const [usuarios, setUsuarios] = useState<Usuario[]>([]);
@@ -837,6 +841,80 @@ export function DashboardPage() {
 
 	return (
 		<>
+		{/* Modal de bienvenida — primer acceso */}
+		{!bienvenidaVista && (
+			<div style={{
+				position: 'fixed', inset: 0, zIndex: 9999,
+				background: 'rgba(0,0,0,0.65)', display: 'flex',
+				alignItems: 'center', justifyContent: 'center', padding: 16,
+			}}>
+				<div style={{
+					background: 'var(--color-bg, #fff)', borderRadius: 14, maxWidth: 540, width: '100%',
+					padding: '32px 28px', boxShadow: '0 8px 40px rgba(0,0,0,0.25)',
+				}}>
+					<div style={{ textAlign: 'center', marginBottom: 20 }}>
+						<div style={{ fontSize: 40, marginBottom: 8 }}>📋</div>
+						<h2 style={{ margin: 0, fontSize: 20, fontWeight: 700 }}>Bienvenido(a) a PayOPS</h2>
+						<p style={{ margin: '6px 0 0', color: 'var(--color-text-muted)', fontSize: 13 }}>
+							Plataforma de legalización y gestión documental de pagos · Goleman IPS
+						</p>
+					</div>
+
+					<p style={{ fontSize: 13.5, lineHeight: 1.6, margin: '0 0 12px' }}>
+						PayOPS es la plataforma oficial de Goleman IPS para el registro, aprobación y trazabilidad
+						de solicitudes de anticipo de gastos, viáticos, cuentas de cobro y legalizaciones.
+					</p>
+					<p style={{ fontSize: 13.5, lineHeight: 1.6, margin: '0 0 12px' }}>
+						<strong>Primer paso:</strong> configura tu información personal en <em>Mi Perfil</em>.
+						Recuerda que estos datos serán utilizados en todos los tipos de solicitud que radiques,
+						y quedarán bajo tu responsabilidad.
+					</p>
+					<div style={{
+						background: 'var(--color-bg-alt, #f8f6ed)', borderRadius: 8,
+						padding: '10px 14px', fontSize: 12.5, lineHeight: 1.6,
+						borderLeft: '3px solid #d4a017', marginBottom: 16,
+					}}>
+						<strong>Aviso legal:</strong> La falsificación, alteración o manipulación de documentos
+						constituye delito conforme al <strong>Art. 286 del Código Penal colombiano</strong> (Ley 599 de 2000).
+						Todos los documentos subidos a esta plataforma son objeto de análisis forense digital.
+					</div>
+
+					<label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', cursor: 'pointer', marginBottom: 20 }}>
+						<input
+							type="checkbox"
+							checked={datosAutorizados}
+							onChange={(e) => setDatosAutorizados(e.target.checked)}
+							style={{ marginTop: 3, flexShrink: 0 }}
+						/>
+						<span style={{ fontSize: 12.5, lineHeight: 1.5 }}>
+							Autorizo el tratamiento de mis datos personales conforme a la{' '}
+							<strong>Ley 1581 de 2012</strong> (Protección de Datos Personales) y declaro
+							que la información que registre en esta plataforma es veraz y verificable.
+						</span>
+					</label>
+
+					<button
+						type="button"
+						disabled={!datosAutorizados}
+						onClick={() => {
+							try { localStorage.setItem('payops:bienvenida:v1:' + (session?.usuario.correo ?? ''), '1'); } catch { /* */ }
+							api.patch('/usuarios/perfil', { datosAutorizados: true }).catch(() => {});
+							setBienvenidaVista(true);
+							setActiveSection('Perfil');
+						}}
+						style={{
+							width: '100%', padding: '11px 0', borderRadius: 8, border: 'none',
+							background: datosAutorizados ? '#1a2742' : '#ccc',
+							color: '#fff', fontWeight: 600, fontSize: 14, cursor: datosAutorizados ? 'pointer' : 'not-allowed',
+							transition: 'background 0.2s',
+						}}
+					>
+						Comenzar — ir a Mi Perfil
+					</button>
+				</div>
+			</div>
+		)}
+
 		{(sessionState === 'warning' || sessionState === 'expired') && (
 			<SessionTimeoutModal
 				state={sessionState}

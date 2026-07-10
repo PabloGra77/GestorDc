@@ -857,8 +857,8 @@ export function NuevaSolicitudPanel({ onCreada }: NuevaSolicitudPanelProps) {
             const esAnticipo    = norm(tipoSel.slug) === 'anticipo'    || norm(tipoSel.nombre) === 'anticipo';
             const esCuentaCobro = norm(tipoSel.slug).includes('cuentacobro') || norm(tipoSel.nombre).includes('cuentacobro');
             if (esLegal)       return <LegalizacionPanel    tipoSolicitudId={tipoSel.id} areaId={areaSel?.id} onCreada={onCreada} />;
-            if (esViat)        return <ViaticosPanel        onCreada={onCreada} />;
-            if (esAnticipo)    return <AnticipOPanel        onCreada={onCreada} />;
+            if (esViat)        return <ViaticosPanel        areaId={areaSel?.id} onCreada={onCreada} />;
+            if (esAnticipo)    return <AnticipOPanel        areaId={areaSel?.id} onCreada={onCreada} />;
             if (esCuentaCobro) return <CuentaCobroOpsPanel tipoSolicitudId={tipoSel.id} areaId={areaSel?.id} onCreada={onCreada} />;
             return (
           <form className="nueva-sol-form" onSubmit={enviar}>

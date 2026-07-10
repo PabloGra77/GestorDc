@@ -147,6 +147,11 @@ if (array_key_exists('lugarExpedicion', $body)) {
     $le = trim((string)($body['lugarExpedicion'] ?? ''));
     $camposExtra['lugar_expedicion'] = $le ?: null;
 }
+// Autorización de datos personales (Ley 1581 de 2012)
+if (array_key_exists('datosAutorizados', $body) && $body['datosAutorizados']) {
+    try { $pdo->exec("ALTER TABLE usuarios ADD COLUMN datos_autorizados TINYINT(1) NOT NULL DEFAULT 0"); } catch (\PDOException) {}
+    $camposExtra['datos_autorizados'] = 1;
+}
 // Área del usuario (el propio usuario puede seleccionar su área)
 if (array_key_exists('areaId', $body)) {
     $areaIdNuevo = $body['areaId'] !== null ? (int)$body['areaId'] : null;
