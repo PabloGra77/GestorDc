@@ -586,11 +586,145 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
 
 /* Elementos solo para móvil — ocultos en desktop */
 .admin-movil-topbar    { display: none; }
+.admin-bottom-nav      { display: none; }
 .admin-nav-overlay     { display: none; }
 .admin-sidebar-cerrar  { display: none; }
 .admin-movil-bell      { display: none; }
 .admin-drawer-usuario  { display: none; }
 .admin-drawer-logout   { display: none; }
+
+/* ── Nueva topbar móvil (campana | PAYOPS | perfil) ── */
+.admin-movil-topbar {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: 52px;
+  background: #070B1D;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  z-index: 300;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+}
+
+.admin-movil-topbar-btn {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 19px;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  position: relative;
+  border-radius: 50%;
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+.admin-movil-topbar-btn:active {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.admin-movil-brand {
+  font-size: 15px;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.admin-movil-bell-badge {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  background: #ef4444;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  min-width: 15px;
+  height: 15px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 3px;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.admin-movil-avatar {
+  background: #3d5afe;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ── Bottom nav bar móvil ── */
+.admin-bottom-nav {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  height: 62px;
+  background: #070B1D;
+  align-items: stretch;
+  z-index: 300;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.admin-bottom-nav-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.42);
+  cursor: pointer;
+  padding: 6px 4px;
+  font-size: 10px;
+  font-weight: 500;
+  transition: color 0.15s, background 0.15s;
+  width: auto !important;
+  min-height: 0;
+  min-width: 0;
+  position: relative;
+}
+.admin-bottom-nav-item.active {
+  color: #7c9aff;
+}
+.admin-bottom-nav-item.active::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 20%; right: 20%;
+  height: 2px;
+  background: #7c9aff;
+  border-radius: 0 0 2px 2px;
+}
+.admin-bottom-nav-item:active {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.admin-bottom-nav-icon {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.admin-bottom-nav-label {
+  font-size: 9.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 60px;
+}
 
 .admin-sidebar {
   background: #070B1D;
@@ -2692,6 +2826,90 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
   .admin-header h1 { font-size: 18px; }
   .admin-header-brand { gap: 8px; }
   .admin-header-logo { width: 48px !important; max-height: 28px !important; }
+
+  /* ── Navegación móvil: topbar + bottom nav, sin sidebar ── */
+  .admin-movil-topbar { display: flex; }
+  .admin-bottom-nav   { display: flex; }
+
+  /* Ocultar la barra de nav horizontal (desktop sidebar) */
+  .admin-sidebar { display: none !important; }
+  .admin-desktop-notif { display: none !important; }
+
+  /* El shell solo necesita la columna de workspace */
+  .admin-shell {
+    display: block !important;
+    padding-top: 52px;
+  }
+
+  /* Workspace con espacio para top y bottom nav */
+  .admin-workspace {
+    min-height: calc(100vh - 52px);
+    padding-bottom: calc(62px + env(safe-area-inset-bottom, 0px)) !important;
+    padding-top: 0 !important;
+  }
+
+  .admin-content {
+    padding-bottom: 8px;
+  }
+
+  /* Header de sección: más compacto */
+  .admin-header {
+    padding: 12px 14px 8px;
+  }
+
+  /* Botones del bottom nav no se expanden con la regla global de botones */
+  .admin-bottom-nav-item {
+    width: auto !important;
+    min-height: 0 !important;
+    font-size: 9.5px !important;
+  }
+
+  /* ── Inicio: compactar y definir mejor visualmente ── */
+  .inicio-layout { gap: 12px; }
+
+  .inicio-seguimiento-principal {
+    padding: 18px 16px 20px;
+    border-radius: 14px;
+    border: 1px solid var(--gold-line, rgba(212,175,55,0.3));
+  }
+  .inicio-seguimiento-header { margin-bottom: 14px; }
+  .inicio-seguimiento-header h3 { font-size: 16px; }
+  .inicio-seguimiento-header .admin-help-text { font-size: 12px; margin-top: 3px; }
+
+  .inicio-recientes {
+    padding: 16px;
+    border-radius: 14px;
+    border: 1px solid var(--gold-line, rgba(212,175,55,0.3));
+  }
+  .inicio-recientes-head { margin-bottom: 10px; }
+  .inicio-recientes-head h4 { font-size: 14px; }
+
+  .inicio-reciente-item {
+    padding: 10px 12px;
+    border-radius: 10px;
+    border-left: 3px solid var(--gold-line, rgba(212,175,55,0.5));
+    border-top: 1px solid rgba(255,255,255,0.06);
+    border-right: 1px solid rgba(255,255,255,0.04);
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .inicio-reciente-item.estado-aprobado { border-left-color: #22c55e; }
+  .inicio-reciente-item.estado-rechazado { border-left-color: #ef4444; }
+  .inicio-reciente-item.estado-devuelto { border-left-color: #f59e0b; }
+  .inicio-reciente-item.estado-en_validacion { border-left-color: #3b82f6; }
+
+  .inicio-recientes-list { gap: 7px; }
+  .inicio-reciente-meta { flex-shrink: 0; }
+
+  /* Perfil banner: más compacto */
+  .profile-verify-banner {
+    padding: 12px 14px;
+    border-radius: 10px;
+    font-size: 13px;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
 }
 
 /* === Tablet (641px - 1023px) === */
@@ -8653,241 +8871,8 @@ textarea {
     gap: 6px;
   }
 
-  /* === NAV LATERAL (DRAWER) EN MÓVIL === */
-
-  /* ── TOPBAR MÓVIL — tema oscuro (coincide con el tema global de la app) ── */
-  .admin-movil-topbar {
-    display: flex !important;
-    align-items: center;
-    gap: 0;
-    position: fixed;
-    top: 0; left: 0; right: 0;
-    height: 52px;
-    padding: 0;
-    z-index: 190;
-    background: #070B1D !important;
-    border-bottom: 1px solid rgba(212,175,55,0.28);
-    box-shadow: 0 2px 16px rgba(0,0,0,0.5);
-    overflow: visible;
-  }
-  /* Cuadro hamburger */
-  .admin-movil-topbar .admin-movil-hamburger {
-    width: 52px;
-    min-width: 52px;
-    height: 52px;
-    flex-shrink: 0;
-    background: rgba(212,175,55,0.08);
-    border: none;
-    border-right: 1px solid rgba(212,175,55,0.18);
-    font-size: 20px;
-    cursor: pointer;
-    color: #D4AF37 !important;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    line-height: 1;
-  }
-  /* "PAYOPS" */
-  .admin-movil-topbar .admin-movil-brand {
-    font-size: 14px;
-    font-weight: 800;
-    color: #D4AF37 !important;
-    letter-spacing: 1.5px;
-    flex-shrink: 0;
-    white-space: nowrap;
-    padding: 0 8px 0 10px;
-    display: inline-block;
-    line-height: 52px;
-  }
-  /* Separador · */
-  .admin-movil-topbar .admin-movil-sep {
-    color: rgba(212,175,55,0.45) !important;
-    flex-shrink: 0;
-    font-size: 15px;
-    padding-right: 8px;
-    white-space: nowrap;
-    display: inline-block;
-    line-height: 52px;
-  }
-  /* Nombre del módulo */
-  .admin-movil-topbar .admin-movil-modulo {
-    flex: 1;
-    min-width: 0;
-    font-size: 13px;
-    font-weight: 600;
-    color: rgba(255,255,255,0.72) !important;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    display: block;
-    line-height: 52px;
-  }
-  /* Campana */
-  .admin-movil-topbar .admin-movil-bell {
-    display: flex !important;
-    align-items: center;
-    justify-content: center;
-    position: relative;
-    width: 52px;
-    min-width: 52px;
-    height: 52px;
-    flex-shrink: 0;
-    background: none;
-    border: none;
-    border-left: 1px solid rgba(212,175,55,0.18);
-    font-size: 18px;
-    cursor: pointer;
-    color: rgba(255,255,255,0.82) !important;
-  }
-  .admin-movil-bell-badge {
-    position: absolute;
-    top: 8px; right: 8px;
-    background: #EF4444;
-    color: #fff !important;
-    font-size: 9px;
-    font-weight: 700;
-    border-radius: 999px;
-    padding: 1px 4px;
-    min-width: 15px;
-    text-align: center;
-  }
-
-  /* Ocultar Rol y Cerrar sesión del header en móvil — van en el drawer */
-  .admin-header-actions { display: none !important; }
-
-  /* Overlay oscuro cuando nav está abierta */
-  .admin-nav-overlay {
-    display: block;
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.55);
-    z-index: 199;
-  }
-
-  /* Sidebar: se convierte en drawer lateral */
-  .admin-sidebar {
-    position: fixed !important;
-    top: 0; left: -280px; bottom: 0;
-    width: 260px;
-    max-height: none;
-    flex-direction: column !important;
-    flex-wrap: nowrap !important;
-    justify-content: flex-start !important;
-    align-items: stretch !important;
-    overflow-y: auto;
-    overflow-x: hidden;
-    z-index: 200;
-    transition: left 0.28s cubic-bezier(0.4, 0, 0.2, 1);
-    padding: 16px 10px;
-    gap: 6px;
-    border-right: 1px solid var(--border-soft, #e5e7eb);
-    scrollbar-width: none;
-  }
-  .admin-sidebar::-webkit-scrollbar { display: none; }
-  .admin-sidebar.movil-abierto {
-    left: 0;
-    box-shadow: 8px 0 32px rgba(0,0,0,0.45);
-  }
-
-  /* Brand row dentro del drawer */
-  .admin-sidebar-brand-wrap {
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
-    flex-shrink: 0;
-    margin-bottom: 8px;
-    padding-bottom: 10px;
-    border-bottom: 1px solid var(--border-soft, #e5e7eb);
-  }
-  .admin-sidebar-cerrar {
-    display: flex;
-    background: none;
-    border: none;
-    font-size: 18px;
-    cursor: pointer;
-    color: var(--text-secondary, #666);
-    padding: 2px 6px;
-  }
-
-  /* Sección usuario en el drawer (visible solo en móvil) */
-  .admin-drawer-usuario {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 12px 10px;
-    margin-bottom: 8px;
-    border-bottom: 1px solid var(--border-soft, rgba(212,175,55,0.15));
-  }
-  .admin-drawer-avatar {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, #D4AF37, #b8860b);
-    color: #000;
-    font-size: 17px;
-    font-weight: 800;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-  }
-  .admin-drawer-nombre {
-    font-size: 14px;
-    font-weight: 700;
-    color: var(--text-primary);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .admin-drawer-rol {
-    font-size: 11px;
-    color: var(--text-muted);
-    margin-top: 2px;
-    text-transform: capitalize;
-  }
-  /* Botón de cerrar sesión al fondo del drawer */
-  .admin-drawer-logout {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    width: 100%;
-    margin-top: auto;
-    padding: 11px 14px;
-    border: 1.5px solid rgba(239,68,68,0.25);
-    border-radius: 8px;
-    background: rgba(239,68,68,0.06);
-    color: #EF4444;
-    font-size: 14px;
-    font-weight: 600;
-    cursor: pointer;
-    text-align: left;
-  }
-  .admin-drawer-logout:hover {
-    background: rgba(239,68,68,0.12);
-    border-color: rgba(239,68,68,0.45);
-  }
-
-  /* Nav items verticales en el drawer */
-  .admin-sidebar-nav {
-    display: flex;
-    flex-direction: column !important;
-    flex-wrap: nowrap !important;
-    gap: 4px;
-    width: 100%;
-  }
-  .admin-nav-item {
-    white-space: normal;
-    width: 100% !important;
-    text-align: left;
-    padding: 10px 12px;
-    font-size: 14px;
-    min-height: auto;
-    border-radius: 8px;
-  }
-
-  /* Empujar el workspace para que no quede debajo de la topbar */
-  .admin-workspace { padding-top: 60px !important; }
+  /* El sidebar horizontal sigue visible en 641-768px */
+  /* La topbar + bottom nav del móvil se activan solo en ≤640px vía su propia media query */
 
   /* Bandeja actions row: columna */
   .bandeja-actions-row {
@@ -10916,8 +10901,13 @@ body[data-weather="tormenta"]::after {
   .tipos-row { padding: 10px 12px; }
   .tipos-panel-head { gap: 8px; }
 
-  /* Admin workspace: sin padding lateral extra */
-  .admin-workspace { padding: 10px !important; }
+  /* Admin workspace: sin padding lateral extra, pero preservar bottom para bottom nav */
+  .admin-workspace {
+    padding-top: 0 !important;
+    padding-left: 10px !important;
+    padding-right: 10px !important;
+    padding-bottom: calc(62px + env(safe-area-inset-bottom, 0px)) !important;
+  }
 
   /* Viáticos: tipo grid → reducir padding tarjetas */
   .viaticos-tipo-card { padding: 14px 12px; }

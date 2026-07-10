@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNotificacionesPayops } from '../../hooks/useNotificacionesPayops';
 
@@ -25,6 +25,13 @@ function getSeenIds(): Set<number> {
 function setSeenIds(ids: number[]) {
 	try { localStorage.setItem(SEEN_KEY, JSON.stringify(ids.slice(-100))); } catch { /* ok */ }
 }
+
+const NAV_ICONS: Record<string, string> = {
+	'Inicio': '🏠',
+	'Radicaciones': '📋',
+	'Panel administrador': '⚙️',
+	'Mi perfil': '👤',
+};
 
 export function Sidebar({ esAdmin, activeSection, onSelectSection, currentUser, rol, onLogout }: SidebarProps) {
 	const [showNotifications, setShowNotifications] = useState(false);
@@ -75,7 +82,6 @@ export function Sidebar({ esAdmin, activeSection, onSelectSection, currentUser, 
 			aria-live="polite"
 			ref={(el) => {
 				if (!el) return;
-				// Usar el bell visible (topbar en móvil, o sidebar en desktop)
 				const btn = bellMovilRef.current ?? notificationsRef.current?.querySelector('.admin-bell-button') as HTMLElement | null;
 				if (btn) {
 					const r = (btn as HTMLElement).getBoundingClientRect();
@@ -115,52 +121,74 @@ export function Sidebar({ esAdmin, activeSection, onSelectSection, currentUser, 
 		document.body
 	) : null;
 
-	const topbarPortal = createPortal(
+	/* ── Topbar móvil: campana | PAYOPS | perfil ── */
+	const topbarMovil = createPortal(
 		<div className="admin-movil-topbar">
-			<button
-				type="button"
-				className="admin-movil-hamburger"
-				onClick={() => setMovilAbierto(true)}
-				aria-label="Abrir menú"
-			>
-				☰
-			</button>
-			<span className="admin-movil-brand">PAYOPS</span>
-			<span className="admin-movil-sep">·</span>
-			<span className="admin-movil-modulo">{activeSection}</span>
 			<button
 				ref={bellMovilRef}
 				type="button"
-				className="admin-movil-bell"
+				className="admin-movil-topbar-btn"
 				onClick={abrirNotif}
 				aria-label="Notificaciones"
 			>
 				🔔
-				{unread.length > 0 ? (
+				{unread.length > 0 && (
 					<span className="admin-movil-bell-badge">{unread.length}</span>
-				) : null}
+				)}
+			</button>
+
+			<span className="admin-movil-brand">PAYOPS</span>
+
+			<button
+				type="button"
+				className="admin-movil-topbar-btn"
+				onClick={() => seleccionar('Mi perfil')}
+				aria-label="Mi perfil"
+				title={currentUser}
+			>
+				<span className="admin-movil-avatar">{(currentUser?.[0] || 'U').toUpperCase()}</span>
 			</button>
 		</div>,
 		document.body
 	);
 
+	/* ── Bottom nav móvil ── */
+	const bottomNav = createPortal(
+		<nav className="admin-bottom-nav" aria-label="Navegación">
+			{menuItems.map((item) => (
+				<button
+					key={item}
+					type="button"
+					className={`admin-bottom-nav-item${activeSection === item ? ' active' : ''}`}
+					onClick={() => seleccionar(item)}
+				>
+					<span className="admin-bottom-nav-icon">{NAV_ICONS[item] ?? '●'}</span>
+					<span className="admin-bottom-nav-label">
+						{item === 'Panel administrador' ? 'Admin' : item}
+					</span>
+				</button>
+			))}
+		</nav>,
+		document.body
+	);
+
 	return (
 		<>
-			{topbarPortal}
+			{/* Topbar + bottom nav — solo en móvil, controlado por CSS */}
+			{topbarMovil}
+			{bottomNav}
 
-			{/* Overlay */}
+			{/* Overlay para tablet drawer */}
 			{movilAbierto ? (
 				<div className="admin-nav-overlay" role="presentation" onClick={() => setMovilAbierto(false)} />
 			) : null}
 
-			{/* ═══ SIDEBAR / DRAWER ═══ */}
+			{/* ═══ SIDEBAR — desktop y tablet drawer ═══ */}
 			<aside className={`admin-sidebar${movilAbierto ? ' movil-abierto' : ''}`}>
 
-				{/* Header del drawer (solo en móvil) */}
 				<div className="admin-sidebar-brand-wrap">
 					<div className="admin-sidebar-brand">PAYOPS</div>
 					<div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-						{/* Bell en desktop sidebar */}
 						<div className="admin-notifications admin-desktop-notif" ref={notificationsRef}>
 							<button
 								type="button"
@@ -172,12 +200,10 @@ export function Sidebar({ esAdmin, activeSection, onSelectSection, currentUser, 
 								{unread.length > 0 ? <span className="admin-bell-count">{unread.length}</span> : null}
 							</button>
 						</div>
-						{/* Botón cerrar drawer (solo móvil) */}
 						<button type="button" className="admin-sidebar-cerrar" onClick={() => setMovilAbierto(false)}>✕</button>
 					</div>
 				</div>
 
-				{/* Info de usuario en el drawer (solo visible en móvil) */}
 				<div className="admin-drawer-usuario">
 					<div className="admin-drawer-avatar">
 						{(currentUser?.[0] || 'U').toUpperCase()}
@@ -188,7 +214,6 @@ export function Sidebar({ esAdmin, activeSection, onSelectSection, currentUser, 
 					</div>
 				</div>
 
-				{/* Nav items */}
 				<nav className="admin-sidebar-nav" aria-label="Navegación principal">
 					{menuItems.map((item) => (
 						<button
@@ -202,7 +227,6 @@ export function Sidebar({ esAdmin, activeSection, onSelectSection, currentUser, 
 					))}
 				</nav>
 
-				{/* Cerrar sesión en el drawer (solo móvil) */}
 				{onLogout ? (
 					<button
 						type="button"
