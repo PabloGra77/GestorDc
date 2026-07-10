@@ -598,12 +598,12 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
   position: fixed;
   top: 0; left: 0; right: 0;
   height: 52px;
-  background: #070B1D;
+  background: #000;
   align-items: center;
   justify-content: space-between;
-  padding: 0 12px;
+  padding: 0 14px;
   z-index: 300;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 1px 0 rgba(212, 175, 55, 0.3), 0 2px 12px rgba(0, 0, 0, 0.5);
 }
 
 .admin-movil-topbar-btn {
@@ -671,10 +671,10 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
   position: fixed;
   bottom: 0; left: 0; right: 0;
   height: 62px;
-  background: #070B1D;
+  background: #000;
   align-items: stretch;
   z-index: 300;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid rgba(212, 175, 55, 0.25);
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
@@ -2886,34 +2886,8 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
     font-size: 9.5px !important;
   }
 
-  /* ── Header de sección: ocultar logo/greeting, conservar logout ── */
-  .admin-header-brand { display: none !important; }
-  .admin-header {
-    padding: 8px 14px;
-    flex-direction: row !important;
-    align-items: center;
-    justify-content: flex-end;
-    border-bottom: 1px solid var(--border-soft, rgba(212,175,55,0.15));
-    background: var(--bg-elevated, rgba(15,23,42,0.03));
-    min-height: 0;
-  }
-  .admin-header-actions {
-    display: flex !important;
-    flex-direction: row !important;
-    align-items: center;
-    gap: 10px;
-    width: auto !important;
-  }
-  .admin-role-pill {
-    font-size: 10px !important;
-    padding: 3px 8px !important;
-  }
-  .admin-header .secondary-button {
-    width: auto !important;
-    font-size: 12px !important;
-    padding: 4px 10px !important;
-    min-height: auto !important;
-  }
+  /* ── Header de sección: ocultar completamente en mobile (nav está en topbar+bottom) ── */
+  .admin-header { display: none !important; }
 
   /* ── Theme toggle: subir para no quedar detrás del bottom nav ── */
   .payops-theme-toggle {
@@ -2922,6 +2896,46 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
     width: 38px !important;
     height: 38px !important;
   }
+
+  /* ── Radicaciones: nav horizontal en vez de sidebar lateral ── */
+  .radicaciones-menu-btn { display: none !important; }
+  .radicaciones-overlay  { display: none !important; }
+  .radicaciones-layout   { flex-direction: column !important; gap: 0; }
+  .radicaciones-nav {
+    position: static !important;
+    left: auto !important; top: auto !important; bottom: auto !important;
+    width: 100% !important; max-width: none !important;
+    flex-direction: row !important;
+    overflow-x: auto !important; overflow-y: hidden !important;
+    gap: 6px !important;
+    padding: 10px 14px !important;
+    border-right: none !important;
+    border-bottom: 1px solid rgba(212, 175, 55, 0.2) !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    transition: none !important;
+    background: #000 !important;
+    scrollbar-width: none;
+  }
+  .radicaciones-nav::-webkit-scrollbar { display: none; }
+  .radicaciones-nav-item {
+    flex: 0 0 auto !important;
+    width: auto !important;
+    padding: 7px 14px !important;
+    font-size: 12px !important;
+    white-space: nowrap !important;
+    border-radius: 20px !important;
+    border: 1px solid rgba(212, 175, 55, 0.25) !important;
+    color: rgba(255, 255, 255, 0.65) !important;
+    background: transparent !important;
+  }
+  .radicaciones-nav-item.active {
+    background: #D4AF37 !important;
+    color: #000 !important;
+    border-color: #D4AF37 !important;
+    font-weight: 700 !important;
+  }
+  .radicaciones-content { padding: 14px 14px 8px !important; }
 
   /* ── Inicio: compactar y definir mejor visualmente ── */
   .inicio-layout { gap: 12px; }
@@ -2969,6 +2983,87 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
     flex-wrap: wrap;
     gap: 10px;
   }
+
+  /* ── Panel administrador: diseño móvil negro/dorado ── */
+  .admin-forms-panel { padding: 0 !important; }
+  .admin-panel-head { padding: 14px 14px 0 !important; }
+  .admin-panel-head h3 { font-size: 17px; }
+  .admin-panel-head p { font-size: 12px; color: var(--text-muted); }
+
+  .admin-kpi-grid { gap: 8px !important; margin: 12px 14px !important; }
+  .admin-kpi-card {
+    padding: 12px 14px !important;
+    border-radius: 10px !important;
+    background: rgba(212,175,55,0.05) !important;
+    border: 1px solid rgba(212,175,55,0.3) !important;
+  }
+  .admin-kpi-card span { font-size: 11px !important; }
+  .admin-kpi-card strong { font-size: 26px !important; color: #D4AF37 !important; }
+
+  .admin-module-nav {
+    width: calc(100% - 28px) !important;
+    margin: 0 14px 14px !important;
+    background: rgba(0,0,0,0.4) !important;
+    border: 1px solid rgba(212,175,55,0.2) !important;
+    scrollbar-width: none;
+    border-radius: 10px !important;
+    padding: 5px !important;
+    gap: 4px !important;
+  }
+  .admin-module-nav::-webkit-scrollbar { display: none; }
+  .admin-module-item {
+    padding: 0 10px !important;
+    height: 30px !important;
+    font-size: 11px !important;
+    border-radius: 6px !important;
+    background: transparent !important;
+    border: 1px solid transparent !important;
+    color: rgba(255,255,255,0.6) !important;
+  }
+  .admin-module-item.active {
+    background: #D4AF37 !important;
+    color: #000 !important;
+    border-color: #D4AF37 !important;
+    font-weight: 700 !important;
+  }
+  .admin-module-item:hover:not(.active) {
+    color: rgba(255,255,255,0.9) !important;
+    border-color: rgba(212,175,55,0.35) !important;
+  }
+
+  .admin-form-grid { padding: 0 14px 14px !important; }
+  .admin-form { border-radius: 10px !important; }
+
+  /* ── Panel de perfil: diseño móvil negro/dorado ── */
+  .profile-layout {
+    grid-template-columns: 1fr !important;
+    gap: 16px !important;
+    margin-top: 12px !important;
+  }
+  .profile-avatar-col {
+    flex-direction: row !important;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 16px;
+    background: rgba(212,175,55,0.06);
+    border: 1px solid rgba(212,175,55,0.2);
+    border-radius: 12px;
+  }
+  .profile-avatar-circle {
+    width: 56px !important;
+    height: 56px !important;
+    font-size: 22px !important;
+    flex-shrink: 0;
+    border: 2px solid rgba(212,175,55,0.5);
+  }
+  .profile-nombre-display { text-align: left !important; font-size: 14px; }
+  .profile-form h4 {
+    padding-bottom: 6px;
+    border-bottom: 1px solid rgba(212,175,55,0.2);
+    margin-bottom: 12px;
+    font-size: 12px !important;
+  }
+  .profile-label { font-size: 11px !important; margin-bottom: 2px !important; }
 }
 
 /* === Tablet (641px - 1023px) === */
@@ -11033,6 +11128,50 @@ body[data-weather="tormenta"]::after {
     padding: 8px 12px !important;
     font-size: 12px !important;
     flex-shrink: 0;
+  }
+}
+
+/* ── Botón logout en perfil (solo móvil) ── */
+.profile-logout-mobile { display: none; }
+
+@media (max-width: 640px) {
+  .profile-logout-mobile {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 14px 14px 0;
+    padding: 12px 16px;
+    background: rgba(212,175,55,0.05);
+    border: 1px solid rgba(212,175,55,0.2);
+    border-radius: 10px;
+  }
+  .profile-logout-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .profile-logout-rol {
+    font-size: 12px;
+    color: var(--text-secondary);
+    font-weight: 500;
+  }
+  .profile-logout-btn {
+    background: none !important;
+    border: 1.5px solid rgba(239,68,68,0.4) !important;
+    color: #ef4444 !important;
+    border-radius: 8px !important;
+    padding: 7px 14px !important;
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    width: auto !important;
+    min-height: auto !important;
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .profile-logout-btn:active {
+    background: rgba(239,68,68,0.1) !important;
   }
 }
 

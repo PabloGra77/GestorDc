@@ -1638,7 +1638,19 @@ export function DashboardPage() {
 
 			{activeSection === 'Radicaciones' ? <RadicacionesModule /> : null}
 
-			{activeSection === 'Mi perfil' ? <ProfilePanel /> : null}
+			{activeSection === 'Mi perfil' ? (
+				<>
+					<ProfilePanel />
+					<div className="profile-logout-mobile">
+						<div className="profile-logout-info">
+							<span className="profile-logout-rol">Rol: {session?.usuario.rol.nombre}</span>
+						</div>
+						<button type="button" className="profile-logout-btn" onClick={handleLogout}>
+							Cerrar sesión
+						</button>
+					</div>
+				</>
+			) : null}
 
 			{isUserPermisosOpen && usuarioPermisosObjetivo ? (
 				<div className="admin-permissions-overlay" role="dialog" aria-modal="true" aria-label="Permisos de usuario">
