@@ -12441,15 +12441,263 @@ body[data-weather="tormenta"]::after {
 [data-theme="light"] .rad2-empty { color: #D1D5DB !important; }
 [data-theme="light"] .rad-badge--draft { background: rgba(0,0,0,0.06) !important; color: #6B7280 !important; }
 
+/* Mobile Radicaciones */
 @media (max-width: 640px) {
-  .rad2-header { padding-bottom: 14px; }
-  .rad2-titulo { font-size: 18px; }
-  .rad2-tab { padding: 9px 13px; font-size: 12.5px; gap: 5px; }
-  .rad2-tab-label { display: none; }
-  .rad2-tab-icon { width: 18px; height: 18px; }
-  .rad2-tab { padding: 9px 14px; }
-  .rad2-kpi-grid { grid-template-columns: repeat(2, 1fr); }
-  .rad2-kpi-val { font-size: 20px; }
+  .rad2-shell { padding: 0; }
+  .rad2-header { padding-bottom: 12px; }
+  .rad2-titulo { font-size: 17px; }
+  .rad2-subtitulo { font-size: 11.5px; }
+
+  /* Tabs: icon + label corta, scroll horizontal */
+  .rad2-tabs { gap: 2px; margin-bottom: 16px; }
+  .rad2-tab {
+    padding: 8px 12px;
+    font-size: 11.5px;
+    gap: 5px;
+    border-radius: 8px 8px 0 0;
+    flex-direction: column;
+    align-items: center;
+    min-width: 60px;
+  }
+  .rad2-tab-label { display: block; font-size: 10px; line-height: 1.2; }
+  .rad2-tab-icon { width: 17px; height: 17px; }
+
+  /* KPI grid: 2 columnas en móvil con fondo visible */
+  .rad2-kpi-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .rad2-kpi {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 12px 14px;
+    background: rgba(212, 175, 55, 0.06) !important;
+    border-color: rgba(212, 175, 55, 0.18) !important;
+    border-radius: 12px;
+  }
+  .rad2-kpi-icon { width: 32px; height: 32px; border-radius: 8px; }
+  .rad2-kpi-val { font-size: 22px; }
+  .rad2-kpi-label { font-size: 11px; color: rgba(255,255,255,0.55) !important; }
+
+  /* Tabla: ocultar columnas no esenciales */
   .rad2-table { font-size: 12px; }
-  .rad2-table td, .rad2-table th { padding: 9px 10px; }
+  .rad2-table td, .rad2-table th { padding: 8px 8px; }
+  .rad2-table th:nth-child(4),
+  .rad2-table td:nth-child(4),
+  .rad2-table th:nth-child(5),
+  .rad2-table td:nth-child(5),
+  .rad2-table th:nth-child(6),
+  .rad2-table td:nth-child(6) { display: none; }
+}
+
+/* Topbar minimal — oculta en todos los breakpoints (Sidebar maneja todo) */
+.topbar-minimal { display: none !important; }
+
+/* ============================================================
+   SIDEBAR — Mejoras visuales de la campana de notificaciones
+   ============================================================ */
+.admin-bell-button {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid rgba(212, 175, 55, 0.25);
+  background: rgba(212, 175, 55, 0.08);
+  cursor: pointer;
+  transition: background 0.18s, border-color 0.18s, transform 0.15s;
+  color: rgba(255, 255, 255, 0.7);
+}
+.admin-bell-button:hover {
+  background: rgba(212, 175, 55, 0.18);
+  border-color: var(--gold, #D4AF37);
+  color: var(--gold, #D4AF37);
+  transform: scale(1.08);
+}
+.admin-bell-svg { display: block; transition: stroke 0.18s; }
+.admin-bell-button:hover .admin-bell-svg { stroke: var(--gold, #D4AF37); }
+
+.admin-bell-count {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 9px;
+  background: #ef4444;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  border: 2px solid #000;
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.2);
+}
+
+/* Campana móvil — misma mejora */
+.admin-movil-topbar-btn.has-notif .admin-movil-bell-svg { color: var(--gold, #D4AF37); }
+.admin-movil-bell-badge {
+  position: absolute;
+  top: 0; right: 0;
+  min-width: 17px; height: 17px;
+  padding: 0 3px;
+  border-radius: 9px;
+  background: #ef4444;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--admin-movil-bg, #0a0a12);
+}
+
+/* Light mode campana */
+[data-theme="light"] .admin-bell-button {
+  border-color: rgba(212,175,55,0.3) !important;
+  background: rgba(212,175,55,0.07) !important;
+  color: #B8901F !important;
+}
+[data-theme="light"] .admin-bell-button:hover {
+  background: rgba(212,175,55,0.15) !important;
+  border-color: #B8901F !important;
+}
+[data-theme="light"] .admin-bell-count { border-color: #fff !important; }
+
+/* ============================================================
+   ADMIN PANEL — Listas acotadas + diseño más compacto
+   ============================================================ */
+
+/* Cap en listas de usuarios y roles */
+.admin-side-list > ul,
+.admin-role-catalog > ul {
+  max-height: 440px;
+  overflow-y: auto;
+  padding-right: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(212,175,55,0.3) transparent;
+}
+.admin-side-list > ul::-webkit-scrollbar,
+.admin-role-catalog > ul::-webkit-scrollbar {
+  width: 5px;
+}
+.admin-side-list > ul::-webkit-scrollbar-thumb,
+.admin-role-catalog > ul::-webkit-scrollbar-thumb {
+  background: rgba(212,175,55,0.25);
+  border-radius: 4px;
+}
+
+/* Ítem de usuario más compacto */
+.admin-user-list-item {
+  padding: 10px 12px !important;
+  gap: 8px !important;
+}
+.admin-user-info strong { font-size: 13px !important; }
+.admin-user-info span  { font-size: 11.5px !important; }
+.admin-user-meta       { font-size: 11px !important; }
+
+/* Acciones de usuario: envolvibles */
+.admin-user-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px !important;
+}
+.admin-user-actions .admin-ghost-button {
+  padding: 4px 10px !important;
+  font-size: 11.5px !important;
+  border-radius: 6px !important;
+}
+
+/* Header con recuento de ítems */
+.admin-user-list-head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding-bottom: 8px;
+  margin-bottom: 4px;
+  background: var(--bg-card, #000);
+}
+[data-theme="light"] .admin-user-list-head { background: #fff !important; }
+
+/* Módulos nav — mejor espaciado y highlight activo más visible */
+.admin-module-nav {
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-bottom: 2px;
+}
+.admin-module-nav::-webkit-scrollbar { display: none; }
+
+.admin-module-item {
+  white-space: nowrap;
+  padding: 7px 14px !important;
+  font-size: 12.5px !important;
+  border-radius: 8px !important;
+  border: 1px solid transparent !important;
+  transition: color 0.15s, background 0.15s, border-color 0.15s !important;
+}
+.admin-module-item.active {
+  background: rgba(212,175,55,0.12) !important;
+  border-color: rgba(212,175,55,0.35) !important;
+  color: var(--gold, #D4AF37) !important;
+  font-weight: 700 !important;
+}
+.admin-module-item:not(.active):hover {
+  background: rgba(255,255,255,0.04) !important;
+  color: rgba(255,255,255,0.8) !important;
+}
+
+/* Light mode módulos nav */
+[data-theme="light"] .admin-module-item.active {
+  background: rgba(212,175,55,0.1) !important;
+  border-color: rgba(212,175,55,0.4) !important;
+  color: #B8901F !important;
+}
+[data-theme="light"] .admin-module-item:not(.active):hover {
+  background: rgba(0,0,0,0.04) !important;
+  color: #374151 !important;
+}
+
+/* KPI admin — con icono implícito via border-left coloreado */
+.admin-kpi-card {
+  border-left: 3px solid var(--gold, #D4AF37) !important;
+  border-radius: 10px !important;
+  padding: 14px 16px !important;
+  min-width: 0;
+}
+.admin-kpi-card span { font-size: 12px !important; }
+.admin-kpi-card strong { font-size: 26px !important; }
+
+/* Panel admin head — layout flex */
+.admin-panel-head {
+  display: flex !important;
+  align-items: flex-start !important;
+  justify-content: space-between !important;
+  gap: 12px !important;
+  flex-wrap: wrap !important;
+  margin-bottom: 16px !important;
+}
+.admin-panel-head h3 { margin: 0 0 2px !important; font-size: 18px !important; }
+.admin-panel-head p  { margin: 0 !important; font-size: 12.5px !important; opacity: 0.6; }
+
+/* Grid form + lista: gap ajustado */
+.admin-form-grid { gap: 16px !important; }
+
+/* Búsqueda sticky en lista usuarios */
+.admin-user-search-wrap {
+  position: sticky;
+  top: 48px;
+  z-index: 1;
+  background: var(--bg-card, #000);
+  padding: 6px 0 8px;
+}
+[data-theme="light"] .admin-user-search-wrap { background: #fff !important; }
+
+@media (max-width: 640px) {
+  .admin-side-list > ul,
+  .admin-role-catalog > ul { max-height: 320px; }
+  .admin-kpi-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 8px !important; }
+  .admin-form-grid { grid-template-columns: 1fr !important; }
 }

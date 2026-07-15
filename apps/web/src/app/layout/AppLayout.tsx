@@ -1,5 +1,4 @@
 import { ReactNode } from 'react';
-import { Header } from './Header';
 import { Sidebar } from './Sidebar';
 
 interface AppLayoutProps {
@@ -34,11 +33,6 @@ export function AppLayout({
 
 			<div className="admin-workspace chat-collapsed">
 				<div className="admin-main">
-					<Header
-						nombre={nombre}
-						rol={rol}
-						onLogout={onLogout}
-					/>
 					<main className="admin-content">{children}</main>
 				</div>
 			</div>
