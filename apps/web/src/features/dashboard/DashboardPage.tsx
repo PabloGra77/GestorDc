@@ -15,12 +15,14 @@ import { ConfiguracionSmtpPanel } from '../admin/ConfiguracionSmtpPanel';
 import { LegalizacionConfigPanel } from '../admin/LegalizacionConfigPanel';
 import { TiposSolicitudPanel } from '../admin/TiposSolicitudPanel';
 import { ProfilePanel } from '../admin/ProfilePanel';
+import { HistorialPanel } from '../admin/HistorialPanel';
 import { InicioStats, InicioRecientes, SeguimientoRadicado } from './InicioStats';
+import { usePayopsLogo } from '../../hooks/usePayopsLogo';
 import type { Role } from '../../types/role';
 import type { Radicado, VerificarRadicadoResponse } from '../../types/radicado';
 import type { Usuario } from '../../types/usuario';
 
-type AdminModule = 'Usuarios' | 'Personal autorizado' | 'Roles' | 'Areas' | 'Usuarios en linea' | 'Configuracion' | 'Configuracion Legalizaciones' | 'Tipos de solicitud';
+type AdminModule = 'Usuarios' | 'Personal autorizado' | 'Roles' | 'Areas' | 'Usuarios en linea' | 'Configuracion' | 'Configuracion Legalizaciones' | 'Tipos de solicitud' | 'Historial';
 
 const ROLE_PERMISSIONS_CATALOG = {
 	inicio: {
@@ -142,6 +144,7 @@ export function DashboardPage() {
 	const composeMensajeEditorRef = useRef<HTMLDivElement | null>(null);
 
 	const rol = useMemo(() => session?.usuario.rol.nombre ?? 'Sin rol', [session]);
+	const usePayopsLogoHero = usePayopsLogo();
 	const saludoInicio = useMemo(() => {
 		const h = new Date().getHours();
 		if (h >= 6 && h < 12) return 'Buenos días';
@@ -958,6 +961,14 @@ export function DashboardPage() {
 					{/* ── Hero de bienvenida ── */}
 					<div className="inicio-hero">
 						<div className="inicio-hero-left">
+							<div className="inicio-hero-logo-row">
+								<img
+									src={usePayopsLogoHero}
+									alt="Goleman IPS"
+									className="inicio-hero-logo"
+									onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+								/>
+							</div>
 							<p className="inicio-saludo-label">{saludoInicio}</p>
 							<h1 className="inicio-hero-nombre">{primerNombreSesion}</h1>
 							<p className="inicio-hero-sub">{rol}&nbsp;·&nbsp;Gestiona tus solicitudes y radicados</p>
@@ -1293,7 +1304,7 @@ export function DashboardPage() {
 					</div>
 
 					<div className="admin-module-nav" role="tablist" aria-label="Módulos administrativos">
-						{(['Usuarios', 'Personal autorizado', 'Roles', 'Areas', 'Usuarios en linea', 'Configuracion', 'Configuracion Legalizaciones', 'Tipos de solicitud'] as AdminModule[]).map((module) => (
+						{(['Usuarios', 'Personal autorizado', 'Roles', 'Areas', 'Usuarios en linea', 'Configuracion', 'Configuracion Legalizaciones', 'Tipos de solicitud', 'Historial'] as AdminModule[]).map((module) => (
 							<button
 								key={module}
 								type="button"
@@ -1640,6 +1651,10 @@ export function DashboardPage() {
 
 						{activeAdminModule === 'Tipos de solicitud' ? (
 							<TiposSolicitudPanel />
+						) : null}
+
+						{activeAdminModule === 'Historial' ? (
+							<HistorialPanel />
 						) : null}
 
 						{activeAdminModule === 'Usuarios' && canCrearUsuarios ? (

@@ -35,6 +35,7 @@ require_once __DIR__ . '/lib/throttle.php';
 require_once __DIR__ . '/lib/shapes.php';
 require_once __DIR__ . '/lib/domain.php';
 require_once __DIR__ . '/lib/forense.php';
+require_once __DIR__ . '/lib/auditoria.php';
 
 try {
     Config::load(__DIR__ . '/.env');

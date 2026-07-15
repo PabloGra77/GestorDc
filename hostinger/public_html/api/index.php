@@ -109,6 +109,9 @@ $routes = [
     ['GET',    '#^/config/legalizacion$#',                       'config/legalizacion_get'],
     ['PUT',    '#^/config/legalizacion$#',                       'config/legalizacion_update'],
 
+    // Historial de auditoría (solo admin)
+    ['GET',    '#^/historial$#',                                    'historial/find_all'],
+
     // Radicados
     ['POST',   '#^/radicados$#',                                 'radicados/create'],
     ['POST',   '#^/radicados/cuentas-cobro-ops/solicitud$#',     'radicados/ops_solicitud'],

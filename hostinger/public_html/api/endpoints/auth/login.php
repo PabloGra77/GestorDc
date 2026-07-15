@@ -41,6 +41,13 @@ $hashAComparar = ($row && (int)$row['activo'] === 1 && !empty($row['password_has
 $passwordOk = password_verify($password, $hashAComparar);
 
 if (!$row || (int)$row['activo'] !== 1 || empty($row['password_hash']) || !$passwordOk) {
+    Auditoria::registrar(
+        'login_fallido',
+        'Intento de inicio de sesión fallido para: ' . $correo,
+        false,
+        null,
+        $correo
+    );
     Response::error('Credenciales invalidas', 401);
 }
 
@@ -53,6 +60,15 @@ $token = Jwt::sign([
     'iat' => time(),
     'exp' => time() + 3600,
 ]);
+
+Auditoria::registrar(
+    'login_exitoso',
+    'Inicio de sesión exitoso',
+    true,
+    (int)$row['id'],
+    $row['correo'],
+    $row['nombre_completo']
+);
 
 Response::json([
     'token' => $token,

@@ -38,7 +38,6 @@ export function AppLayout({
 						nombre={nombre}
 						rol={rol}
 						onLogout={onLogout}
-						mostrarBienvenida={activeSection === 'Inicio'}
 					/>
 					<main className="admin-content">{children}</main>
 				</div>
