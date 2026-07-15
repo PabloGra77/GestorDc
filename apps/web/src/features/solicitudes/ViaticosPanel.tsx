@@ -620,7 +620,7 @@ export function ViaticosPanel({ onCreada, areaId }: { onCreada?: (info: { id: nu
                 className={`viaticos-tipo-card${tipoViatico === 'anticipo' ? ' selected' : ''}`}
                 onClick={() => setTipoViatico('anticipo')}>
                 <span className="viaticos-tipo-icon">💳</span>
-                <strong>Solicitar anticipo</strong>
+                <strong>Solicitar viático</strong>
                 <p>El viaje no se ha realizado aún. Solicitas dinero por adelantado para cubrirlo.</p>
               </button>
               <button type="button"
@@ -1301,7 +1301,7 @@ export function ViaticosPanel({ onCreada, areaId }: { onCreada?: (info: { id: nu
           <div className="leg-actions">
             <button type="button" className="admin-ghost-button" onClick={anterior}>← Atrás</button>
             <button type="button" className="admin-primary-button" onClick={enviar} disabled={enviando}>
-              {enviando ? 'Enviando…' : tipoViatico === 'anticipo' ? 'Solicitar anticipo de viático' : 'Enviar legalización de viático'}
+              {enviando ? 'Enviando…' : tipoViatico === 'anticipo' ? 'Solicitar viático' : 'Enviar legalización de viático'}
             </button>
           </div>
         </div>

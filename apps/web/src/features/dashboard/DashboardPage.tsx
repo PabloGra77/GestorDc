@@ -20,7 +20,7 @@ import type { Role } from '../../types/role';
 import type { Radicado, VerificarRadicadoResponse } from '../../types/radicado';
 import type { Usuario } from '../../types/usuario';
 
-type AdminModule = 'Usuarios' | 'Personal autorizado' | 'Roles' | 'Areas' | 'Usuarios en linea' | 'Reportes' | 'Configuracion' | 'Configuracion Legalizaciones' | 'Tipos de solicitud';
+type AdminModule = 'Usuarios' | 'Personal autorizado' | 'Roles' | 'Areas' | 'Usuarios en linea' | 'Configuracion' | 'Configuracion Legalizaciones' | 'Tipos de solicitud';
 
 const ROLE_PERMISSIONS_CATALOG = {
 	inicio: {
@@ -98,6 +98,7 @@ export function DashboardPage() {
 	const [isLoadingAdminData, setIsLoadingAdminData] = useState(false);
 	const [roles, setRoles] = useState<Role[]>([]);
 	const [usuarios, setUsuarios] = useState<Usuario[]>([]);
+	const [userSearch, setUserSearch] = useState('');
 	const [adminMessage, setAdminMessage] = useState('');
 	const [adminError, setAdminError] = useState('');
 
@@ -141,6 +142,16 @@ export function DashboardPage() {
 	const composeMensajeEditorRef = useRef<HTMLDivElement | null>(null);
 
 	const rol = useMemo(() => session?.usuario.rol.nombre ?? 'Sin rol', [session]);
+	const saludoInicio = useMemo(() => {
+		const h = new Date().getHours();
+		if (h >= 6 && h < 12) return 'Buenos días';
+		if (h >= 12 && h < 18) return 'Buenas tardes';
+		return 'Buenas noches';
+	}, []);
+	const primerNombreSesion = useMemo(() => {
+		const n = session?.usuario.nombreCompleto ?? '';
+		return n.split(' ')[0] || n;
+	}, [session]);
 	const permisosUsuarioSesion = useMemo(() => session?.usuario.permisos ?? {}, [session]);
 	const permisosRolSesion = useMemo(() => session?.usuario.rol.permisos ?? {}, [session]);
 	const esAdmin = rol.toLowerCase() === 'administrador';
@@ -167,7 +178,16 @@ export function DashboardPage() {
 	const canCrearUsuarios = tienePermiso('panelAdministrador', 'crearUsuarios');
 	const canCrearRoles = tienePermiso('panelAdministrador', 'crearRoles');
 	const totalUsuariosActivos = useMemo(() => usuarios.filter((usuario) => usuario.activo).length, [usuarios]);
-	const usuariosRecientes = useMemo(() => [...usuarios].slice(-6).reverse(), [usuarios]);
+	const usuariosRecientes = useMemo(() => [...usuarios].reverse(), [usuarios]);
+	const usuariosFiltrados = useMemo(() => {
+		const q = userSearch.trim().toLowerCase();
+		if (!q) return usuariosRecientes;
+		return usuariosRecientes.filter((u) =>
+			u.nombreCompleto.toLowerCase().includes(q) ||
+			u.correo.toLowerCase().includes(q) ||
+			(u.rol?.nombre || '').toLowerCase().includes(q)
+		);
+	}, [usuariosRecientes, userSearch]);
 	const usuariosEnLinea = useMemo(() => {
 		if (!session) {
 			return [] as Usuario[];
@@ -934,6 +954,50 @@ export function DashboardPage() {
 		>
 			{activeSection === 'Inicio' ? (
 				<section className="inicio-layout">
+
+					{/* ── Hero de bienvenida ── */}
+					<div className="inicio-hero">
+						<div className="inicio-hero-left">
+							<p className="inicio-saludo-label">{saludoInicio}</p>
+							<h1 className="inicio-hero-nombre">{primerNombreSesion}</h1>
+							<p className="inicio-hero-sub">{rol}&nbsp;·&nbsp;Gestiona tus solicitudes y radicados</p>
+						</div>
+						<div className="inicio-acciones">
+							<button type="button" className="inicio-accion-card" onClick={() => setActiveSection('Radicaciones')}>
+								<span className="inicio-accion-icon">
+									<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+								</span>
+								<span className="inicio-accion-label">Nueva solicitud</span>
+								<span className="inicio-accion-desc">Crea un nuevo radicado de viático u otros</span>
+							</button>
+							<button type="button" className="inicio-accion-card" onClick={() => setActiveSection('Radicaciones')}>
+								<span className="inicio-accion-icon">
+									<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+								</span>
+								<span className="inicio-accion-label">Mis radicaciones</span>
+								<span className="inicio-accion-desc">Consulta y haz seguimiento a tus solicitudes</span>
+							</button>
+							{esAdmin ? (
+								<button type="button" className="inicio-accion-card inicio-accion-card--admin" onClick={() => setActiveSection('Panel administrador')}>
+									<span className="inicio-accion-icon">
+										<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
+									</span>
+									<span className="inicio-accion-label">Panel admin</span>
+									<span className="inicio-accion-desc">Gestiona usuarios, roles y configuración</span>
+								</button>
+							) : (
+								<button type="button" className="inicio-accion-card" onClick={() => setActiveSection('Mi perfil')}>
+									<span className="inicio-accion-icon">
+										<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+									</span>
+									<span className="inicio-accion-label">Mi perfil</span>
+									<span className="inicio-accion-desc">Verifica tus datos y cuenta bancaria</span>
+								</button>
+							)}
+						</div>
+					</div>
+
+					{/* ── Banner perfil pendiente ── */}
 					{!perfilBannerDismissed && (
 						<div className="profile-verify-banner">
 							<span>👤 <strong>Completa tu perfil:</strong> verifica tus datos personales y cuenta bancaria para agilizar futuras solicitudes.</span>
@@ -948,10 +1012,13 @@ export function DashboardPage() {
 							</div>
 						</div>
 					)}
-					<SeguimientoRadicado />
 
-					<div className="inicio-grid">
-						<div className="inicio-grid-main">
+					{/* ── Grid 2 columnas: seguimiento + recientes ── */}
+					<div className="inicio-2col">
+						<div className="inicio-2col-main">
+							<SeguimientoRadicado />
+						</div>
+						<div className="inicio-2col-side">
 							<InicioRecientes />
 						</div>
 					</div>
@@ -1226,7 +1293,7 @@ export function DashboardPage() {
 					</div>
 
 					<div className="admin-module-nav" role="tablist" aria-label="Módulos administrativos">
-						{(['Usuarios', 'Personal autorizado', 'Roles', 'Areas', 'Usuarios en linea', 'Reportes', 'Configuracion', 'Configuracion Legalizaciones', 'Tipos de solicitud'] as AdminModule[]).map((module) => (
+						{(['Usuarios', 'Personal autorizado', 'Roles', 'Areas', 'Usuarios en linea', 'Configuracion', 'Configuracion Legalizaciones', 'Tipos de solicitud'] as AdminModule[]).map((module) => (
 							<button
 								key={module}
 								type="button"
@@ -1368,77 +1435,68 @@ export function DashboardPage() {
 									)}
 
 								<aside className="admin-side-list card-surface">
-									<h4>Usuarios recientes</h4>
-									<p className="admin-help-text">El estado refleja si la cuenta está habilitada, no si tiene sesión activa.</p>
-									{usuariosRecientes.length === 0 ? (
-										<p>No hay usuarios creados aún.</p>
+									<div className="admin-user-list-head">
+										<h4>Usuarios ({usuarios.length})</h4>
+										<p className="admin-help-text">El estado refleja si la cuenta está habilitada, no si tiene sesión activa.</p>
+									</div>
+									<div className="admin-user-search-wrap">
+										<input
+											type="search"
+											className="admin-input admin-user-search"
+											placeholder="Buscar por nombre, correo o rol…"
+											value={userSearch}
+											onChange={(e) => setUserSearch(e.target.value)}
+										/>
+									</div>
+									{usuariosFiltrados.length === 0 ? (
+										<p className="admin-help-text" style={{ margin: '12px 0 0' }}>
+											{userSearch ? 'Sin resultados para esa búsqueda.' : 'No hay usuarios creados aún.'}
+										</p>
 									) : (
 										<ul>
-											{usuariosRecientes.map((usuario) => (
-												<li key={usuario.id}>
-													<div>
+											{usuariosFiltrados.map((usuario) => (
+												<li key={usuario.id} className="admin-user-list-item">
+													<div className="admin-user-info">
 														<strong>{usuario.nombreCompleto}</strong>
 														<span>{usuario.correo}</span>
-														<span className="admin-user-meta">
-															{usuario.rol?.nombre || 'Sin rol'}
+														<span className="admin-user-meta">{usuario.rol?.nombre || 'Sin rol'}</span>
+													</div>
+													<div className="admin-user-status-row">
+														<span className={`status-pill ${usuario.activo ? 'on' : 'off'}`}>
+															{usuario.activo ? 'Habilitado' : 'Pendiente'}
 														</span>
 													</div>
-													<div className="admin-inline-actions">
-														<button
-															type="button"
-															className="admin-ghost-button"
-															onClick={() => enviarRestablecimientoUsuario(usuario)}
-														>
-															Restablecer
-														</button>
-														<button
-															type="button"
-															className="admin-ghost-button"
-															disabled={usuario.rol.nombre.trim().toLowerCase() === 'administrador'}
-															onClick={() => abrirPermisosUsuario(usuario)}
-														>
-															Permisos
-														</button>
-														<button
-															type="button"
-															className="admin-ghost-button admin-user-edit"
-															disabled={!canCrearUsuarios}
-															onClick={() => iniciarEdicionUsuario(usuario)}
-														>
+													<div className="admin-user-actions">
+														<button type="button" className="admin-ghost-button"
+															onClick={() => iniciarEdicionUsuario(usuario)} disabled={!canCrearUsuarios}>
 															Modificar
 														</button>
+														<button type="button" className="admin-ghost-button"
+															disabled={usuario.rol.nombre.trim().toLowerCase() === 'administrador'}
+															onClick={() => abrirPermisosUsuario(usuario)}>
+															Permisos
+														</button>
+														<button type="button" className="admin-ghost-button"
+															onClick={() => enviarRestablecimientoUsuario(usuario)}>
+															Restablecer
+														</button>
 														{usuario.activo ? (
-															<button
-																type="button"
-																className="admin-ghost-button"
-																disabled={!canCrearUsuarios}
-																onClick={() => cambiarEstadoUsuario(usuario)}
-															>
+															<button type="button" className="admin-ghost-button"
+																disabled={!canCrearUsuarios} onClick={() => cambiarEstadoUsuario(usuario)}>
 																Desactivar
 															</button>
 														) : (
 															<>
-																<button
-																	type="button"
-																	className="admin-ghost-button"
-																	disabled={!canCrearUsuarios}
-																	onClick={() => cambiarEstadoUsuario(usuario)}
-																>
+																<button type="button" className="admin-ghost-button"
+																	disabled={!canCrearUsuarios} onClick={() => cambiarEstadoUsuario(usuario)}>
 																	Aprobar
 																</button>
-																<button
-																	type="button"
-																	className="admin-ghost-button admin-role-delete"
-																	disabled={!canCrearUsuarios}
-																	onClick={() => eliminarUsuario(usuario)}
-																>
+																<button type="button" className="admin-ghost-button admin-role-delete"
+																	disabled={!canCrearUsuarios} onClick={() => eliminarUsuario(usuario)}>
 																	Rechazar
 																</button>
 															</>
 														)}
-														<span className={`status-pill ${usuario.activo ? 'on' : 'off'}`}>
-															{usuario.activo ? 'Habilitado' : 'Pendiente'}
-														</span>
 													</div>
 												</li>
 											))}
@@ -1570,10 +1628,6 @@ export function DashboardPage() {
 
 						{activeAdminModule === 'Areas' ? (
 							<AreasPanel />
-						) : null}
-
-						{activeAdminModule === 'Reportes' ? (
-							<ReportesPanel onMsg={setAdminMessage} onErr={setAdminError} />
 						) : null}
 
 						{activeAdminModule === 'Configuracion' ? (

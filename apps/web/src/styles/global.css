@@ -746,13 +746,15 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
 }
 
 .admin-sidebar {
-  background: #070B1D;
-  color: var(--bg-elevated);
-  padding: 16px 20px;
+  background: #000;
+  color: #fff;
+  padding: 14px 20px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
+  border-bottom: 1px solid rgba(212, 175, 55, 0.3);
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.5);
 }
 
 .admin-sidebar-brand-wrap {
@@ -762,8 +764,11 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
 }
 
 .admin-sidebar-brand {
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 800;
+  color: var(--gold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .admin-notifications {
@@ -924,19 +929,24 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
 }
 
 .admin-nav-item {
-  border: 1px solid rgba(148, 163, 184, 0.25);
-  background: rgba(15, 23, 42, 0.25);
-  color: var(--border-soft);
-  border-radius: 12px;
-  padding: 10px 12px;
+  border: 1px solid rgba(212, 175, 55, 0.22);
+  background: rgba(212, 175, 55, 0.04);
+  color: rgba(255, 255, 255, 0.65);
+  border-radius: 10px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
   text-align: left;
   cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
 }
 
 .admin-nav-item.active,
 .admin-nav-item:hover {
-  border-color: rgba(96, 165, 250, 0.8);
-  background: rgba(61, 90, 254, 0.35);
+  border-color: var(--gold);
+  background: rgba(212, 175, 55, 0.14);
+  color: var(--gold);
 }
 
 .admin-workspace {
@@ -974,10 +984,10 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
 }
 
 .requests-chat-toggle {
-  border: 1px solid var(--border);
+  border: 1px solid rgba(212, 175, 55, 0.2);
   border-radius: 12px;
-  background: var(--bg-card);
-  color: #070B1D;
+  background: rgba(212, 175, 55, 0.04);
+  color: rgba(255, 255, 255, 0.85);
   padding: 10px 12px;
   font-weight: 700;
   display: flex;
@@ -986,7 +996,12 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
   justify-content: space-between;
   cursor: pointer;
   width: 100%;
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.14);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  transition: border-color 0.15s;
+}
+.requests-chat-toggle:hover {
+  border-color: var(--gold);
+  color: var(--gold);
 }
 
 .requests-chat-toggle-icon {
@@ -1039,20 +1054,21 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
 }
 
 .requests-chat-tab {
-  border: 1px solid var(--border);
+  border: 1px solid rgba(212, 175, 55, 0.18);
   border-radius: 10px;
-  background: var(--bg-elevated);
-  color: #070B1D;
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(255, 255, 255, 0.6);
   padding: 7px 10px;
   cursor: pointer;
   font-size: 13px;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
 }
 
 .requests-chat-tab.active,
 .requests-chat-tab:hover {
-  border-color: rgba(96, 165, 250, 0.8);
-  background: rgba(61, 90, 254, 0.14);
-  color: var(--royal-blue);
+  border-color: var(--gold);
+  background: rgba(212, 175, 55, 0.14);
+  color: var(--gold);
 }
 
 .requests-chat-form {
@@ -1117,7 +1133,7 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
   font-size: 36px;
   line-height: 1.05;
   letter-spacing: 0.2px;
-  color: var(--dark-navy);
+  color: var(--gold-bright, #E8C658);
 }
 
 .admin-header-actions {
@@ -1709,7 +1725,8 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
 }
 
 .admin-kpi-card {
-  border: 1px solid var(--border);
+  border: 1px solid rgba(212, 175, 55, 0.2);
+  border-left: 3px solid var(--gold);
   border-radius: 12px;
   padding: 16px 18px;
   display: flex;
@@ -1717,6 +1734,12 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
   align-items: flex-start;
   gap: 6px;
   min-height: 78px;
+  background: rgba(212, 175, 55, 0.04);
+  transition: border-color 0.15s, background 0.15s;
+}
+.admin-kpi-card:hover {
+  background: rgba(212, 175, 55, 0.08);
+  border-left-color: var(--gold-bright);
 }
 
 .admin-kpi-card span {
@@ -1733,26 +1756,24 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
 }
 
 .admin-module-nav {
-  display: inline-flex;
-  width: fit-content;
-  max-width: 100%;
-  flex-wrap: nowrap;
-  overflow-x: auto;
+  display: flex;
+  flex-wrap: wrap;
+  width: 100%;
   align-items: center;
   align-self: start;
   gap: 6px;
-  padding: 4px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--bg-elevated);
+  padding: 6px;
+  border: 1px solid rgba(212, 175, 55, 0.2);
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.4);
 }
 
 .admin-module-item {
-  border: 1px solid var(--border);
-  background: transparent;
-  color: var(--dark-navy);
+  border: 1px solid rgba(212, 175, 55, 0.18);
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(255, 255, 255, 0.55);
   border-radius: 9px;
-  padding: 0 12px;
+  padding: 0 14px;
   height: 36px;
   display: inline-flex;
   align-items: center;
@@ -1762,13 +1783,14 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
   font-size: 13px;
   cursor: pointer;
   font-weight: 600;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
 }
 
 .admin-module-item.active,
 .admin-module-item:hover {
-  border-color: var(--text-muted);
-  background: linear-gradient(180deg, var(--border), var(--border));
-  color: var(--dark-navy);
+  border-color: var(--gold);
+  background: rgba(212, 175, 55, 0.16);
+  color: var(--gold);
 }
 
 .admin-primary-button {
@@ -1851,23 +1873,25 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
 }
 
 .admin-ghost-button {
-  border: 1px solid var(--border);
+  border: 1px solid rgba(212, 175, 55, 0.22);
   background: transparent;
-  color: var(--text-secondary);
+  color: rgba(255, 255, 255, 0.6);
   border-radius: 9px;
-  padding: 6px 10px;
+  padding: 6px 12px;
   font-weight: 600;
   font-size: 12px;
   cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
 }
 
 .admin-ghost-button:hover {
-  border-color: var(--text-muted);
-  background: var(--gold-soft);
+  border-color: var(--gold);
+  background: rgba(212, 175, 55, 0.1);
+  color: var(--gold);
 }
 
 .admin-ghost-button:disabled {
-  opacity: 0.55;
+  opacity: 0.45;
   cursor: not-allowed;
 }
 
@@ -1909,13 +1933,19 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
 }
 
 .admin-side-list li {
-  border: 1px solid var(--border);
+  border: 1px solid rgba(212, 175, 55, 0.15);
   border-radius: 10px;
   padding: 12px 14px;
   display: flex;
   justify-content: space-between;
   gap: 12px;
   align-items: center;
+  background: rgba(255, 255, 255, 0.02);
+  transition: border-color 0.15s, background 0.15s;
+}
+.admin-side-list li:hover {
+  border-color: rgba(212, 175, 55, 0.4);
+  background: rgba(212, 175, 55, 0.06);
 }
 
 .admin-side-list li div {
@@ -2139,41 +2169,39 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
 .rad-movil-volver   { display: none; }
 
 .radicaciones-nav {
-  display: inline-flex;
-  width: fit-content;
-  max-width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  width: 100%;
   gap: 6px;
-  flex-wrap: nowrap;
-  overflow-x: auto;
-  padding: 4px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--bg-elevated);
+  padding: 6px;
+  border: 1px solid rgba(212, 175, 55, 0.2);
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.4);
 }
 
 .radicaciones-nav-item {
-  border: 1px solid var(--border);
+  border: 1px solid rgba(212, 175, 55, 0.18);
   border-radius: 9px;
-  background: transparent;
-  color: var(--dark-navy);
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(255, 255, 255, 0.55);
   height: 38px;
-  padding: 0 12px;
+  padding: 0 14px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
   white-space: nowrap;
   font-size: 13px;
-  font-weight: 650;
+  font-weight: 600;
   cursor: pointer;
-  transition: all 0.18s ease;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
 }
 
 .radicaciones-nav-item.active,
 .radicaciones-nav-item:hover {
-  border-color: #3D5AFE;
-  background: var(--bg-elevated);
-  color: #070B1D;
+  border-color: var(--gold);
+  background: rgba(212, 175, 55, 0.16);
+  color: var(--gold);
 }
 
 .radicaciones-grid {
@@ -2183,12 +2211,17 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
 }
 
 .radicaciones-kpi {
-  border: 1px solid var(--border);
+  border: 1px solid rgba(212, 175, 55, 0.2);
+  border-left: 3px solid var(--gold);
   border-radius: 12px;
   padding: 12px 14px;
-  background: var(--bg-card);
+  background: rgba(212, 175, 55, 0.04);
   display: grid;
   gap: 3px;
+  transition: background 0.15s;
+}
+.radicaciones-kpi:hover {
+  background: rgba(212, 175, 55, 0.08);
 }
 
 .radicaciones-kpi span {
@@ -2198,7 +2231,7 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
 
 .radicaciones-kpi strong {
   font-size: 24px;
-  color: var(--dark-navy);
+  color: var(--gold-bright, #E8C658);
 }
 
 .radicaciones-progress,
@@ -2226,7 +2259,7 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
 
 .radicaciones-progress-bar {
   height: 100%;
-  background: linear-gradient(90deg, #9EDBFF, #3D5AFE);
+  background: linear-gradient(90deg, rgba(212, 175, 55, 0.6), var(--gold));
 }
 
 .radicaciones-progress span {
@@ -2863,11 +2896,22 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
     padding-top: 52px;
   }
 
-  /* Workspace con espacio para top y bottom nav */
+  /* Workspace con espacio para top y bottom nav — fondo negro forzado */
   .admin-workspace {
     min-height: calc(100vh - 52px);
     padding-bottom: calc(62px + env(safe-area-inset-bottom, 0px)) !important;
     padding-top: 0 !important;
+    background: #000 !important;
+    overflow-x: hidden !important;
+  }
+
+  /* Forzar fondo oscuro en todas las card-surface del workspace móvil */
+  .admin-workspace .card-surface,
+  .admin-workspace .admin-panel,
+  .admin-workspace .admin-form,
+  .admin-workspace .admin-side-list {
+    background: #111 !important;
+    color: #fff !important;
   }
 
   .admin-content {
@@ -2971,10 +3015,39 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
   /* Ocultar volver en menu de tarjetas */
   .rad-cards-active .rad-movil-volver { display: none !important; }
 
+  /* ── Lista de usuarios: diseño vertical mobile ── */
+  .admin-user-list-head { padding: 0 0 8px; }
+  .admin-user-search-wrap { padding-bottom: 10px; }
+  .admin-user-search { font-size: 13px !important; }
+  .admin-side-list ul { gap: 8px; }
+  .admin-user-list-item {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 8px !important;
+    padding: 12px !important;
+  }
+  .admin-user-info { display: flex; flex-direction: column; gap: 2px; width: 100%; }
+  .admin-user-info strong { font-size: 14px; }
+  .admin-user-info span { font-size: 12px; color: rgba(255,255,255,0.6); word-break: break-all; }
+  .admin-user-status-row { display: flex; }
+  .admin-user-actions {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 6px !important;
+    width: 100%;
+  }
+  .admin-user-actions .admin-ghost-button {
+    font-size: 11px !important;
+    padding: 5px 10px !important;
+    height: auto !important;
+    min-height: 0 !important;
+    flex: 0 0 auto;
+    width: auto !important;
+  }
+
   /* ── Tarjetas de módulo (móvil) ── */
-  /* Fondo oscuro forzado en todo el módulo de radicaciones */
+  /* El módulo de radicaciones hereda el fondo del workspace negro */
   .radicaciones-module {
-    background: #0A0A0A !important;
     min-height: calc(100dvh - 52px - 62px - env(safe-area-inset-bottom, 0px)) !important;
   }
 
@@ -11360,4 +11433,259 @@ body[data-weather="tormenta"]::after {
 .session-modal-actions .admin-primary-button,
 .session-modal-actions .admin-ghost-button {
   width: 100%; justify-content: center;
+}
+
+/* ============================================================
+   POLISH DE ESCRITORIO — mejoras visuales para pantallas >= 641px
+   No afecta mobile (ya tiene sus propios !important en los bloques @media 640px)
+   ============================================================ */
+@media (min-width: 641px) {
+  /* Admin workspace — sin fondo propio, usa el del shell */
+  .admin-workspace {
+    background: transparent;
+  }
+
+  /* card-surface — paneles con borde sutil dorado */
+  .card-surface {
+    border: 1px solid rgba(212, 175, 55, 0.1);
+    border-radius: 16px;
+    padding: 24px;
+    background: rgba(255, 255, 255, 0.02);
+  }
+
+  /* Admin header separador dorado */
+  .admin-header {
+    border-bottom: 1px solid rgba(212, 175, 55, 0.22);
+    padding-bottom: 18px;
+  }
+  .admin-header-label {
+    color: var(--gold);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-size: 11px;
+  }
+
+  /* Bell button — dorado */
+  .admin-bell-button {
+    border-color: rgba(212, 175, 55, 0.3);
+    background: rgba(212, 175, 55, 0.05);
+    color: var(--gold);
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .admin-bell-button:hover {
+    border-color: var(--gold);
+    background: rgba(212, 175, 55, 0.14);
+  }
+
+  /* Admin side list en desktop: más espacio */
+  .admin-side-list ul { gap: 8px; }
+
+  /* KPI grid desktop: 4 columnas si hay espacio */
+  .admin-kpi-grid {
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  }
+
+  /* Radicaciones paneles: consistencia dorada */
+  .radicaciones-progress,
+  .radicaciones-timeline {
+    border-color: rgba(212, 175, 55, 0.18);
+    background: rgba(212, 175, 55, 0.03);
+  }
+  .radicaciones-progress h4,
+  .radicaciones-timeline h4,
+  .radicaciones-panel h4 {
+    color: var(--gold);
+    letter-spacing: 0.03em;
+  }
+
+  /* Admin form h4: secciones con separador dorado */
+  .admin-form h4 {
+    color: var(--gold);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    font-size: 11px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid rgba(212, 175, 55, 0.2);
+    margin-bottom: 12px;
+  }
+
+  /* Role permissions: strong texto visible en oscuro */
+  .role-permissions-module strong {
+    color: rgba(255, 255, 255, 0.85);
+  }
+
+  /* Admin panel role catalog con borde dorado */
+  .admin-role-form,
+  .admin-role-catalog {
+    border-color: rgba(212, 175, 55, 0.15);
+    background: rgba(255, 255, 255, 0.02);
+  }
+}
+
+/* ============================================================
+   INICIO — Hero de bienvenida + acciones rápidas + 2-col grid
+   ============================================================ */
+
+/* Hero principal */
+.inicio-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 32px;
+  padding: 36px 44px;
+  border-radius: 20px;
+  border: 1px solid rgba(212, 175, 55, 0.22);
+  background:
+    radial-gradient(ellipse 80% 120% at 0% 60%, rgba(212, 175, 55, 0.11), transparent 55%),
+    radial-gradient(ellipse 60% 80% at 100% 20%, rgba(212, 175, 55, 0.06), transparent 55%),
+    rgba(10, 8, 2, 0.55);
+  position: relative;
+  overflow: hidden;
+}
+.inicio-hero::before {
+  content: '';
+  position: absolute;
+  bottom: -80px; right: -80px;
+  width: 280px; height: 280px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(212, 175, 55, 0.10), transparent 70%);
+  pointer-events: none;
+}
+
+/* Texto izquierdo del hero */
+.inicio-hero-left { flex-shrink: 0; }
+.inicio-saludo-label {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+.inicio-hero-nombre {
+  margin: 0 0 8px;
+  font-size: 46px;
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: -0.5px;
+  color: #fff;
+}
+.inicio-hero-sub {
+  margin: 0;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+/* Tarjetas de acción rápida */
+.inicio-acciones {
+  display: flex;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.inicio-accion-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+  padding: 18px 20px;
+  min-width: 148px;
+  border: 1px solid rgba(212, 175, 55, 0.2);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.04);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.2s, background 0.2s, transform 0.18s, box-shadow 0.2s;
+  position: relative;
+  overflow: hidden;
+}
+.inicio-accion-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  opacity: 0;
+  background: radial-gradient(circle at 50% 0%, rgba(212, 175, 55, 0.18), transparent 70%);
+  transition: opacity 0.25s;
+  pointer-events: none;
+}
+.inicio-accion-card:hover {
+  border-color: var(--gold);
+  background: rgba(212, 175, 55, 0.08);
+  transform: translateY(-3px);
+  box-shadow: 0 10px 30px rgba(212, 175, 55, 0.18);
+}
+.inicio-accion-card:hover::after { opacity: 1; }
+.inicio-accion-card:active { transform: translateY(-1px); }
+
+.inicio-accion-card--admin {
+  border-color: rgba(212, 175, 55, 0.35);
+  background: rgba(212, 175, 55, 0.06);
+}
+.inicio-accion-card--admin .inicio-accion-icon { color: var(--gold); }
+
+.inicio-accion-icon {
+  color: rgba(255, 255, 255, 0.7);
+  display: flex;
+  align-items: center;
+  margin-bottom: 4px;
+  transition: color 0.2s;
+}
+.inicio-accion-card:hover .inicio-accion-icon { color: var(--gold); }
+
+.inicio-accion-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  display: block;
+}
+.inicio-accion-desc {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.4);
+  line-height: 1.4;
+  display: block;
+}
+
+/* Grid 2 columnas: seguimiento (izq) + recientes (der) */
+.inicio-2col {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 0.7fr);
+  gap: 16px;
+  align-items: start;
+}
+.inicio-2col-main, .inicio-2col-side { display: grid; gap: 14px; align-content: start; }
+
+@media (max-width: 980px) {
+  .inicio-2col { grid-template-columns: 1fr; }
+  .inicio-hero { flex-wrap: wrap; gap: 20px; }
+  .inicio-acciones { flex-wrap: wrap; }
+}
+
+/* ── Overrides mobile para el hero ── */
+@media (max-width: 640px) {
+  .inicio-hero {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    padding: 20px 16px 24px !important;
+    border-radius: 14px !important;
+    gap: 20px !important;
+  }
+  .inicio-hero-nombre { font-size: 28px !important; }
+  .inicio-hero-sub { font-size: 12px !important; }
+  .inicio-acciones {
+    width: 100% !important;
+    display: flex !important;
+    flex-direction: row !important;
+    overflow-x: auto !important;
+    gap: 10px !important;
+    padding-bottom: 4px !important;
+  }
+  .inicio-accion-card {
+    min-width: 130px !important;
+    flex-shrink: 0 !important;
+    padding: 14px 14px !important;
+  }
+  .inicio-accion-label { font-size: 12px !important; }
+  .inicio-accion-desc { display: none !important; }
+  .inicio-2col { grid-template-columns: 1fr !important; }
 }

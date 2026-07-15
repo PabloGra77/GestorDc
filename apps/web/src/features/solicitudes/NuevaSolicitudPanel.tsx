@@ -347,6 +347,7 @@ export function NuevaSolicitudPanel({ onCreada }: NuevaSolicitudPanelProps) {
   const tiposDelArea = useMemo(() => {
     if (!areaSel) return [];
     return tipos.filter((t) => {
+      if ((t.slug ?? '').toLowerCase() === 'anticipo') return false;
       if (t.areaId === areaSel.id) return true;
       const av = t.configuracionTipo?.areasVisibles;
       if (av === 'todas') return true;
