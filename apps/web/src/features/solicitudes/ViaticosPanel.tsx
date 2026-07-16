@@ -260,7 +260,7 @@ export function ViaticosPanel({ onCreada, areaId }: { onCreada?: (info: { id: nu
   const [paso, setPaso] = useState<1 | 2 | 3 | 4 | 5>(1);
 
   /* Paso 1 */
-  const [tipoViatico, setTipoViatico] = useState<'anticipo' | 'legalizar' | ''>('');
+  const [tipoViatico, setTipoViatico] = useState<'anticipo' | 'legalizar' | ''>('anticipo');
   const [autorizadorInput, setAutorizadorInput] = useState('');
   const [autorizadorId, setAutorizadorId] = useState(0);
   const [autorizadorNombre, setAutorizadorNombre] = useState('');
@@ -459,7 +459,6 @@ export function ViaticosPanel({ onCreada, areaId }: { onCreada?: (info: { id: nu
 
   function validarPaso(): string {
     if (paso === 1) {
-      if (!tipoViatico) return 'Selecciona si es anticipo o legalización de viático';
       if (!autorizadorId) return 'Selecciona el autorizador del viaje de la lista';
       if (autorizadorInput.trim() !== autorizadorNombre) return 'Selecciona el autorizador de la lista de sugerencias';
       if (!motivoViaje.trim()) return 'Describe el motivo o propósito del viaje';
@@ -612,26 +611,6 @@ export function ViaticosPanel({ onCreada, areaId }: { onCreada?: (info: { id: nu
       {paso === 1 && (
         <div className="leg-form card-surface">
           <h3>Tipo de viático y autorización</h3>
-
-          <div className="leg-field">
-            <label>¿Qué tipo de viático necesitas? *</label>
-            <div className="viaticos-tipo-grid">
-              <button type="button"
-                className={`viaticos-tipo-card${tipoViatico === 'anticipo' ? ' selected' : ''}`}
-                onClick={() => setTipoViatico('anticipo')}>
-                <span className="viaticos-tipo-icon">💳</span>
-                <strong>Solicitar viático</strong>
-                <p>El viaje no se ha realizado aún. Solicitas dinero por adelantado para cubrirlo.</p>
-              </button>
-              <button type="button"
-                className={`viaticos-tipo-card${tipoViatico === 'legalizar' ? ' selected' : ''}`}
-                onClick={() => setTipoViatico('legalizar')}>
-                <span className="viaticos-tipo-icon">🧾</span>
-                <strong>Legalizar viático</strong>
-                <p>El viaje ya ocurrió y tienes facturas. Solicitas el reembolso de los gastos reales.</p>
-              </button>
-            </div>
-          </div>
 
           <div className="leg-field" style={{ marginTop: 16 }}>
             <label>Motivo / propósito del viaje *</label>
