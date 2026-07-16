@@ -17,8 +17,8 @@ if (-not (Test-Path $SSH_KEY)) { Write-Error "Clave SSH no encontrada. Ejecuta s
 $testAuth = & ssh -p $SSH_PORT -i $SSH_KEY -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=8 "${SSH_USER}@${SSH_HOST}" "echo OK" 2>&1
 if (-not ($testAuth -match "OK")) { Write-Error "SSH key auth fallo. Verifica la clave en el panel de Hostinger."; exit 1 }
 
-$SCP_OPTS = @("-P", $SSH_PORT, "-i", $SSH_KEY, "-o", "StrictHostKeyChecking=accept-new", "-o", "BatchMode=yes")
-$SSH_OPTS = @("-p", $SSH_PORT, "-i", $SSH_KEY, "-o", "StrictHostKeyChecking=accept-new", "-o", "BatchMode=yes")
+$SCP_OPTS = @("-P", $SSH_PORT, "-i", $SSH_KEY, "-o", "StrictHostKeyChecking=accept-new", "-o", "BatchMode=yes", "-C", "-o", "ServerAliveInterval=30", "-o", "ServerAliveCountMax=6", "-o", "IPQoS=throughput")
+$SSH_OPTS = @("-p", $SSH_PORT, "-i", $SSH_KEY, "-o", "StrictHostKeyChecking=accept-new", "-o", "BatchMode=yes", "-o", "ServerAliveInterval=30", "-o", "ServerAliveCountMax=6")
 
 function SSH-Run([string]$Cmd) {
     & ssh @SSH_OPTS "${SSH_USER}@${SSH_HOST}" $Cmd

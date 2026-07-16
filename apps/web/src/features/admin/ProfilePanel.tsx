@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../../services/http/api';
 import { getAuthSession, saveAuthSession } from '../auth/auth.service';
 
@@ -40,6 +40,91 @@ interface PerfilData {
   nivelAprobacion?: string | null;
 }
 
+type Seccion = 'personal' | 'contacto' | 'banco' | 'documentos';
+
+const SECCIONES: { key: Seccion; label: string; icon: string }[] = [
+  { key: 'personal',    label: 'Datos personales', icon: 'person' },
+  { key: 'contacto',   label: 'Contacto',          icon: 'mail'   },
+  { key: 'banco',      label: 'Cuenta bancaria',   icon: 'card'   },
+  { key: 'documentos', label: 'Documentos OPS',    icon: 'file'   },
+];
+
+const BANCOS = [
+  'Bancolombia','Davivienda','Banco de Bogotá','Banco Popular','BBVA',
+  'Scotiabank Colpatria','Banco de Occidente','Banco Caja Social','Banco Agrario',
+  'Nequi','Daviplata','Banco Falabella','Banco Pichincha','Banco Finandina',
+  'Lulo Bank','Rappi Pay','Banco Cooperativo Coopcentral',
+  'Caja Promotora de Vivienda Militar',
+];
+
+function SeccionIcon({ name }: { name: string }) {
+  const s = 17;
+  if (name === 'person') return (
+    <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
+    </svg>
+  );
+  if (name === 'mail') return (
+    <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <rect x="2" y="4" width="20" height="16" rx="2"/><path d="m2 7 10 7 10-7"/>
+    </svg>
+  );
+  if (name === 'card') return (
+    <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/>
+    </svg>
+  );
+  return (
+    <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="13" y2="17"/>
+    </svg>
+  );
+}
+
+function DocAdjunto({
+  label, hint, subiendoDoc, tipo, nombre, onSubir, onQuitar,
+}: {
+  label: string; hint?: string;
+  subiendoDoc: string | null; tipo: string; nombre: string;
+  onSubir: (f: File, tipo: string) => void;
+  onQuitar: () => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    if (f) onSubir(f, tipo);
+    e.target.value = '';
+  }, [onSubir, tipo]);
+
+  return (
+    <div className="prof-doc-item">
+      <div className="prof-doc-info">
+        <span className="prof-doc-label">{label}</span>
+        {hint && <span className="prof-doc-hint">{hint}</span>}
+      </div>
+      <div className="prof-doc-actions">
+        {subiendoDoc === tipo ? (
+          <span className="prof-doc-uploading">Subiendo…</span>
+        ) : nombre ? (
+          <>
+            <span className="prof-doc-ok">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden><polyline points="20 6 9 17 4 12"/></svg>
+              {nombre}
+            </span>
+            <button type="button" className="prof-doc-quitar" onClick={onQuitar}>Quitar</button>
+          </>
+        ) : (
+          <label className="prof-doc-btn">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Adjuntar
+            <input ref={inputRef} type="file" accept="application/pdf,image/*" style={{ display: 'none' }} onChange={handleChange} />
+          </label>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function ProfilePanel() {
   const session = getAuthSession();
   const [perfil, setPerfil] = useState<PerfilData | null>(null);
@@ -47,6 +132,7 @@ export function ProfilePanel() {
   const [guardando, setGuardando] = useState(false);
   const [err, setErr] = useState('');
   const [msg, setMsg] = useState('');
+  const [seccion, setSeccion] = useState<Seccion>('personal');
 
   const [primerNombre, setPrimerNombre] = useState('');
   const [segundoNombre, setSegundoNombre] = useState('');
@@ -65,12 +151,8 @@ export function ProfilePanel() {
   const [tipoCuenta, setTipoCuenta] = useState('ahorros');
   const [numeroCuenta, setNumeroCuenta] = useState('');
   const [titularCuenta, setTitularCuenta] = useState('');
-
-  // Área organizacional
   const [areas, setAreas] = useState<Area[]>([]);
   const [areaId, setAreaId] = useState<number | null>(null);
-
-  // Documentos OPS
   const [eps, setEps] = useState('');
   const [archivoEpsId, setArchivoEpsId] = useState('');
   const [archivoEpsNombre, setArchivoEpsNombre] = useState('');
@@ -84,11 +166,6 @@ export function ProfilePanel() {
   const [archivoCartaEpsNombre, setArchivoCartaEpsNombre] = useState('');
   const [subiendoDoc, setSubiendoDoc] = useState<string | null>(null);
   const [errDoc, setErrDoc] = useState('');
-  const epsInputRef = useRef<HTMLInputElement>(null);
-  const docInputRef = useRef<HTMLInputElement>(null);
-  const cuentaInputRef = useRef<HTMLInputElement>(null);
-  const rutInputRef = useRef<HTMLInputElement>(null);
-  const cartaEpsInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     api.get<Area[]>('/areas').then((r) => setAreas(r.data.filter((a) => a.activo))).catch(() => {});
@@ -125,16 +202,13 @@ export function ProfilePanel() {
       setArchivoRutNombre(p.archivoRutNombre || '');
       setArchivoCartaEpsId(p.archivoCartaEpsId || '');
       setArchivoCartaEpsNombre(p.archivoCartaEpsNombre || '');
-    }).catch(() => {
-      setErr('No se pudo cargar el perfil.');
-    }).finally(() => setLoading(false));
+    }).catch(() => setErr('No se pudo cargar el perfil.'))
+      .finally(() => setLoading(false));
   }, []);
 
   async function guardar(e: React.FormEvent) {
     e.preventDefault();
-    setGuardando(true);
-    setErr('');
-    setMsg('');
+    setGuardando(true); setErr(''); setMsg('');
     try {
       const r = await api.patch<PerfilData>('/usuarios/perfil', {
         primerNombre: primerNombre.trim(),
@@ -143,24 +217,22 @@ export function ProfilePanel() {
         segundoApellido: segundoApellido.trim() || null,
         tipoDocumento,
         numeroDocumento: numeroDocumento.trim(),
-        ...(fechaNacimiento ? { fechaNacimiento } : { fechaNacimiento: null }),
-        ...(fechaExpedicion ? { fechaExpedicion } : { fechaExpedicion: null }),
+        ...(fechaNacimiento  ? { fechaNacimiento }  : { fechaNacimiento: null }),
+        ...(fechaExpedicion  ? { fechaExpedicion }  : { fechaExpedicion: null }),
         ...(lugarExpedicion.trim() ? { lugarExpedicion: lugarExpedicion.trim() } : { lugarExpedicion: null }),
         correo: correo.trim(),
         ...(correoPersonal.trim() ? { correoPersonal: correoPersonal.trim() } : { correoPersonal: null }),
-        ...(telefono.trim() ? { telefono: telefono.trim() } : { telefono: null }),
-        ...(direccion.trim() ? { direccion: direccion.trim() } : { direccion: null }),
-        ...(banco ? { banco: banco.trim() } : { banco: null }),
+        ...(telefono.trim()       ? { telefono: telefono.trim() }             : { telefono: null }),
+        ...(direccion.trim()      ? { direccion: direccion.trim() }           : { direccion: null }),
+        ...(banco                 ? { banco: banco.trim() }                   : { banco: null }),
         tipoCuenta: tipoCuenta || 'ahorros',
-        ...(numeroCuenta.trim() ? { numeroCuenta: numeroCuenta.trim() } : { numeroCuenta: null }),
-        ...(titularCuenta.trim() ? { titularCuenta: titularCuenta.trim() } : { titularCuenta: null }),
-        ...(eps.trim() ? { eps: eps.trim() } : { eps: null }),
+        ...(numeroCuenta.trim()   ? { numeroCuenta: numeroCuenta.trim() }     : { numeroCuenta: null }),
+        ...(titularCuenta.trim()  ? { titularCuenta: titularCuenta.trim() }   : { titularCuenta: null }),
+        ...(eps.trim()            ? { eps: eps.trim() }                       : { eps: null }),
         areaId: areaId ?? null,
       });
       setPerfil(r.data);
       setMsg('Perfil actualizado correctamente.');
-
-      // Actualizar nombre en sesión para que el sidebar lo refleje
       if (session) {
         saveAuthSession({
           ...session,
@@ -177,22 +249,20 @@ export function ProfilePanel() {
         });
       }
     } catch (ex: unknown) {
-      const errMsg = (ex as { response?: { data?: { error?: string } } })?.response?.data?.error;
-      setErr(errMsg || 'No se pudo guardar el perfil.');
+      const m = (ex as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      setErr(m || 'No se pudo guardar el perfil.');
     } finally {
       setGuardando(false);
     }
   }
 
-  async function subirDocPerfil(file: File, tipo: 'eps' | 'documento' | 'cuenta' | 'rut' | 'carta_eps') {
-    setErrDoc('');
-    setSubiendoDoc(tipo);
+  async function subirDoc(file: File, tipo: string) {
+    setErrDoc(''); setSubiendoDoc(tipo);
     try {
       const fd = new FormData();
       fd.append('archivo', file);
       const r = await api.post<{ id: string }>('/archivos', fd, { headers: { 'Content-Type': undefined } });
-      const id = r.data.id;
-      const nombre = file.name;
+      const id = r.data.id; const nombre = file.name;
       const patch: Record<string, string | null> = {};
       if (tipo === 'eps') {
         setArchivoEpsId(id); setArchivoEpsNombre(nombre);
@@ -213,427 +283,257 @@ export function ProfilePanel() {
       await api.patch('/usuarios/perfil', patch);
     } catch {
       setErrDoc('No se pudo subir el archivo. Máx 10 MB, formatos: PDF, JPG, PNG.');
-    } finally {
-      setSubiendoDoc(null);
-    }
+    } finally { setSubiendoDoc(null); }
   }
 
+  function quitarDoc(tipo: string) {
+    const patch: Record<string, null> = {};
+    if (tipo === 'eps') { setArchivoEpsId(''); setArchivoEpsNombre(''); patch.archivoEpsId = null; patch.archivoEpsNombre = null; }
+    else if (tipo === 'documento') { setArchivoDocumentoId(''); setArchivoDocumentoNombre(''); patch.archivoDocumentoId = null; patch.archivoDocumentoNombre = null; }
+    else if (tipo === 'cuenta') { setArchivoCuentaId(''); setArchivoCuentaNombre(''); patch.archivoCuentaId = null; patch.archivoCuentaNombre = null; }
+    else if (tipo === 'rut') { setArchivoRutId(''); setArchivoRutNombre(''); patch.archivoRutId = null; patch.archivoRutNombre = null; }
+    else if (tipo === 'carta_eps') { setArchivoCartaEpsId(''); setArchivoCartaEpsNombre(''); patch.archivoCartaEpsId = null; patch.archivoCartaEpsNombre = null; }
+    api.patch('/usuarios/perfil', patch).catch(() => {});
+  }
+
+  /* Completitud del perfil */
+  const camposObligatorios = [primerNombre, primerApellido, numeroDocumento, correo];
+  const camposOpcionales = [segundoNombre, primerApellido, tipoDocumento, fechaNacimiento, telefono, direccion, banco, numeroCuenta, eps];
+  const todos = [...camposObligatorios, ...camposOpcionales];
+  const llenos = todos.filter(Boolean).length;
+  const pct = Math.round((llenos / todos.length) * 100);
+
   const inicial = (perfil?.nombreCompleto?.[0] || session?.usuario.nombreCompleto?.[0] || 'U').toUpperCase();
+  const areaNombre = areaId ? (areas.find((a) => a.id === areaId)?.nombre ?? '') : '';
+
+  if (loading) {
+    return (
+      <div className="prof-shell">
+        <div className="prof-loading">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="prof-loading-icon" aria-hidden>
+            <line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/>
+            <line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/>
+            <line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/>
+            <line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/>
+          </svg>
+          <p>Cargando perfil…</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <section className="profile-panel card-surface">
-      <header className="admin-panel-head">
-        <div>
-          <h3>Mi perfil</h3>
-          <p className="admin-help-text">Actualiza tus datos personales. Tu correo debe ser institucional (@ipsgoleman.com).</p>
-        </div>
-      </header>
-
-      {loading ? <p className="admin-help-text">Cargando perfil…</p> : null}
-      {err ? <div className="admin-error">{err}</div> : null}
-      {msg ? <div className="admin-success">{msg}</div> : null}
-
-      {perfil && !loading ? (
-        <div className="profile-layout">
-          {/* Avatar + info estática */}
-          <div className="profile-avatar-col">
-            <div className="profile-avatar-circle">{inicial}</div>
-            <p className="profile-nombre-display">{perfil.nombreCompleto}</p>
-            <p className="admin-help-text">{perfil.rol?.nombre}</p>
-            {areaId && areas.length > 0 ? (
-              <p className="admin-help-text">{areas.find((a) => a.id === areaId)?.nombre ?? ''}</p>
-            ) : null}
-            {perfil.nivelAprobacion ? (
-              <p className="admin-help-text">Nivel: {perfil.nivelAprobacion}</p>
-            ) : null}
+    <div className="prof-shell">
+      {/* ── Hero ── */}
+      <div className="prof-hero">
+        <div className="prof-hero-avatar">{inicial}</div>
+        <div className="prof-hero-info">
+          <h2 className="prof-hero-nombre">{perfil?.nombreCompleto || 'Mi perfil'}</h2>
+          <div className="prof-hero-badges">
+            <span className="prof-badge prof-badge--rol">{perfil?.rol?.nombre ?? 'Usuario'}</span>
+            {areaNombre && <span className="prof-badge prof-badge--area">{areaNombre}</span>}
+            {perfil?.nivelAprobacion && <span className="prof-badge prof-badge--nivel">Nivel {perfil.nivelAprobacion}</span>}
           </div>
-
-          {/* Formulario */}
-          <form className="profile-form admin-form" onSubmit={guardar}>
-            <h4>Datos personales</h4>
-
-            <div className="admin-user-form-grid">
-              <div>
-                <label className="profile-label">Primer nombre *</label>
-                <input
-                  type="text"
-                  className="admin-input"
-                  value={primerNombre}
-                  onChange={(e) => setPrimerNombre(e.target.value)}
-                  required
-                  placeholder="Ej: María"
-                />
-              </div>
-              <div>
-                <label className="profile-label">Segundo nombre</label>
-                <input
-                  type="text"
-                  className="admin-input"
-                  value={segundoNombre}
-                  onChange={(e) => setSegundoNombre(e.target.value)}
-                  placeholder="Opcional"
-                />
-              </div>
-              <div>
-                <label className="profile-label">Primer apellido *</label>
-                <input
-                  type="text"
-                  className="admin-input"
-                  value={primerApellido}
-                  onChange={(e) => setPrimerApellido(e.target.value)}
-                  required
-                  placeholder="Ej: García"
-                />
-              </div>
-              <div>
-                <label className="profile-label">Segundo apellido</label>
-                <input
-                  type="text"
-                  className="admin-input"
-                  value={segundoApellido}
-                  onChange={(e) => setSegundoApellido(e.target.value)}
-                  placeholder="Opcional"
-                />
-              </div>
+          <div className="prof-completitud">
+            <div className="prof-completitud-bar">
+              <div className="prof-completitud-fill" style={{ width: `${pct}%` }} />
             </div>
+            <span className="prof-completitud-pct">{pct}% completado</span>
+          </div>
+        </div>
+      </div>
 
-            <h4 style={{ marginTop: 16 }}>Documento de identidad</h4>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 10 }}>
-              <div>
-                <label className="profile-label">Tipo</label>
-                <select
-                  className="admin-input"
-                  value={tipoDocumento}
-                  onChange={(e) => setTipoDocumento(e.target.value)}
-                >
+      {/* ── Mensajes globales ── */}
+      {err ? <div className="admin-error" style={{ margin: '0 0 12px' }}>{err}</div> : null}
+      {msg ? <div className="admin-success" style={{ margin: '0 0 12px' }}>{msg}</div> : null}
+
+      {/* ── Tabs de sección ── */}
+      <nav className="prof-tabs" aria-label="Secciones del perfil">
+        {SECCIONES.map((s) => (
+          <button
+            key={s.key}
+            type="button"
+            className={`prof-tab${seccion === s.key ? ' prof-tab--active' : ''}`}
+            onClick={() => { setSeccion(s.key); setMsg(''); setErr(''); }}
+          >
+            <span className="prof-tab-icon"><SeccionIcon name={s.icon} /></span>
+            <span className="prof-tab-label">{s.label}</span>
+          </button>
+        ))}
+      </nav>
+
+      {/* ── Contenido ── */}
+      <form className="prof-form" onSubmit={guardar}>
+
+        {/* ─── DATOS PERSONALES ─── */}
+        {seccion === 'personal' && (
+          <div className="prof-section">
+            <div className="prof-section-head">
+              <h3>Datos personales</h3>
+              <p>Nombre completo e información del documento de identidad.</p>
+            </div>
+            <div className="prof-fields-grid">
+              <div className="prof-field">
+                <label>Primer nombre *</label>
+                <input type="text" value={primerNombre} onChange={(e) => setPrimerNombre(e.target.value)} required placeholder="Ej: María" />
+              </div>
+              <div className="prof-field">
+                <label>Segundo nombre</label>
+                <input type="text" value={segundoNombre} onChange={(e) => setSegundoNombre(e.target.value)} placeholder="Opcional" />
+              </div>
+              <div className="prof-field">
+                <label>Primer apellido *</label>
+                <input type="text" value={primerApellido} onChange={(e) => setPrimerApellido(e.target.value)} required placeholder="Ej: García" />
+              </div>
+              <div className="prof-field">
+                <label>Segundo apellido</label>
+                <input type="text" value={segundoApellido} onChange={(e) => setSegundoApellido(e.target.value)} placeholder="Opcional" />
+              </div>
+              <div className="prof-field">
+                <label>Tipo de documento</label>
+                <select value={tipoDocumento} onChange={(e) => setTipoDocumento(e.target.value)}>
                   <option value="CC">Cédula (CC)</option>
                   <option value="CE">Cédula extranjería (CE)</option>
                   <option value="TI">Tarjeta identidad (TI)</option>
                   <option value="PP">Pasaporte (PP)</option>
                 </select>
               </div>
-              <div>
-                <label className="profile-label">Número *</label>
-                <input
-                  type="text"
-                  className="admin-input"
-                  value={numeroDocumento}
-                  onChange={(e) => setNumeroDocumento(e.target.value)}
-                  required
-                  placeholder="Número de documento"
-                />
+              <div className="prof-field">
+                <label>Número de documento *</label>
+                <input type="text" value={numeroDocumento} onChange={(e) => setNumeroDocumento(e.target.value)} required placeholder="Número de documento" />
+              </div>
+              <div className="prof-field">
+                <label>Fecha de nacimiento</label>
+                <input type="date" value={fechaNacimiento} onChange={(e) => setFechaNacimiento(e.target.value)} />
+              </div>
+              <div className="prof-field">
+                <label>Fecha de expedición</label>
+                <input type="date" value={fechaExpedicion} onChange={(e) => setFechaExpedicion(e.target.value)} />
+              </div>
+              <div className="prof-field prof-field--full">
+                <label>Lugar de expedición</label>
+                <input type="text" value={lugarExpedicion} onChange={(e) => setLugarExpedicion(e.target.value)} placeholder="Ej: Bogotá D.C." maxLength={150} />
               </div>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 10 }}>
-              <div>
-                <label className="profile-label">Fecha de nacimiento</label>
-                <input
-                  type="date"
-                  className="admin-input"
-                  value={fechaNacimiento}
-                  onChange={(e) => setFechaNacimiento(e.target.value)}
-                />
+          </div>
+        )}
+
+        {/* ─── CONTACTO ─── */}
+        {seccion === 'contacto' && (
+          <div className="prof-section">
+            <div className="prof-section-head">
+              <h3>Contacto</h3>
+              <p>Correos, teléfono y área organizacional.</p>
+            </div>
+            <div className="prof-fields-grid">
+              <div className="prof-field prof-field--full">
+                <label>Correo institucional *</label>
+                <input type="email" value={correo} onChange={(e) => setCorreo(e.target.value)} required placeholder="usuario@ipsgoleman.com" />
+                <span className="prof-field-hint">Debe ser correo con dominio @ipsgoleman.com</span>
               </div>
-              <div>
-                <label className="profile-label">Fecha de expedición</label>
-                <input
-                  type="date"
-                  className="admin-input"
-                  value={fechaExpedicion}
-                  onChange={(e) => setFechaExpedicion(e.target.value)}
-                />
+              <div className="prof-field prof-field--full">
+                <label>Correo personal</label>
+                <input type="email" value={correoPersonal} onChange={(e) => setCorreoPersonal(e.target.value)} placeholder="Ej: usuario@gmail.com" maxLength={120} />
+                <span className="prof-field-hint">Correo de uso personal (cualquier dominio)</span>
+              </div>
+              <div className="prof-field">
+                <label>Teléfono / Celular</label>
+                <input type="tel" value={telefono} onChange={(e) => setTelefono(e.target.value)} placeholder="Ej: 3001234567" maxLength={20} />
+              </div>
+              <div className="prof-field">
+                <label>Dirección</label>
+                <input type="text" value={direccion} onChange={(e) => setDireccion(e.target.value)} placeholder="Ej: Cra 10 #25-30, Bogotá" maxLength={255} />
+              </div>
+              <div className="prof-field prof-field--full">
+                <label>Área organizacional</label>
+                <select value={areaId ?? ''} onChange={(e) => setAreaId(e.target.value ? Number(e.target.value) : null)}>
+                  <option value="">Sin área asignada</option>
+                  {areas.map((a) => <option key={a.id} value={a.id}>{a.nombre}</option>)}
+                </select>
+                <span className="prof-field-hint">Define qué área aparece en tus solicitudes y quién las valida primero.</span>
               </div>
             </div>
-            <div style={{ marginTop: 10 }}>
-              <label className="profile-label">Lugar de expedición</label>
-              <input
-                type="text"
-                className="admin-input"
-                value={lugarExpedicion}
-                onChange={(e) => setLugarExpedicion(e.target.value)}
-                placeholder="Ej: Bogotá D.C."
-                maxLength={150}
-              />
-            </div>
+          </div>
+        )}
 
-            <h4 style={{ marginTop: 16 }}>Contacto</h4>
-            <div>
-              <label className="profile-label">Correo institucional *</label>
-              <input
-                type="email"
-                className="admin-input"
-                value={correo}
-                onChange={(e) => setCorreo(e.target.value)}
-                required
-                placeholder="usuario@ipsgoleman.com"
-              />
-              <p className="admin-help-text" style={{ marginTop: 3 }}>Debe ser correo con dominio @ipsgoleman.com</p>
+        {/* ─── CUENTA BANCARIA ─── */}
+        {seccion === 'banco' && (
+          <div className="prof-section">
+            <div className="prof-section-head">
+              <h3>Cuenta bancaria</h3>
+              <p>Estos datos se pre-rellenan automáticamente en las solicitudes de legalización.</p>
             </div>
-            <div style={{ marginTop: 10 }}>
-              <label className="profile-label">Correo personal</label>
-              <input
-                type="email"
-                className="admin-input"
-                value={correoPersonal}
-                onChange={(e) => setCorreoPersonal(e.target.value)}
-                placeholder="Ej: usuario@gmail.com"
-                maxLength={120}
-              />
-              <p className="admin-help-text" style={{ marginTop: 3 }}>Correo de uso personal (cualquier dominio)</p>
-            </div>
-            <div style={{ marginTop: 10 }}>
-              <label className="profile-label">Teléfono / Celular</label>
-              <input
-                type="tel"
-                className="admin-input"
-                value={telefono}
-                onChange={(e) => setTelefono(e.target.value)}
-                placeholder="Ej: 3001234567"
-                maxLength={20}
-              />
-            </div>
-            <div style={{ marginTop: 10 }}>
-              <label className="profile-label">Dirección</label>
-              <input
-                type="text"
-                className="admin-input"
-                value={direccion}
-                onChange={(e) => setDireccion(e.target.value)}
-                placeholder="Ej: Cra 10 #25-30, Bogotá"
-                maxLength={255}
-              />
-            </div>
-
-            <h4 style={{ marginTop: 16 }}>Área organizacional</h4>
-            <div>
-              <label className="profile-label">Área a la que perteneces</label>
-              <select
-                className="admin-input"
-                value={areaId ?? ''}
-                onChange={(e) => setAreaId(e.target.value ? Number(e.target.value) : null)}
-              >
-                <option value="">Sin área asignada</option>
-                {areas.map((a) => (
-                  <option key={a.id} value={a.id}>{a.nombre}</option>
-                ))}
-              </select>
-              <p className="admin-help-text" style={{ marginTop: 3 }}>
-                Define qué área aparece en tus solicitudes y quién las valida primero.
-              </p>
-            </div>
-
-            <h4 style={{ marginTop: 16 }}>Cuenta bancaria para pagos</h4>
-            <p className="admin-help-text" style={{ marginBottom: 8 }}>
-              Estos datos se pre-rellenan automáticamente en las solicitudes de legalización.
-            </p>
-            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 10 }}>
-              <div>
-                <label className="profile-label">Banco</label>
-                <select
-                  className="admin-input"
-                  value={banco}
-                  onChange={(e) => setBanco(e.target.value)}
-                >
+            <div className="prof-fields-grid">
+              <div className="prof-field">
+                <label>Banco</label>
+                <select value={banco} onChange={(e) => setBanco(e.target.value)}>
                   <option value="">Selecciona banco</option>
-                  {['Bancolombia','Davivienda','Banco de Bogotá','Banco Popular','BBVA','Scotiabank Colpatria','Banco de Occidente','Banco Caja Social','Banco Agrario','Nequi','Daviplata','Banco Falabella','Banco Pichincha','Banco Finandina','Lulo Bank','Rappi Pay','Banco Cooperativo Coopcentral','Caja Promotora de Vivienda Militar'].map((b) => (
-                    <option key={b} value={b}>{b}</option>
-                  ))}
+                  {BANCOS.map((b) => <option key={b} value={b}>{b}</option>)}
                 </select>
               </div>
-              <div>
-                <label className="profile-label">Tipo de cuenta</label>
-                <select
-                  className="admin-input"
-                  value={tipoCuenta}
-                  onChange={(e) => setTipoCuenta(e.target.value)}
-                >
+              <div className="prof-field">
+                <label>Tipo de cuenta</label>
+                <select value={tipoCuenta} onChange={(e) => setTipoCuenta(e.target.value)}>
                   <option value="ahorros">Ahorros</option>
                   <option value="corriente">Corriente</option>
                 </select>
               </div>
-            </div>
-            <div style={{ marginTop: 10 }}>
-              <label className="profile-label">Número de cuenta</label>
-              <input
-                type="text"
-                className="admin-input"
-                value={numeroCuenta}
-                onChange={(e) => setNumeroCuenta(e.target.value)}
-                placeholder="Ej: 12345678901"
-                maxLength={30}
-              />
-            </div>
-            <div style={{ marginTop: 10 }}>
-              <label className="profile-label">Titular de la cuenta</label>
-              <input
-                type="text"
-                className="admin-input"
-                value={titularCuenta}
-                onChange={(e) => setTitularCuenta(e.target.value)}
-                placeholder="Nombre exacto como aparece en la cuenta"
-                maxLength={120}
-              />
-            </div>
-
-            <h4 style={{ marginTop: 24 }}>Documentos para Cuenta de Cobro OPS</h4>
-            <p className="admin-help-text" style={{ marginBottom: 10 }}>
-              Estos documentos se adjuntan automáticamente al crear una Cuenta de Cobro OPS.
-              Se guardan en tu perfil para no tener que subirlos cada vez.
-            </p>
-            {errDoc ? <div className="admin-error" style={{ marginBottom: 8 }}>{errDoc}</div> : null}
-
-            <div style={{ marginTop: 10 }}>
-              <label className="profile-label">EPS a la que está afiliado</label>
-              <input
-                type="text"
-                className="admin-input"
-                value={eps}
-                onChange={(e) => setEps(e.target.value)}
-                placeholder="Ej: Sura, Nueva EPS, Sanitas…"
-                maxLength={120}
-              />
-            </div>
-
-            <div style={{ marginTop: 12 }}>
-              <label className="profile-label">Certificado de afiliaciones (EPS / ARL / Pensión)</label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 4 }}>
-                {subiendoDoc === 'eps' ? (
-                  <span className="admin-help-text">Subiendo…</span>
-                ) : (
-                  <label className="admin-ghost-button" style={{ cursor: 'pointer', fontSize: 13 }}>
-                    {archivoEpsNombre ? `✓ ${archivoEpsNombre}` : '+ Adjuntar certificado'}
-                    <input
-                      ref={epsInputRef}
-                      type="file"
-                      accept="application/pdf,image/*"
-                      style={{ display: 'none' }}
-                      onChange={(e) => { const f = e.target.files?.[0]; if (f) subirDocPerfil(f, 'eps'); e.target.value = ''; }}
-                    />
-                  </label>
-                )}
-                {archivoEpsNombre && subiendoDoc !== 'eps' && (
-                  <button type="button" className="admin-ghost-button" style={{ fontSize: 12 }}
-                    onClick={() => { setArchivoEpsId(''); setArchivoEpsNombre(''); api.patch('/usuarios/perfil', { archivoEpsId: null, archivoEpsNombre: null }); }}>
-                    ✕ Quitar
-                  </button>
-                )}
+              <div className="prof-field">
+                <label>Número de cuenta</label>
+                <input type="text" value={numeroCuenta} onChange={(e) => setNumeroCuenta(e.target.value)} placeholder="Ej: 12345678901" maxLength={30} />
+              </div>
+              <div className="prof-field">
+                <label>Titular de la cuenta</label>
+                <input type="text" value={titularCuenta} onChange={(e) => setTitularCuenta(e.target.value)} placeholder="Nombre exacto en la cuenta" maxLength={120} />
               </div>
             </div>
+          </div>
+        )}
 
-            <div style={{ marginTop: 12 }}>
-              <label className="profile-label">Copia del documento de identidad</label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 4 }}>
-                {subiendoDoc === 'documento' ? (
-                  <span className="admin-help-text">Subiendo…</span>
-                ) : (
-                  <label className="admin-ghost-button" style={{ cursor: 'pointer', fontSize: 13 }}>
-                    {archivoDocumentoNombre ? `✓ ${archivoDocumentoNombre}` : '+ Adjuntar copia del documento'}
-                    <input
-                      ref={docInputRef}
-                      type="file"
-                      accept="application/pdf,image/*"
-                      style={{ display: 'none' }}
-                      onChange={(e) => { const f = e.target.files?.[0]; if (f) subirDocPerfil(f, 'documento'); e.target.value = ''; }}
-                    />
-                  </label>
-                )}
-                {archivoDocumentoNombre && subiendoDoc !== 'documento' && (
-                  <button type="button" className="admin-ghost-button" style={{ fontSize: 12 }}
-                    onClick={() => { setArchivoDocumentoId(''); setArchivoDocumentoNombre(''); api.patch('/usuarios/perfil', { archivoDocumentoId: null, archivoDocumentoNombre: null }); }}>
-                    ✕ Quitar
-                  </button>
-                )}
-              </div>
+        {/* ─── DOCUMENTOS OPS ─── */}
+        {seccion === 'documentos' && (
+          <div className="prof-section">
+            <div className="prof-section-head">
+              <h3>Documentos para Cuenta de Cobro OPS</h3>
+              <p>Se adjuntan automáticamente al crear una Cuenta de Cobro OPS. Súbelos una vez y no tendrás que hacerlo de nuevo.</p>
             </div>
 
-            <div style={{ marginTop: 12 }}>
-              <label className="profile-label">Certificado de cuenta bancaria</label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 4 }}>
-                {subiendoDoc === 'cuenta' ? (
-                  <span className="admin-help-text">Subiendo…</span>
-                ) : (
-                  <label className="admin-ghost-button" style={{ cursor: 'pointer', fontSize: 13 }}>
-                    {archivoCuentaNombre ? `✓ ${archivoCuentaNombre}` : '+ Adjuntar certificado bancario'}
-                    <input
-                      ref={cuentaInputRef}
-                      type="file"
-                      accept="application/pdf,image/*"
-                      style={{ display: 'none' }}
-                      onChange={(e) => { const f = e.target.files?.[0]; if (f) subirDocPerfil(f, 'cuenta'); e.target.value = ''; }}
-                    />
-                  </label>
-                )}
-                {archivoCuentaNombre && subiendoDoc !== 'cuenta' && (
-                  <button type="button" className="admin-ghost-button" style={{ fontSize: 12 }}
-                    onClick={() => { setArchivoCuentaId(''); setArchivoCuentaNombre(''); api.patch('/usuarios/perfil', { archivoCuentaId: null, archivoCuentaNombre: null }); }}>
-                    ✕ Quitar
-                  </button>
-                )}
-              </div>
+            {errDoc ? <div className="admin-error" style={{ marginBottom: 12 }}>{errDoc}</div> : null}
+
+            <div className="prof-field prof-field--full" style={{ marginBottom: 16 }}>
+              <label>EPS a la que está afiliado</label>
+              <input type="text" value={eps} onChange={(e) => setEps(e.target.value)} placeholder="Ej: Sura, Nueva EPS, Sanitas…" maxLength={120} />
             </div>
 
-            <div style={{ marginTop: 12 }}>
-              <label className="profile-label">Carta informando EPS a la que está afiliado</label>
-              <p className="admin-help-text" style={{ marginTop: 2, marginBottom: 4 }}>Carta o constancia que informa a qué EPS está afiliado. Se adjunta automáticamente en cada radicación.</p>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 4 }}>
-                {subiendoDoc === 'carta_eps' ? (
-                  <span className="admin-help-text">Subiendo…</span>
-                ) : (
-                  <label className="admin-ghost-button" style={{ cursor: 'pointer', fontSize: 13 }}>
-                    {archivoCartaEpsNombre ? `✓ ${archivoCartaEpsNombre}` : '+ Adjuntar carta EPS'}
-                    <input
-                      ref={cartaEpsInputRef}
-                      type="file"
-                      accept="application/pdf,image/*"
-                      style={{ display: 'none' }}
-                      onChange={(e) => { const f = e.target.files?.[0]; if (f) subirDocPerfil(f, 'carta_eps'); e.target.value = ''; }}
-                    />
-                  </label>
-                )}
-                {archivoCartaEpsNombre && subiendoDoc !== 'carta_eps' && (
-                  <button type="button" className="admin-ghost-button" style={{ fontSize: 12 }}
-                    onClick={() => { setArchivoCartaEpsId(''); setArchivoCartaEpsNombre(''); api.patch('/usuarios/perfil', { archivoCartaEpsId: null, archivoCartaEpsNombre: null }); }}>
-                    ✕ Quitar
-                  </button>
-                )}
-              </div>
+            <div className="prof-docs-list">
+              <DocAdjunto label="Certificado de afiliaciones (EPS / ARL / Pensión)"
+                tipo="eps" nombre={archivoEpsNombre} subiendoDoc={subiendoDoc}
+                onSubir={subirDoc} onQuitar={() => quitarDoc('eps')} />
+              <DocAdjunto label="Copia del documento de identidad"
+                tipo="documento" nombre={archivoDocumentoNombre} subiendoDoc={subiendoDoc}
+                onSubir={subirDoc} onQuitar={() => quitarDoc('documento')} />
+              <DocAdjunto label="Certificado de cuenta bancaria"
+                tipo="cuenta" nombre={archivoCuentaNombre} subiendoDoc={subiendoDoc}
+                onSubir={subirDoc} onQuitar={() => quitarDoc('cuenta')} />
+              <DocAdjunto label="Carta informando EPS" hint="Carta o constancia de afiliación a EPS. Se adjunta automáticamente en cada radicación."
+                tipo="carta_eps" nombre={archivoCartaEpsNombre} subiendoDoc={subiendoDoc}
+                onSubir={subirDoc} onQuitar={() => quitarDoc('carta_eps')} />
+              <DocAdjunto label="Copia del RUT" hint="Requerido para colaboradores nuevos. Se adjunta automáticamente si está guardado aquí."
+                tipo="rut" nombre={archivoRutNombre} subiendoDoc={subiendoDoc}
+                onSubir={subirDoc} onQuitar={() => quitarDoc('rut')} />
             </div>
+          </div>
+        )}
 
-            <div style={{ marginTop: 12 }}>
-              <label className="profile-label">Copia del RUT</label>
-              <p className="admin-help-text" style={{ marginTop: 2, marginBottom: 4 }}>Requerido para colaboradores nuevos. Se adjunta automáticamente si está guardado aquí.</p>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 4 }}>
-                {subiendoDoc === 'rut' ? (
-                  <span className="admin-help-text">Subiendo…</span>
-                ) : (
-                  <label className="admin-ghost-button" style={{ cursor: 'pointer', fontSize: 13 }}>
-                    {archivoRutNombre ? `✓ ${archivoRutNombre}` : '+ Adjuntar RUT'}
-                    <input
-                      ref={rutInputRef}
-                      type="file"
-                      accept="application/pdf,image/*"
-                      style={{ display: 'none' }}
-                      onChange={(e) => { const f = e.target.files?.[0]; if (f) subirDocPerfil(f, 'rut'); e.target.value = ''; }}
-                    />
-                  </label>
-                )}
-                {archivoRutNombre && subiendoDoc !== 'rut' && (
-                  <button type="button" className="admin-ghost-button" style={{ fontSize: 12 }}
-                    onClick={() => { setArchivoRutId(''); setArchivoRutNombre(''); api.patch('/usuarios/perfil', { archivoRutId: null, archivoRutNombre: null }); }}>
-                    ✕ Quitar
-                  </button>
-                )}
-              </div>
-            </div>
-
-            <div style={{ marginTop: 20 }}>
-              <button type="submit" className="admin-primary-button" disabled={guardando}>
-                {guardando ? 'Guardando…' : 'Guardar cambios'}
-              </button>
-            </div>
-          </form>
-        </div>
-      ) : null}
-    </section>
+        {/* Botón guardar (no en documentos porque se guarda inmediatamente al subir) */}
+        {seccion !== 'documentos' && (
+          <div className="prof-save-row">
+            <button type="submit" className="admin-primary-button prof-save-btn" disabled={guardando}>
+              {guardando ? 'Guardando…' : 'Guardar cambios'}
+            </button>
+          </div>
+        )}
+      </form>
+    </div>
   );
 }

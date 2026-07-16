@@ -7,6 +7,10 @@ import { NuevaSolicitudPanel } from '../solicitudes/NuevaSolicitudPanel';
 
 type Vista = 'nueva' | 'misSolicitudes' | 'bandeja' | 'tablero';
 
+interface RadicacionesProps {
+  vistaInicial?: Vista;
+}
+
 interface SolicitudResumen {
   id: number;
   numeroRadicado: string;
@@ -26,33 +30,34 @@ const ETIQUETAS_ESTADO: Record<string, string> = {
   devuelto: 'Devuelto',
 };
 
-const TABS: { key: Vista; label: string; desc: string; icon: string }[] = [
-  { key: 'nueva',          label: 'Nueva solicitud',       desc: 'Crea un nuevo radicado', icon: 'plus' },
-  { key: 'misSolicitudes', label: 'Mis solicitudes',        desc: 'Consulta tus radicados', icon: 'doc' },
-  { key: 'bandeja',        label: 'Bandeja',                desc: 'Validación documental',  icon: 'inbox' },
-  { key: 'tablero',        label: 'Tablero',                desc: 'Indicadores generales',  icon: 'chart' },
+const TABS: { key: Vista; label: string; labelCorta: string; desc: string; icon: string }[] = [
+  { key: 'nueva',          label: 'Nueva solicitud', labelCorta: 'Nueva',   desc: 'Crea un nuevo radicado', icon: 'plus' },
+  { key: 'misSolicitudes', label: 'Mis solicitudes',  labelCorta: 'Mis sol.', desc: 'Consulta tus radicados', icon: 'doc' },
+  { key: 'bandeja',        label: 'Bandeja',           labelCorta: 'Bandeja',  desc: 'Validación documental',  icon: 'inbox' },
+  { key: 'tablero',        label: 'Tablero',           labelCorta: 'Tablero',  desc: 'Indicadores generales',  icon: 'chart' },
 ];
 
-function TabIcon({ name }: { name: string }) {
-  const s = 18;
+function TabIcon({ name, size = 19 }: { name: string; size?: number }) {
+  const s = size;
   if (name === 'plus') return (
     <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/>
+      <path d="M12 5v14M5 12h14"/>
     </svg>
   );
   if (name === 'doc') return (
     <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
+      <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="2"/><path d="M9 12h6M9 16h4"/>
     </svg>
   );
   if (name === 'inbox') return (
     <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>
+      <path d="M9 12l2 2 4-4"/><path d="M21 12c0 1.2-.504 2.4-1.4 3.2L12 22 4.4 15.2A4.4 4.4 0 0 1 3 12V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v7z"/>
     </svg>
   );
+  /* chart — barras verticales */
   return (
     <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
+      <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/><line x1="2" y1="20" x2="22" y2="20"/>
     </svg>
   );
 }
@@ -66,8 +71,8 @@ function EstadoBadge({ estado }: { estado: string }) {
   return <span className={`rad-badge ${cls}`}>{ETIQUETAS_ESTADO[estado] ?? estado}</span>;
 }
 
-export function RadicacionesModule() {
-  const [vista, setVista]         = useState<Vista>('misSolicitudes');
+export function RadicacionesModule({ vistaInicial }: RadicacionesProps = {}) {
+  const [vista, setVista]         = useState<Vista>(vistaInicial ?? 'misSolicitudes');
   const [items, setItems]         = useState<SolicitudResumen[]>([]);
   const [loading, setLoading]     = useState(false);
   const [borrando, setBorrando]   = useState<number | null>(null);
@@ -139,6 +144,7 @@ export function RadicacionesModule() {
           >
             <span className="rad2-tab-icon"><TabIcon name={tab.icon} /></span>
             <span className="rad2-tab-label">{tab.label}</span>
+            <span className="rad2-tab-label-short">{tab.labelCorta}</span>
           </button>
         ))}
       </nav>

@@ -28,6 +28,8 @@ export function PersonalAutorizadoPanel({ areas }: { areas: AreaMin[] }) {
   const [cargando, setCargando] = useState(false);
   const [msg, setMsg] = useState('');
   const [err, setErr] = useState('');
+  const [busqueda, setBusqueda] = useState('');
+  const [filtroArea, setFiltroArea] = useState('');
 
   // Individual
   const [cc, setCc] = useState('');
@@ -91,6 +93,12 @@ export function PersonalAutorizadoPanel({ areas }: { areas: AreaMin[] }) {
     } catch (e) { setErr(getErr(e)); }
   }
 
+  const listaFiltrada = lista.filter((p) => {
+    const docOk = busqueda.trim() === '' || p.numeroDocumento.includes(busqueda.trim());
+    const areaOk = filtroArea === '' || (p.area ?? '').toLowerCase().includes(filtroArea.toLowerCase());
+    return docOk && areaOk;
+  });
+
   async function eliminar(id: number, doc: string) {
     if (!window.confirm(`¿Quitar la autorización del documento ${doc}?`)) return;
     setMsg(''); setErr('');
@@ -139,12 +147,41 @@ export function PersonalAutorizadoPanel({ areas }: { areas: AreaMin[] }) {
       </form>
 
       <aside className="admin-side-list card-surface">
-        <h4>Personal autorizado ({lista.length})</h4>
+        <div className="pers-list-head">
+          <h4>Personal autorizado ({lista.length})</h4>
+          {lista.length > 0 && (
+            <div className="pers-filtros">
+              <input
+                type="text"
+                className="pers-busqueda-input"
+                placeholder="Buscar por N.º documento…"
+                value={busqueda}
+                onChange={(e) => setBusqueda(e.target.value.replace(/[^A-Za-z0-9]/g, ''))}
+                maxLength={20}
+              />
+              <select
+                className="pers-area-select"
+                value={filtroArea}
+                onChange={(e) => setFiltroArea(e.target.value)}
+              >
+                <option value="">Todas las áreas</option>
+                {[...new Set(lista.map((p) => p.area).filter(Boolean))].sort().map((a) => (
+                  <option key={a!} value={a!}>{a}</option>
+                ))}
+              </select>
+            </div>
+          )}
+        </div>
+
         {cargando ? <p>Cargando…</p> : lista.length === 0 ? (
           <p>Aún no hay personal autorizado.</p>
+        ) : listaFiltrada.length === 0 ? (
+          <p className="admin-help-text" style={{ padding: '12px 0' }}>
+            Sin resultados para la búsqueda actual.
+          </p>
         ) : (
           <ul>
-            {lista.map((p) => (
+            {listaFiltrada.map((p) => (
               <li key={p.id}>
                 <div>
                   <strong>{p.numeroDocumento}</strong>
