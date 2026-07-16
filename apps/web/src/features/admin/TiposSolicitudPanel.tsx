@@ -132,6 +132,19 @@ export function TiposSolicitudPanel() {
     }
   }
 
+  async function eliminarTipo(t: TipoSolicitud) {
+    if (!window.confirm(`¿Eliminar permanentemente el tipo "${t.nombre}"?\n\nSi tiene solicitudes asociadas, el sistema lo impedirá.`)) return;
+    setMsg(''); setErr('');
+    try {
+      await api.delete(`/tipos/${t.id}`);
+      setMsg(`Tipo "${t.nombre}" eliminado correctamente.`);
+      await cargar();
+    } catch (ex: unknown) {
+      const m = (ex as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      setErr(m ?? 'No se pudo eliminar el tipo.');
+    }
+  }
+
   async function crearTipo() {
     if (!cNombre.trim()) { setErr('Ingresa el nombre del tipo.'); return; }
     if (!cAreaId) { setErr('Selecciona un área.'); return; }
@@ -174,6 +187,7 @@ export function TiposSolicitudPanel() {
       onCancelar: () => setEditId(null),
       onGuardar: guardarTipo,
       onToggle: () => toggleActivo(t),
+      onEliminar: () => eliminarTipo(t),
       guardando,
     };
   }
@@ -275,10 +289,11 @@ interface TipoRowProps {
   onCancelar: () => void;
   onGuardar: (id: number, data: object) => Promise<void>;
   onToggle: () => void;
+  onEliminar: () => void;
   guardando: boolean;
 }
 
-function TipoRow({ tipo, areas, editando, onAbrir, onCancelar, onGuardar, onToggle, guardando }: TipoRowProps) {
+function TipoRow({ tipo, areas, editando, onAbrir, onCancelar, onGuardar, onToggle, onEliminar, guardando }: TipoRowProps) {
   const hint = SLUGS_ESPECIALES[tipo.slug] ?? null;
 
   /* ── Estado del editor (inicializado al abrir) ── */
@@ -429,7 +444,10 @@ function TipoRow({ tipo, areas, editando, onAbrir, onCancelar, onGuardar, onTogg
             {tipo.activo ? '⏸ Deshabilitar' : '▶ Habilitar'}
           </button>
           {!editando
-            ? <button type="button" className="admin-ghost-button" onClick={onAbrir}>⚙ Configurar</button>
+            ? <>
+                <button type="button" className="admin-ghost-button" onClick={onAbrir}>⚙ Configurar</button>
+                <button type="button" className="tipos-eliminar-btn" onClick={onEliminar}>🗑 Eliminar</button>
+              </>
             : <button type="button" className="admin-ghost-button" onClick={onCancelar}>✕ Cancelar</button>
           }
         </div>

@@ -397,10 +397,13 @@ export function DashboardPage() {
 
 	// Escuchar evento 401 del interceptor axios (sesión expirada por el servidor)
 	useEffect(() => {
-		const handler = () => { /* el hook ya lo manejará cuando expire */ };
+		const handler = () => {
+			clearAuthSession();
+			navigate('/login', { replace: true });
+		};
 		window.addEventListener('payops:session-expired', handler);
 		return () => window.removeEventListener('payops:session-expired', handler);
-	}, []);
+	}, [navigate]);
 
 	function getErrorMessage(error: unknown) {
 		const maybeError = error as { response?: { data?: { message?: string | string[] } } };

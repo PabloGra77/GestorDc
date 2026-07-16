@@ -591,7 +591,27 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
 .admin-sidebar-cerrar  { display: none; }
 .admin-movil-bell      { display: none; }
 .admin-drawer-usuario  { display: none; }
-.admin-drawer-logout   { display: none; }
+.admin-drawer-logout {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 13px;
+  border-radius: 7px;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  background: none;
+  color: rgba(239, 68, 68, 0.85);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  flex-shrink: 0;
+}
+.admin-drawer-logout:hover {
+  background: rgba(239, 68, 68, 0.12);
+  border-color: rgba(239, 68, 68, 0.6);
+  color: #f87171;
+}
 
 /* ── Campana: gris sin notifs, dorada con animación cuando hay ── */
 @keyframes bellShake {
@@ -13016,4 +13036,25 @@ body[data-weather="tormenta"]::after {
    ============================================================ */
 .admin-form-grid .historial-panel {
   grid-column: 1 / -1;
+}
+
+/* ============================================================
+   TIPOS — Botón eliminar (destructivo)
+   ============================================================ */
+.tipos-eliminar-btn {
+  padding: 5px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  background: none;
+  color: rgba(239, 68, 68, 0.75);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+.tipos-eliminar-btn:hover {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.55);
+  color: #f87171;
 }
