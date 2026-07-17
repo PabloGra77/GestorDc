@@ -21,4 +21,19 @@ $row = $stmt->fetch();
 
 if (!$row) Response::error('Usuario no encontrado', 404);
 
-Response::json(Shapes::usuario($row));
+$extra = [];
+try {
+    $chk = $pdo->prepare("SELECT telefono, correo_personal, banco, tipo_cuenta, numero_cuenta, titular_cuenta FROM usuarios WHERE id = :id LIMIT 1");
+    $chk->execute([':id' => $id]);
+    $ex = $chk->fetch();
+    if ($ex) {
+        $extra['telefono']       = $ex['telefono']       ?? null;
+        $extra['correoPersonal'] = $ex['correo_personal'] ?? null;
+        $extra['banco']          = $ex['banco']          ?? null;
+        $extra['tipoCuenta']     = $ex['tipo_cuenta']    ?? null;
+        $extra['numeroCuenta']   = $ex['numero_cuenta']  ?? null;
+        $extra['titularCuenta']  = $ex['titular_cuenta'] ?? null;
+    }
+} catch (Throwable) {}
+
+Response::json(array_merge(Shapes::usuario($row), $extra));

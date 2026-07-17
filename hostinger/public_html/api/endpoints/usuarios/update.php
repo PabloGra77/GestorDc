@@ -122,6 +122,31 @@ if (array_key_exists('nivelAprobacion', $body)) {
     $row['nivel_aprobacion'] = $na;
 }
 
+// Campos de perfil personal y cuenta bancaria (columnas pueden no existir aún)
+$camposExtra = [];
+foreach ([
+    'telefono'       => 'telefono',
+    'correoPersonal' => 'correo_personal',
+    'banco'          => 'banco',
+    'tipoCuenta'     => 'tipo_cuenta',
+    'numeroCuenta'   => 'numero_cuenta',
+    'titularCuenta'  => 'titular_cuenta',
+] as $in => $col) {
+    if (array_key_exists($in, $body)) {
+        $camposExtra[$col] = trim((string)($body[$in] ?? '')) ?: null;
+    }
+}
+if (!empty($camposExtra)) {
+    try {
+        $sets   = implode(', ', array_map(fn($k) => "$k = :ex_$k", array_keys($camposExtra)));
+        $params = array_merge([':id' => $id], array_combine(
+            array_map(fn($k) => ":ex_$k", array_keys($camposExtra)),
+            array_values($camposExtra)
+        ));
+        $pdo->prepare("UPDATE usuarios SET $sets WHERE id = :id")->execute($params);
+    } catch (Throwable) {}
+}
+
 $upd = $pdo->prepare(
     "UPDATE usuarios SET
         primer_nombre = :pn,

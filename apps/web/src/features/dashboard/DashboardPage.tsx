@@ -116,6 +116,11 @@ export function DashboardPage() {
 	const [userRolId, setUserRolId] = useState<number | ''>('');
 	const [userAreaId, setUserAreaId] = useState<number | ''>('');
 	const [userNivelAprobacion, setUserNivelAprobacion] = useState<string>('');
+	const [userCorreoPersonal, setUserCorreoPersonal] = useState('');
+	const [userBanco, setUserBanco] = useState('');
+	const [userTipoCuenta, setUserTipoCuenta] = useState('');
+	const [userNumeroCuenta, setUserNumeroCuenta] = useState('');
+	const [userTitularCuenta, setUserTitularCuenta] = useState('');
 	const [areasUsuarios, setAreasUsuarios] = useState<Array<{ id: number; nombre: string }>>([]);
 	const [editingUserId, setEditingUserId] = useState<number | null>(null);
 	const [isUserPermisosOpen, setIsUserPermisosOpen] = useState(false);
@@ -476,6 +481,11 @@ export function DashboardPage() {
 		setUserPassword('');
 		setUserAreaId('');
 		setUserNivelAprobacion('');
+		setUserCorreoPersonal('');
+		setUserBanco('');
+		setUserTipoCuenta('');
+		setUserNumeroCuenta('');
+		setUserTitularCuenta('');
 		setEditingUserId(null);
 	}
 
@@ -545,7 +555,7 @@ export function DashboardPage() {
 		setRolePermisos(normalizarPermisosEntrada(roleItem.permisos));
 	}
 
-	function iniciarEdicionUsuario(usuario: Usuario) {
+	async function iniciarEdicionUsuario(usuario: Usuario) {
 		setAdminMessage('');
 		setAdminError('');
 		setEditingUserId(usuario.id);
@@ -562,6 +572,16 @@ export function DashboardPage() {
 		setUserRolId(usuario.rol?.id || '');
 		setUserAreaId(usuario.areaId ?? '');
 		setUserNivelAprobacion(usuario.nivelAprobacion ?? '');
+		// Cargar datos extra (cuenta bancaria, correo personal)
+		try {
+			const r = await api.get<Record<string, unknown>>(`/usuarios/${usuario.id}`);
+			const d = r.data;
+			setUserCorreoPersonal((d.correoPersonal as string) ?? '');
+			setUserBanco((d.banco as string) ?? '');
+			setUserTipoCuenta((d.tipoCuenta as string) ?? '');
+			setUserNumeroCuenta((d.numeroCuenta as string) ?? '');
+			setUserTitularCuenta((d.titularCuenta as string) ?? '');
+		} catch { /* silencioso */ }
 	}
 
 	async function handleCreateRole(event: FormEvent<HTMLFormElement>) {
@@ -628,6 +648,11 @@ export function DashboardPage() {
 				rolId: Number(userRolId),
 				areaId: userAreaId === '' ? null : Number(userAreaId),
 				nivelAprobacion: userNivelAprobacion || null,
+				correoPersonal: userCorreoPersonal || null,
+				banco: userBanco || null,
+				tipoCuenta: userTipoCuenta || null,
+				numeroCuenta: userNumeroCuenta || null,
+				titularCuenta: userTitularCuenta || null,
 				activo: true,
 			} as Record<string, unknown>;
 
@@ -1438,6 +1463,43 @@ export function DashboardPage() {
 										<option value="director">Director</option>
 										<option value="contabilidad">Contabilidad</option>
 									</select>
+									{editingUserId ? (
+										<>
+											<p className="admin-help-text" style={{ margin: '8px 0 2px', fontWeight: 600, fontSize: 12 }}>Datos personales y bancarios</p>
+											<input
+												type="email"
+												placeholder="Correo personal"
+												value={userCorreoPersonal}
+												onChange={(e) => setUserCorreoPersonal(e.target.value)}
+											/>
+											<input
+												type="text"
+												placeholder="Banco"
+												value={userBanco}
+												onChange={(e) => setUserBanco(e.target.value)}
+											/>
+											<select
+												value={userTipoCuenta}
+												onChange={(e) => setUserTipoCuenta(e.target.value)}
+											>
+												<option value="">Tipo de cuenta</option>
+												<option value="ahorros">Ahorros</option>
+												<option value="corriente">Corriente</option>
+											</select>
+											<input
+												type="text"
+												placeholder="Número de cuenta"
+												value={userNumeroCuenta}
+												onChange={(e) => setUserNumeroCuenta(e.target.value)}
+											/>
+											<input
+												type="text"
+												placeholder="Titular de la cuenta"
+												value={userTitularCuenta}
+												onChange={(e) => setUserTitularCuenta(e.target.value)}
+											/>
+										</>
+									) : null}
 										<button type="submit" className="admin-primary-button">
 											{editingUserId ? 'Guardar cambios' : 'Crear usuario'}
 										</button>
