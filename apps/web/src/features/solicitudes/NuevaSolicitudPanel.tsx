@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api } from '../../services/http/api';
+import { getAuthSession } from '../auth/auth.service';
 import { useOcrDocument, validarOcrContraDato, validarTipoDocumento } from '../../hooks/useOcrDocument';
 import { numeroAPesosEnLetras, formatearMiles } from '../../utils/numeroALetras';
 import { SignaturePad } from '../../components/SignaturePad';
@@ -280,6 +281,7 @@ function TablaItemsField({ columnas, value, onChange, conFactura, verificaciones
 }
 
 export function NuevaSolicitudPanel({ onCreada }: NuevaSolicitudPanelProps) {
+  const sessionAreaId = getAuthSession()?.usuario?.areaId ?? null;
   const [paso, setPaso] = useState<1 | 2 | 3>(1);
   const [areas, setAreas] = useState<Area[]>([]);
   const [tipos, setTipos] = useState<TipoSolicitud[]>([]);
@@ -317,6 +319,14 @@ export function NuevaSolicitudPanel({ onCreada }: NuevaSolicitudPanelProps) {
       .finally(() => setLoading(false));
     return () => { cancel = true; };
   }, []);
+
+  // Auto-seleccionar área si el usuario ya tiene una configurada en su perfil
+  useEffect(() => {
+    if (!sessionAreaId || areas.length === 0 || areaSel) return;
+    const found = areas.find((a) => a.id === sessionAreaId);
+    if (found) { setAreaSel(found); setTipoSel(null); setPaso(2); }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [areas]);
 
   // Nombres de usuarios para autocompletar campos tipo "persona" (no crítico si falla)
   useEffect(() => {
@@ -725,23 +735,27 @@ export function NuevaSolicitudPanel({ onCreada }: NuevaSolicitudPanelProps) {
     <section className="nueva-solicitud-panel">
       {/* Stepper */}
       <div className="nueva-sol-steps">
-        <button
-          type="button"
-          className={`nueva-sol-step${paso >= 1 ? ' active' : ''}`}
-          onClick={() => paso > 1 && setPaso(1)}
-        >
-          <span className="nueva-sol-step-n">1</span>
-          <span>Area</span>
-          {areaSel ? <small>{areaSel.nombre}</small> : null}
-        </button>
-        <div className="nueva-sol-divider" />
+        {!sessionAreaId && (
+          <>
+            <button
+              type="button"
+              className={`nueva-sol-step${paso >= 1 ? ' active' : ''}`}
+              onClick={() => paso > 1 && setPaso(1)}
+            >
+              <span className="nueva-sol-step-n">1</span>
+              <span>Area</span>
+              {areaSel ? <small>{areaSel.nombre}</small> : null}
+            </button>
+            <div className="nueva-sol-divider" />
+          </>
+        )}
         <button
           type="button"
           className={`nueva-sol-step${paso >= 2 ? ' active' : ''}`}
           disabled={!areaSel}
           onClick={() => paso > 2 && areaSel && setPaso(2)}
         >
-          <span className="nueva-sol-step-n">2</span>
+          <span className="nueva-sol-step-n">{sessionAreaId ? '1' : '2'}</span>
           <span>Tipo de solicitud</span>
           {tipoSel ? <small>{tipoSel.nombre}</small> : null}
         </button>
@@ -751,7 +765,7 @@ export function NuevaSolicitudPanel({ onCreada }: NuevaSolicitudPanelProps) {
           className={`nueva-sol-step${paso >= 3 ? ' active' : ''}`}
           disabled={!tipoSel}
         >
-          <span className="nueva-sol-step-n">3</span>
+          <span className="nueva-sol-step-n">{sessionAreaId ? '2' : '3'}</span>
           <span>Diligenciar</span>
         </button>
       </div>
@@ -790,9 +804,11 @@ export function NuevaSolicitudPanel({ onCreada }: NuevaSolicitudPanelProps) {
               <h3>Tipo de solicitud · {areaSel.nombre}</h3>
               <p className="admin-help-text">Elige el tipo de solicitud que corresponde al tramite.</p>
             </div>
-            <button type="button" className="admin-ghost-button" onClick={() => setPaso(1)}>
-              ← Cambiar area
-            </button>
+            {!sessionAreaId && (
+              <button type="button" className="admin-ghost-button" onClick={() => setPaso(1)}>
+                ← Cambiar area
+              </button>
+            )}
           </header>
           <div className="nueva-sol-cards">
             {tiposDelArea.length === 0 ? (

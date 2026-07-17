@@ -179,7 +179,7 @@ export function DashboardPage() {
 
 	const canRealizarSolicitudes = tienePermiso('inicio', 'realizarSolicitudes');
 	const canVerificarRadicados = tienePermiso('inicio', 'verificarRadicados');
-	const canCrearUsuarios = tienePermiso('panelAdministrador', 'crearUsuarios');
+	const canCrearUsuarios = esAdmin || tienePermiso('panelAdministrador', 'crearUsuarios');
 	const canCrearRoles = tienePermiso('panelAdministrador', 'crearRoles');
 	const totalUsuariosActivos = useMemo(() => usuarios.filter((usuario) => usuario.activo).length, [usuarios]);
 	const usuariosRecientes = useMemo(() => [...usuarios].reverse(), [usuarios]);
