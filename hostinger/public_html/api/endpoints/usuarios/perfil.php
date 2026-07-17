@@ -43,10 +43,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         "ALTER TABLE usuarios ADD COLUMN archivo_rut_nombre VARCHAR(255) NULL",
         "ALTER TABLE usuarios ADD COLUMN archivo_carta_eps_id VARCHAR(100) NULL",
         "ALTER TABLE usuarios ADD COLUMN archivo_carta_eps_nombre VARCHAR(255) NULL",
+        "ALTER TABLE usuarios ADD COLUMN cargo VARCHAR(150) NULL",
     ] as $sql) { try { $pdo->exec($sql); } catch (Throwable) {} }
 
     try {
-        $chkOps = $pdo->prepare("SELECT eps, archivo_eps_id, archivo_eps_nombre, archivo_documento_id, archivo_documento_nombre, archivo_cuenta_id, archivo_cuenta_nombre, archivo_rut_id, archivo_rut_nombre, archivo_carta_eps_id, archivo_carta_eps_nombre FROM usuarios WHERE id = :id LIMIT 1");
+        $chkOps = $pdo->prepare("SELECT eps, archivo_eps_id, archivo_eps_nombre, archivo_documento_id, archivo_documento_nombre, archivo_cuenta_id, archivo_cuenta_nombre, archivo_rut_id, archivo_rut_nombre, archivo_carta_eps_id, archivo_carta_eps_nombre, cargo FROM usuarios WHERE id = :id LIMIT 1");
         $chkOps->execute([':id' => $usuarioId]);
         $exOps = $chkOps->fetch();
         if ($exOps !== false) {
@@ -61,6 +62,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             $extra['archivoRutNombre'] = $exOps['archivo_rut_nombre'] ?? null;
             $extra['archivoCartaEpsId'] = $exOps['archivo_carta_eps_id'] ?? null;
             $extra['archivoCartaEpsNombre'] = $exOps['archivo_carta_eps_nombre'] ?? null;
+            $extra['cargo'] = $exOps['cargo'] ?? null;
         }
     } catch (Throwable) { /* columnas OPS aún no existen */ }
 
@@ -163,6 +165,8 @@ if (array_key_exists('areaId', $body)) {
     }
     $camposExtra['area_id'] = $areaIdNuevo ?: null;
 }
+// Cargo profesional
+if (array_key_exists('cargo', $body)) $camposExtra['cargo'] = trim((string)($body['cargo'] ?? '')) ?: null;
 // Campos OPS
 if (array_key_exists('eps', $body)) $camposExtra['eps'] = trim((string)($body['eps'] ?? '')) ?: null;
 if (array_key_exists('archivoEpsId', $body)) $camposExtra['archivo_eps_id'] = $body['archivoEpsId'] ?: null;
@@ -216,7 +220,7 @@ try {
 } catch (Throwable) { /* columnas aún no existen */ }
 
 try {
-    $chkOps2 = $pdo->prepare("SELECT eps, archivo_eps_id, archivo_eps_nombre, archivo_documento_id, archivo_documento_nombre, archivo_cuenta_id, archivo_cuenta_nombre, archivo_rut_id, archivo_rut_nombre, archivo_carta_eps_id, archivo_carta_eps_nombre FROM usuarios WHERE id = :id LIMIT 1");
+    $chkOps2 = $pdo->prepare("SELECT eps, archivo_eps_id, archivo_eps_nombre, archivo_documento_id, archivo_documento_nombre, archivo_cuenta_id, archivo_cuenta_nombre, archivo_rut_id, archivo_rut_nombre, archivo_carta_eps_id, archivo_carta_eps_nombre, cargo FROM usuarios WHERE id = :id LIMIT 1");
     $chkOps2->execute([':id' => $usuarioId]);
     $exOps2 = $chkOps2->fetch();
     if ($exOps2 !== false) {
@@ -231,6 +235,7 @@ try {
         $extra['archivoRutNombre'] = $exOps2['archivo_rut_nombre'] ?? null;
         $extra['archivoCartaEpsId'] = $exOps2['archivo_carta_eps_id'] ?? null;
         $extra['archivoCartaEpsNombre'] = $exOps2['archivo_carta_eps_nombre'] ?? null;
+        $extra['cargo'] = $exOps2['cargo'] ?? null;
     }
 } catch (Throwable) { /* columnas OPS aún no existen */ }
 

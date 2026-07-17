@@ -24,6 +24,7 @@ interface PerfilData {
   tipoCuenta?: string | null;
   numeroCuenta?: string | null;
   titularCuenta?: string | null;
+  cargo?: string | null;
   eps?: string | null;
   archivoEpsId?: string | null;
   archivoEpsNombre?: string | null;
@@ -47,6 +48,101 @@ const SECCIONES: { key: Seccion; label: string; icon: string }[] = [
   { key: 'contacto',   label: 'Contacto',          icon: 'mail'   },
   { key: 'banco',      label: 'Cuenta bancaria',   icon: 'card'   },
   { key: 'documentos', label: 'Documentos OPS',    icon: 'file'   },
+];
+
+const CARGOS = [
+  'ABOGADO JUNIOR',
+  'AGENTE DE CALL CENTER',
+  'ANALISTA CONTABLE',
+  'ANALISTA CONTABLE Y NÓMINA',
+  'ANALISTA DE COMPRAS JUNIOR',
+  'ANALISTA DE FACTURACION',
+  'ANALISTA DE GLOSAS Y FACTURACION',
+  'ANALISTA DE PQRS Y SIAU',
+  'ANALISTA DE TALENTO HUMANO',
+  'APRENDIZ SENA',
+  'ARQUITECTURA',
+  'ASISTENTE DE GERENCIA',
+  'ASISTENTE LOGISTICO',
+  'AUDITOR GESTOR DE CALIDAD',
+  'AUXILIAR ADMINISTRATIVO',
+  'AUXILIAR ATENCION AL USUARIO',
+  'AUXILIAR DE BODEGA',
+  'AUXILIAR DE CALIDAD',
+  'AUXILIAR DE ENFERMERIA',
+  'AUXILIAR DE FACTURACION',
+  'AUXILIAR DE FARMACIA',
+  'AUXILIAR DE LABORATORIO',
+  'AUXILIAR DE NUTRICION',
+  'AUXILIAR DE SERVICIOS GENERALES',
+  'AUXILIAR DE TALENTO HUMANO',
+  'AUXILIAR DE TOMA DE MUESTRAS',
+  'AUXILIAR ENFERMERIA INTEGRAL',
+  'AUXILIAR ESTADISTICO Y SOFTWARE',
+  'AUXILIAR JURIDICO',
+  'AUXILIAR LINEA DE FRENTE',
+  'AUXILIAR ODONTOLOGIA',
+  'AUXILIAR SOPORTE TECNICO',
+  'BACTERIOLOGO/A',
+  'CONDUCTOR TODERO',
+  'CONTADOR',
+  'COORDINADOR DE COMPRAS Y ACTIVOS FIJOS',
+  'COORDINADOR DE PHD',
+  'COORDINADOR DE PSICOLOGIA',
+  'COORDINADOR DEL SERVICIO',
+  'COORDINADOR FISIOTERAPEUTA',
+  'COORDINADOR REGIONAL CENTRAL',
+  'COORDINADOR REGIONAL OCCIDENTE',
+  'COORDINADOR REGIONAL ORIENTE',
+  'COORDINADOR REGIONAL VIEJOCALDAS',
+  'COORDINADORA DE OFICINA JURIDICA Y CONTRATACION',
+  'COORDINADORA DE PIR Y CONSULTA EXTERNA',
+  'CUIDADOR',
+  'DIRECTOR ADMINISTRATIVO',
+  'DIRECTOR DE CONTABILIDAD COSTOS Y TESORERIA',
+  'DIRECTOR DE INNOVACION Y TECNOLOGIA',
+  'EDUCACION ESPECIAL',
+  'EDUCADORA ESPECIAL',
+  'EDUCADORA ESPECIAL DE ACOMPAÑAMIENTO',
+  'EDUCADORA ESPECIAL/TERAPEUTA ACOMPAÑAMIENTO',
+  'ENFERMERA',
+  'FISIOTERAPEUTA',
+  'FISIOTERAPEUTA DOMICILIARIO',
+  'FONOAUDIOLOGO(A)',
+  'GERENTE ADMINISTRATIVO',
+  'GERENTE FINANCIERO',
+  'GERENTE Y REPRESENTANTE LEGAL',
+  'GESTOR DOCUMENTAL',
+  'HIGIENISTA ORAL',
+  'INTERPRETE DE SEÑAS',
+  'INVENTARISTA',
+  'JEFE DE ENFERMERIA',
+  'JEFE PARTICIPACION SOCIAL',
+  'LIDER DE ESTADISTICA Y SOFTWARE',
+  'MAESTRO DE OBRAS',
+  'MEDICO',
+  'MEDICO PSIQUIATRA',
+  'NEUROPSICOLOGO',
+  'NUTRICIONISTA',
+  'ODONTOLOGA',
+  'ORIENTADORA SERVICIO AL CLIENTE',
+  'PROFESIONAL DE CALIDAD',
+  'PROFESIONAL EN SEGURIDAD Y SALUD EN EL TRABAJO',
+  'PSICOLOGA/TERAPEUTA ACOMPAÑAMIENTO',
+  'PSICOLOGO',
+  'PSICOPEDAGOGA',
+  'PSICOPEDAGOGA/TERAPEUTA ACOMPAÑAMIENTO',
+  'PSIQUIATRA',
+  'PSIQUIATRIA',
+  'QUIMICO FARMACEUTICO',
+  'REGENTE DIRECTOR TECNICO DE ESTABLECIMIENTO CARC',
+  'REGENTE DE FARMACIA',
+  'SERVICIOS GENERALES',
+  'SUBGERENTE ADMINISTRATIVO',
+  'TECNICO DE SISTEMAS Y TECNOLOGIA',
+  'TECNICO ESTADISTICO',
+  'TERAPEUTA OCUPACIONAL',
+  'TRABAJO SOCIAL',
 ];
 
 const BANCOS = [
@@ -164,6 +260,8 @@ export function ProfilePanel() {
   const [archivoRutNombre, setArchivoRutNombre] = useState('');
   const [archivoCartaEpsId, setArchivoCartaEpsId] = useState('');
   const [archivoCartaEpsNombre, setArchivoCartaEpsNombre] = useState('');
+  const [cargo, setCargo] = useState('');
+  const [sugCargo, setSugCargo] = useState<string[]>([]);
   const [subiendoDoc, setSubiendoDoc] = useState<string | null>(null);
   const [errDoc, setErrDoc] = useState('');
 
@@ -202,6 +300,7 @@ export function ProfilePanel() {
       setArchivoRutNombre(p.archivoRutNombre || '');
       setArchivoCartaEpsId(p.archivoCartaEpsId || '');
       setArchivoCartaEpsNombre(p.archivoCartaEpsNombre || '');
+      setCargo(p.cargo || '');
     }).catch(() => setErr('No se pudo cargar el perfil.'))
       .finally(() => setLoading(false));
   }, []);
@@ -229,6 +328,7 @@ export function ProfilePanel() {
         ...(numeroCuenta.trim()   ? { numeroCuenta: numeroCuenta.trim() }     : { numeroCuenta: null }),
         ...(titularCuenta.trim()  ? { titularCuenta: titularCuenta.trim() }   : { titularCuenta: null }),
         ...(eps.trim()            ? { eps: eps.trim() }                       : { eps: null }),
+        ...(cargo.trim()          ? { cargo: cargo.trim() }                   : { cargo: null }),
         areaId: areaId ?? null,
       });
       setPerfil(r.data);
@@ -298,7 +398,7 @@ export function ProfilePanel() {
 
   /* Completitud del perfil */
   const camposObligatorios = [primerNombre, primerApellido, numeroDocumento, correo];
-  const camposOpcionales = [segundoNombre, primerApellido, tipoDocumento, fechaNacimiento, telefono, direccion, banco, numeroCuenta, eps];
+  const camposOpcionales = [segundoNombre, primerApellido, tipoDocumento, fechaNacimiento, telefono, direccion, banco, numeroCuenta, eps, cargo];
   const todos = [...camposObligatorios, ...camposOpcionales];
   const llenos = todos.filter(Boolean).length;
   const pct = Math.round((llenos / todos.length) * 100);
@@ -413,6 +513,30 @@ export function ProfilePanel() {
               <div className="prof-field prof-field--full">
                 <label>Lugar de expedición</label>
                 <input type="text" value={lugarExpedicion} onChange={(e) => setLugarExpedicion(e.target.value)} placeholder="Ej: Bogotá D.C." maxLength={150} />
+              </div>
+              <div className="prof-field prof-field--full prof-cargo-wrap">
+                <label>Cargo</label>
+                <input
+                  type="text"
+                  value={cargo}
+                  autoComplete="off"
+                  placeholder="Escribe para buscar tu cargo…"
+                  maxLength={150}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setCargo(v);
+                    const q = v.trim().toUpperCase();
+                    setSugCargo(q.length >= 2 ? CARGOS.filter((c) => c.includes(q)).slice(0, 8) : []);
+                  }}
+                  onBlur={() => setTimeout(() => setSugCargo([]), 150)}
+                />
+                {sugCargo.length > 0 && (
+                  <ul className="prof-cargo-sugerencias">
+                    {sugCargo.map((s) => (
+                      <li key={s} onMouseDown={() => { setCargo(s); setSugCargo([]); }}>{s}</li>
+                    ))}
+                  </ul>
+                )}
               </div>
             </div>
           </div>
