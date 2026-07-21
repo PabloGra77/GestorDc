@@ -9,10 +9,8 @@ $uid   = (int)($admin['jwt']['sub'] ?? 0);
 $nombre         = trim((string)($_POST['nombre']         ?? ''));
 $periodoInicio  = trim((string)($_POST['periodoInicio']  ?? ''));
 $periodoFin     = trim((string)($_POST['periodoFin']     ?? ''));
-$tipoPlantilla  = trim((string)($_POST['tipoPlantilla']  ?? 'ppl'));
 
 if (!$nombre) Response::error('El nombre del informe es obligatorio', 400);
-if (!in_array($tipoPlantilla, ['ppl', 'servicio'], true)) $tipoPlantilla = 'ppl';
 
 if (empty($_FILES['archivo']) || ($_FILES['archivo']['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
     Response::error('Debes adjuntar el archivo CSV del informe', 400);
@@ -33,6 +31,11 @@ if (count($lineas) < 2) Response::error('El archivo está vacío o solo tiene en
 
 // Parsear encabezado
 $enc = array_map(fn($h) => mb_strtolower(trim(str_replace(['"', "'"], '', $h))), str_getcsv($lineas[0]));
+
+// ── Auto-detectar tipo de plantilla por columnas ───────────────────────────
+$tipoPlantilla = (in_array('nombres_paciente', $enc, true) || in_array('apellidos_paciente', $enc, true))
+    ? 'servicio'
+    : 'ppl';
 
 // ── Alias de columnas según tipo de plantilla ──────────────────────────────
 $aliasComun = [

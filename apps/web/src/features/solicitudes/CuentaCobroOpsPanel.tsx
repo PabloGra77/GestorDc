@@ -215,6 +215,15 @@ interface AtencionSede {
   hc: string;
 }
 
+interface AtencionServicio {
+  id: string;
+  nombres: string;
+  apellidos: string;
+  numId: string;
+  servicio: string;
+  sesiones: string;
+}
+
 interface NotaAclaratoria {
   id: string;
   regional: string;
@@ -228,6 +237,9 @@ function uid() { return Math.random().toString(36).slice(2, 10); }
 
 function defaultAtencion(): AtencionSede {
   return { id: uid(), regional: 'Central', sede: REGIONALES_PPL['Central'][0], fecha: '', hc: '' };
+}
+function defaultAtencionServicio(): AtencionServicio {
+  return { id: uid(), nombres: '', apellidos: '', numId: '', servicio: '', sesiones: '1' };
 }
 function defaultNota(): NotaAclaratoria {
   return { id: uid(), regional: 'Central', sede: REGIONALES_PPL['Central'][0], fecha: '', hc: '', descripcion: '' };
@@ -248,7 +260,10 @@ export function CuentaCobroOpsPanel({ onCreada, tipoSolicitudId, areaId }: Cuent
   const [fechaFinContrato, setFechaFinContrato] = useState('');
 
   // ── Paso 2: Atenciones ───────────────────────────────────────────────────────
+  const [tipoPlantillaAten, setTipoPlantillaAten] = useState<'ppl' | 'servicio'>('ppl');
   const [atenciones, setAtenciones] = useState<AtencionSede[]>([defaultAtencion()]);
+  const [atencionesServicio, setAtencionesServicio] = useState<AtencionServicio[]>([defaultAtencionServicio()]);
+  const [tarifasOps, setTarifasOps] = useState<string[]>([]);
   const [conNotasAcl, setConNotasAcl] = useState(false);
   const [notasAcl, setNotasAcl] = useState<NotaAclaratoria[]>([defaultNota()]);
   const [comentariosAdicionales, setComentariosAdicionales] = useState('');
@@ -293,6 +308,13 @@ export function CuentaCobroOpsPanel({ onCreada, tipoSolicitudId, areaId }: Cuent
 
   // ── Paso 5: Firma ──────────────────────────────────────────────────────────
   const [firma, setFirma] = useState('');
+
+  // ── Cargar tarifas OPS ──────────────────────────────────────────────────────
+  useEffect(() => {
+    api.get<{ servicio: string }[]>('/tarifas-ops')
+      .then((r) => setTarifasOps(r.data.map((t) => t.servicio)))
+      .catch(() => {});
+  }, []);
 
   // ── Auto-crear tipo ─────────────────────────────────────────────────────────
   useEffect(() => {
@@ -379,13 +401,21 @@ export function CuentaCobroOpsPanel({ onCreada, tipoSolicitudId, areaId }: Cuent
       if (periodoFin < periodoInicio) return 'La fecha fin del período no puede ser anterior a la de inicio.';
     }
     if (paso === 2) {
-      for (const a of atenciones) {
-        if (!a.fecha) return 'Cada fila de atenciones debe tener una fecha.';
-        if (!a.hc.trim()) return 'Indica el número de HC cargadas en cada fecha.';
-      }
-      if (conNotasAcl) {
-        for (const n of notasAcl) {
-          if (!n.fecha) return 'Cada nota aclaratoria debe tener fecha.';
+      if (tipoPlantillaAten === 'ppl') {
+        for (const a of atenciones) {
+          if (!a.fecha) return 'Cada fila de atenciones debe tener una fecha.';
+          if (!a.hc.trim()) return 'Indica el número de HC cargadas en cada fecha.';
+        }
+        if (conNotasAcl) {
+          for (const n of notasAcl) {
+            if (!n.fecha) return 'Cada nota aclaratoria debe tener fecha.';
+          }
+        }
+      } else {
+        if (atencionesServicio.length === 0) return 'Agrega al menos una fila de atenciones.';
+        for (const a of atencionesServicio) {
+          if (!a.servicio.trim()) return 'Cada fila debe tener un servicio seleccionado.';
+          if (!a.sesiones.trim() || parseInt(a.sesiones) < 1) return 'El número de sesiones debe ser al menos 1.';
         }
       }
     }
@@ -432,7 +462,9 @@ export function CuentaCobroOpsPanel({ onCreada, tipoSolicitudId, areaId }: Cuent
         datos: {
           periodoInicio, periodoFin,
           fechaInicioContrato, fechaFinContrato,
-          atencionesJson: JSON.stringify(atenciones),
+          tipoPlantillaAtenciones: tipoPlantillaAten,
+          atencionesJson: tipoPlantillaAten === 'ppl' ? JSON.stringify(atenciones) : '[]',
+          atencionesServicioJson: tipoPlantillaAten === 'servicio' ? JSON.stringify(atencionesServicio) : '[]',
           conNotasAclaratorias: conNotasAcl ? 'si' : 'no',
           notasAclaratorias: conNotasAcl ? JSON.stringify(notasAcl) : '[]',
           actividadesRealizadas: comentariosAdicionales,
@@ -544,115 +576,201 @@ export function CuentaCobroOpsPanel({ onCreada, tipoSolicitudId, areaId }: Cuent
       {/* ═══ Paso 2: Atenciones ═══ */}
       {paso === 2 && (
         <div className="leg-form card-surface">
-          <h3>Atenciones realizadas en PPL</h3>
+          <h3>{tipoPlantillaAten === 'ppl' ? 'Atenciones realizadas en PPL' : 'Atenciones realizadas por servicio'}</h3>
 
-          {/* ── Atenciones por sede ── */}
-          <div className="ops-atenciones-section">
-            <h4 className="ops-seccion-titulo">Atenciones por sede</h4>
-            <p className="leg-nota" style={{ marginBottom: 10 }}>
-              Registra cada día de atención indicando la sede, la fecha y el número de HC cargadas.
-            </p>
-
-            {atenciones.map((a, idx) => (
-              <div key={a.id} className="ops-atencion-row">
-                <span className="ops-atencion-num">{idx + 1}</span>
-                <div className="ops-atencion-fields">
-                  <div className="leg-field" style={{ flex: '0 0 130px' }}>
-                    <label>Regional</label>
-                    <select value={a.regional} onChange={(e) => setAtencionField(a.id, 'regional', e.target.value)}>
-                      {NOMBRES_REGIONALES.map(r => <option key={r} value={r}>{r}</option>)}
-                    </select>
-                  </div>
-                  <div className="leg-field" style={{ flex: '1 1 200px' }}>
-                    <label>Establecimiento</label>
-                    <select value={a.sede} onChange={(e) => setAtencionField(a.id, 'sede', e.target.value)}>
-                      {(REGIONALES_PPL[a.regional] || []).map(s => <option key={s} value={s}>{s}</option>)}
-                    </select>
-                  </div>
-                  <div className="leg-field" style={{ flex: '0 0 145px' }}>
-                    <label>Fecha</label>
-                    <input type="date" value={a.fecha} onChange={(e) => setAtencionField(a.id, 'fecha', e.target.value)} />
-                  </div>
-                  <div className="leg-field" style={{ flex: '0 0 90px' }}>
-                    <label>N° HC</label>
-                    <input type="number" min="0" placeholder="0" value={a.hc}
-                      onChange={(e) => setAtencionField(a.id, 'hc', e.target.value)} />
-                  </div>
-                </div>
-                {atenciones.length > 1 && (
-                  <button type="button" className="admin-ghost-button ops-rm-btn"
-                    onClick={() => setAtenciones(p => p.filter(x => x.id !== a.id))}>✕</button>
-                )}
-              </div>
-            ))}
-
-            <button type="button" className="admin-ghost-button" style={{ marginTop: 8 }}
-              onClick={() => setAtenciones(p => [...p, defaultAtencion()])}>
-              + Agregar otra fecha de atención
-            </button>
-
-            {atenciones.length > 0 && (
-              <p className="leg-nota" style={{ marginTop: 6 }}>
-                Total HC registradas: <strong>{atenciones.reduce((s, a) => s + (parseInt(a.hc) || 0), 0)}</strong>
-              </p>
-            )}
+          {/* ── Selector tipo de plantilla ── */}
+          <div className="leg-field" style={{ marginBottom: 16 }}>
+            <label>Tipo de atenciones a reportar</label>
+            <div className="leg-radio-group">
+              <label className="leg-radio-item">
+                <input type="radio" name="tipoPlantillaAten" value="ppl"
+                  checked={tipoPlantillaAten === 'ppl'}
+                  onChange={() => setTipoPlantillaAten('ppl')} />
+                Atenciones realizadas en PPL
+              </label>
+              <label className="leg-radio-item">
+                <input type="radio" name="tipoPlantillaAten" value="servicio"
+                  checked={tipoPlantillaAten === 'servicio'}
+                  onChange={() => setTipoPlantillaAten('servicio')} />
+                Atenciones realizadas por servicio
+              </label>
+            </div>
           </div>
 
-          {/* ── Notas aclaratorias ── */}
-          <div className="ops-atenciones-section" style={{ marginTop: 16 }}>
-            <label className="ops-seccion-check">
-              <input type="checkbox" checked={conNotasAcl} onChange={e => setConNotasAcl(e.target.checked)} />
-              <span className="ops-seccion-titulo">Se cargaron notas aclaratorias</span>
-            </label>
-            {conNotasAcl && (
-              <div style={{ marginTop: 10 }}>
+          {/* ── Formulario PPL ── */}
+          {tipoPlantillaAten === 'ppl' && (
+            <>
+              <div className="ops-atenciones-section">
+                <h4 className="ops-seccion-titulo">Atenciones por sede</h4>
                 <p className="leg-nota" style={{ marginBottom: 10 }}>
-                  Registra las notas aclaratorias con sede, fecha y número de HC.
+                  Registra cada día de atención indicando la sede, la fecha y el número de HC cargadas.
                 </p>
-                {notasAcl.map((n, idx) => (
-                  <div key={n.id} className="ops-atencion-row">
+
+                {atenciones.map((a, idx) => (
+                  <div key={a.id} className="ops-atencion-row">
                     <span className="ops-atencion-num">{idx + 1}</span>
-                    <div className="ops-atencion-fields" style={{ flexWrap: 'wrap' }}>
+                    <div className="ops-atencion-fields">
                       <div className="leg-field" style={{ flex: '0 0 130px' }}>
                         <label>Regional</label>
-                        <select value={n.regional} onChange={(e) => setNotaField(n.id, 'regional', e.target.value)}>
+                        <select value={a.regional} onChange={(e) => setAtencionField(a.id, 'regional', e.target.value)}>
                           {NOMBRES_REGIONALES.map(r => <option key={r} value={r}>{r}</option>)}
                         </select>
                       </div>
                       <div className="leg-field" style={{ flex: '1 1 200px' }}>
                         <label>Establecimiento</label>
-                        <select value={n.sede} onChange={(e) => setNotaField(n.id, 'sede', e.target.value)}>
-                          {(REGIONALES_PPL[n.regional] || []).map(s => <option key={s} value={s}>{s}</option>)}
+                        <select value={a.sede} onChange={(e) => setAtencionField(a.id, 'sede', e.target.value)}>
+                          {(REGIONALES_PPL[a.regional] || []).map(s => <option key={s} value={s}>{s}</option>)}
                         </select>
                       </div>
                       <div className="leg-field" style={{ flex: '0 0 145px' }}>
                         <label>Fecha</label>
-                        <input type="date" value={n.fecha} onChange={(e) => setNotaField(n.id, 'fecha', e.target.value)} />
+                        <input type="date" value={a.fecha} onChange={(e) => setAtencionField(a.id, 'fecha', e.target.value)} />
                       </div>
                       <div className="leg-field" style={{ flex: '0 0 90px' }}>
                         <label>N° HC</label>
-                        <input type="number" min="0" placeholder="0" value={n.hc}
-                          onChange={(e) => setNotaField(n.id, 'hc', e.target.value)} />
-                      </div>
-                      <div className="leg-field" style={{ flex: '1 1 100%', marginTop: 4 }}>
-                        <label>Descripción de la nota <span style={{ opacity: 0.5 }}>(opcional)</span></label>
-                        <input type="text" placeholder="Ej: corrección de fecha anterior, HC adicionales no cargados…"
-                          value={n.descripcion} onChange={(e) => setNotaField(n.id, 'descripcion', e.target.value)} />
+                        <input type="number" min="0" placeholder="0" value={a.hc}
+                          onChange={(e) => setAtencionField(a.id, 'hc', e.target.value)} />
                       </div>
                     </div>
-                    {notasAcl.length > 1 && (
+                    {atenciones.length > 1 && (
                       <button type="button" className="admin-ghost-button ops-rm-btn"
-                        onClick={() => setNotasAcl(p => p.filter(x => x.id !== n.id))}>✕</button>
+                        onClick={() => setAtenciones(p => p.filter(x => x.id !== a.id))}>✕</button>
                     )}
                   </div>
                 ))}
+
                 <button type="button" className="admin-ghost-button" style={{ marginTop: 8 }}
-                  onClick={() => setNotasAcl(p => [...p, defaultNota()])}>
-                  + Agregar otra nota aclaratoria
+                  onClick={() => setAtenciones(p => [...p, defaultAtencion()])}>
+                  + Agregar otra fecha de atención
                 </button>
+
+                {atenciones.length > 0 && (
+                  <p className="leg-nota" style={{ marginTop: 6 }}>
+                    Total HC registradas: <strong>{atenciones.reduce((s, a) => s + (parseInt(a.hc) || 0), 0)}</strong>
+                  </p>
+                )}
               </div>
-            )}
-          </div>
+
+              {/* ── Notas aclaratorias ── */}
+              <div className="ops-atenciones-section" style={{ marginTop: 16 }}>
+                <label className="ops-seccion-check">
+                  <input type="checkbox" checked={conNotasAcl} onChange={e => setConNotasAcl(e.target.checked)} />
+                  <span className="ops-seccion-titulo">Se cargaron notas aclaratorias</span>
+                </label>
+                {conNotasAcl && (
+                  <div style={{ marginTop: 10 }}>
+                    <p className="leg-nota" style={{ marginBottom: 10 }}>
+                      Registra las notas aclaratorias con sede, fecha y número de HC.
+                    </p>
+                    {notasAcl.map((n, idx) => (
+                      <div key={n.id} className="ops-atencion-row">
+                        <span className="ops-atencion-num">{idx + 1}</span>
+                        <div className="ops-atencion-fields" style={{ flexWrap: 'wrap' }}>
+                          <div className="leg-field" style={{ flex: '0 0 130px' }}>
+                            <label>Regional</label>
+                            <select value={n.regional} onChange={(e) => setNotaField(n.id, 'regional', e.target.value)}>
+                              {NOMBRES_REGIONALES.map(r => <option key={r} value={r}>{r}</option>)}
+                            </select>
+                          </div>
+                          <div className="leg-field" style={{ flex: '1 1 200px' }}>
+                            <label>Establecimiento</label>
+                            <select value={n.sede} onChange={(e) => setNotaField(n.id, 'sede', e.target.value)}>
+                              {(REGIONALES_PPL[n.regional] || []).map(s => <option key={s} value={s}>{s}</option>)}
+                            </select>
+                          </div>
+                          <div className="leg-field" style={{ flex: '0 0 145px' }}>
+                            <label>Fecha</label>
+                            <input type="date" value={n.fecha} onChange={(e) => setNotaField(n.id, 'fecha', e.target.value)} />
+                          </div>
+                          <div className="leg-field" style={{ flex: '0 0 90px' }}>
+                            <label>N° HC</label>
+                            <input type="number" min="0" placeholder="0" value={n.hc}
+                              onChange={(e) => setNotaField(n.id, 'hc', e.target.value)} />
+                          </div>
+                          <div className="leg-field" style={{ flex: '1 1 100%', marginTop: 4 }}>
+                            <label>Descripción de la nota <span style={{ opacity: 0.5 }}>(opcional)</span></label>
+                            <input type="text" placeholder="Ej: corrección de fecha anterior, HC adicionales no cargados…"
+                              value={n.descripcion} onChange={(e) => setNotaField(n.id, 'descripcion', e.target.value)} />
+                          </div>
+                        </div>
+                        {notasAcl.length > 1 && (
+                          <button type="button" className="admin-ghost-button ops-rm-btn"
+                            onClick={() => setNotasAcl(p => p.filter(x => x.id !== n.id))}>✕</button>
+                        )}
+                      </div>
+                    ))}
+                    <button type="button" className="admin-ghost-button" style={{ marginTop: 8 }}
+                      onClick={() => setNotasAcl(p => [...p, defaultNota()])}>
+                      + Agregar otra nota aclaratoria
+                    </button>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+
+          {/* ── Formulario Por servicio ── */}
+          {tipoPlantillaAten === 'servicio' && (
+            <div className="ops-atenciones-section">
+              <p className="leg-nota" style={{ marginBottom: 10 }}>
+                Registra cada paciente con el servicio prestado y el número de sesiones.
+              </p>
+
+              {atencionesServicio.map((a, idx) => (
+                <div key={a.id} className="ops-atencion-row">
+                  <span className="ops-atencion-num">{idx + 1}</span>
+                  <div className="ops-atencion-fields" style={{ flexWrap: 'wrap' }}>
+                    <div className="leg-field" style={{ flex: '1 1 150px' }}>
+                      <label>Nombres del paciente <span style={{ opacity: 0.5 }}>(opc.)</span></label>
+                      <input type="text" placeholder="Nombres" value={a.nombres}
+                        onChange={(e) => setAtencionesServicio(p => p.map(x => x.id === a.id ? { ...x, nombres: e.target.value } : x))} />
+                    </div>
+                    <div className="leg-field" style={{ flex: '1 1 150px' }}>
+                      <label>Apellidos <span style={{ opacity: 0.5 }}>(opc.)</span></label>
+                      <input type="text" placeholder="Apellidos" value={a.apellidos}
+                        onChange={(e) => setAtencionesServicio(p => p.map(x => x.id === a.id ? { ...x, apellidos: e.target.value } : x))} />
+                    </div>
+                    <div className="leg-field" style={{ flex: '0 0 130px' }}>
+                      <label>N° identificación <span style={{ opacity: 0.5 }}>(opc.)</span></label>
+                      <input type="text" inputMode="numeric" placeholder="CC/TI" value={a.numId}
+                        onChange={(e) => setAtencionesServicio(p => p.map(x => x.id === a.id ? { ...x, numId: e.target.value.replace(/\D/g, '') } : x))} />
+                    </div>
+                    <div className="leg-field" style={{ flex: '1 1 200px' }}>
+                      <label>Servicio <span className="req">*</span></label>
+                      {tarifasOps.length > 0 ? (
+                        <select value={a.servicio}
+                          onChange={(e) => setAtencionesServicio(p => p.map(x => x.id === a.id ? { ...x, servicio: e.target.value } : x))}>
+                          <option value="">— Selecciona —</option>
+                          {tarifasOps.map(s => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                      ) : (
+                        <input type="text" placeholder="Nombre del servicio" value={a.servicio}
+                          onChange={(e) => setAtencionesServicio(p => p.map(x => x.id === a.id ? { ...x, servicio: e.target.value } : x))} />
+                      )}
+                    </div>
+                    <div className="leg-field" style={{ flex: '0 0 100px' }}>
+                      <label>Sesiones <span className="req">*</span></label>
+                      <input type="number" min="1" placeholder="1" value={a.sesiones}
+                        onChange={(e) => setAtencionesServicio(p => p.map(x => x.id === a.id ? { ...x, sesiones: e.target.value } : x))} />
+                    </div>
+                  </div>
+                  {atencionesServicio.length > 1 && (
+                    <button type="button" className="admin-ghost-button ops-rm-btn"
+                      onClick={() => setAtencionesServicio(p => p.filter(x => x.id !== a.id))}>✕</button>
+                  )}
+                </div>
+              ))}
+
+              <button type="button" className="admin-ghost-button" style={{ marginTop: 8 }}
+                onClick={() => setAtencionesServicio(p => [...p, defaultAtencionServicio()])}>
+                + Agregar paciente / servicio
+              </button>
+
+              <p className="leg-nota" style={{ marginTop: 6 }}>
+                Total sesiones: <strong>{atencionesServicio.reduce((s, a) => s + (parseInt(a.sesiones) || 0), 0)}</strong>
+              </p>
+            </div>
+          )}
 
           {/* Comentarios adicionales */}
           <div className="leg-field" style={{ marginTop: 16 }}>
