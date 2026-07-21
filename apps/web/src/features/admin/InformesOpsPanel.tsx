@@ -1,7 +1,5 @@
-import { FormEvent, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api } from '../../services/http/api';
-
-// ── Tipos ─────────────────────────────────────────────────────────────────────
 
 interface InformeOps {
   id: number;
@@ -13,60 +11,17 @@ interface InformeOps {
   subidoPor: string | null;
 }
 
-interface TarifaOps {
-  id: number;
-  servicio: string;
-  tipoServicio: 'sm' | 'pad';
-  valorUnitario: number;
-  activo: boolean;
-}
-
 interface Props {
   onMsg: (m: string) => void;
   onErr: (e: string) => void;
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-const fmt = (n: number) =>
-  n.toLocaleString('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
 const fmtFecha = (s: string | null) =>
   s ? new Date(s + 'T00:00:00').toLocaleDateString('es-CO') : '—';
 const fmtDt = (s: string) =>
   new Date(s).toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' });
 
-// ── Componente ────────────────────────────────────────────────────────────────
-
 export function InformesOpsPanel({ onMsg, onErr }: Props) {
-  const [tab, setTab] = useState<'informes' | 'tarifas'>('informes');
-
-  return (
-    <div>
-      <div className="admin-module-nav" role="tablist" style={{ marginBottom: 20 }}>
-        {(['informes', 'tarifas'] as const).map((t) => (
-          <button
-            key={t}
-            type="button"
-            className={`admin-module-item${tab === t ? ' active' : ''}`}
-            onClick={() => { setTab(t); onMsg(''); onErr(''); }}
-          >
-            {t === 'informes' ? 'Informes de atenciones' : 'Tarifas por servicio'}
-          </button>
-        ))}
-      </div>
-
-      {tab === 'informes' ? (
-        <InformesTab onMsg={onMsg} onErr={onErr} />
-      ) : (
-        <TarifasTab onMsg={onMsg} onErr={onErr} />
-      )}
-    </div>
-  );
-}
-
-// ── Tab: Informes ─────────────────────────────────────────────────────────────
-
-function InformesTab({ onMsg, onErr }: Props) {
   const [informes, setInformes]   = useState<InformeOps[]>([]);
   const [loading, setLoading]     = useState(false);
   const [subiendo, setSubiendo]   = useState(false);
@@ -87,7 +42,7 @@ function InformesTab({ onMsg, onErr }: Props) {
 
   useEffect(() => { cargar(); }, []);
 
-  async function handleSubir(e: FormEvent) {
+  async function handleSubir(e: { preventDefault(): void }) {
     e.preventDefault();
     onMsg(''); onErr('');
     const file = fileRef.current?.files?.[0];
@@ -103,7 +58,7 @@ function InformesTab({ onMsg, onErr }: Props) {
     setSubiendo(true);
     try {
       const { data } = await api.post<{ totalFilas: number; nombre: string }>(
-        '/admin/informes-ops', fd, { headers: { 'Content-Type': 'multipart/form-data' } }
+        '/admin/informes-ops', fd, { headers: { 'Content-Type': undefined } }
       );
       onMsg(`Informe "${data.nombre}" cargado — ${data.totalFilas.toLocaleString('es-CO')} atenciones/sesiones.`);
       setNombre(''); setPi(''); setPf('');
@@ -139,7 +94,7 @@ function InformesTab({ onMsg, onErr }: Props) {
           <br />
           <strong>Servicios SM</strong> (por paciente): + fecha_atencion, regional, establecimiento, cc_paciente
           <br />
-          <strong>Servicios PAD</strong> (por sesiones): + numero_sesiones
+          <strong>Servicios generales / PAD</strong> (por sesiones): + numero_sesiones
         </p>
 
         <div className="admin-form-row">
@@ -221,128 +176,5 @@ function InformesTab({ onMsg, onErr }: Props) {
         )}
       </aside>
     </div>
-  );
-}
-
-// ── Tab: Tarifas ──────────────────────────────────────────────────────────────
-
-function TarifasTab({ onMsg, onErr }: Props) {
-  const [tarifas, setTarifas]   = useState<TarifaOps[]>([]);
-  const [loading, setLoading]   = useState(false);
-  const [guardando, setGuardando] = useState(false);
-  // Copia editable: { servicio → valor }
-  const [valores, setValores]   = useState<Record<string, string>>({});
-
-  async function cargar() {
-    setLoading(true);
-    try {
-      const { data } = await api.get<TarifaOps[]>('/admin/tarifas-ops');
-      setTarifas(data);
-      const init: Record<string, string> = {};
-      data.forEach((t) => { init[t.servicio] = String(t.valorUnitario); });
-      setValores(init);
-    } catch { onErr('No se pudieron cargar las tarifas.'); }
-    finally { setLoading(false); }
-  }
-
-  useEffect(() => { cargar(); }, []);
-
-  async function handleGuardar(e: FormEvent) {
-    e.preventDefault();
-    onMsg(''); onErr('');
-    setGuardando(true);
-    try {
-      const payload = tarifas.map((t) => ({
-        servicio:      t.servicio,
-        tipoServicio:  t.tipoServicio,
-        valorUnitario: parseFloat((valores[t.servicio] || '0').replace(/[^0-9.]/g, '')) || 0,
-        activo:        t.activo,
-      }));
-      await api.post('/admin/tarifas-ops', { tarifas: payload });
-      onMsg('Tarifas guardadas correctamente.');
-      await cargar();
-    } catch { onErr('Error al guardar las tarifas.'); }
-    finally { setGuardando(false); }
-  }
-
-  const sm  = tarifas.filter((t) => t.tipoServicio === 'sm');
-  const pad = tarifas.filter((t) => t.tipoServicio === 'pad');
-
-  if (loading) return <p className="admin-help-text">Cargando tarifas…</p>;
-
-  return (
-    <form className="admin-form card-surface" onSubmit={handleGuardar}>
-      <h3 className="admin-section-title">Tarifas por servicio OPS</h3>
-      <p className="admin-help-text" style={{ marginBottom: 16 }}>
-        Configura el valor unitario de cada servicio. Los servicios <strong>SM</strong> cobran
-        por atención (paciente); los <strong>PAD</strong> cobran por sesión.
-        El sistema calculará el valor esperado al revisar la solicitud del profesional.
-      </p>
-
-      {/* SM */}
-      <h4 style={{ marginBottom: 8 }}>Servicios SM — valor por atención / paciente</h4>
-      <table className="bandeja-items-table" style={{ width: '100%', marginBottom: 24 }}>
-        <thead>
-          <tr><th style={{ textAlign: 'left' }}>Servicio</th><th style={{ width: 200 }}>Valor unitario (COP)</th></tr>
-        </thead>
-        <tbody>
-          {sm.map((t) => (
-            <tr key={t.servicio}>
-              <td>{t.servicio}</td>
-              <td>
-                <input
-                  className="admin-input"
-                  type="text"
-                  inputMode="numeric"
-                  value={valores[t.servicio] ?? '0'}
-                  onChange={(e) => setValores((v) => ({ ...v, [t.servicio]: e.target.value }))}
-                  style={{ margin: 0 }}
-                />
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-
-      {/* PAD */}
-      <h4 style={{ marginBottom: 8 }}>Servicios PAD — valor por sesión</h4>
-      <table className="bandeja-items-table" style={{ width: '100%', marginBottom: 24 }}>
-        <thead>
-          <tr><th style={{ textAlign: 'left' }}>Servicio</th><th style={{ width: 200 }}>Valor unitario (COP)</th></tr>
-        </thead>
-        <tbody>
-          {pad.map((t) => (
-            <tr key={t.servicio}>
-              <td>{t.servicio}</td>
-              <td>
-                <input
-                  className="admin-input"
-                  type="text"
-                  inputMode="numeric"
-                  value={valores[t.servicio] ?? '0'}
-                  onChange={(e) => setValores((v) => ({ ...v, [t.servicio]: e.target.value }))}
-                  style={{ margin: 0 }}
-                />
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-
-      {/* Vista previa total */}
-      {tarifas.length > 0 && (
-        <div className="admin-help-text" style={{ marginBottom: 16 }}>
-          Tarifas configuradas:{' '}
-          {tarifas
-            .filter((t) => parseFloat(valores[t.servicio] || '0') > 0)
-            .map((t) => `${t.servicio}: ${fmt(parseFloat(valores[t.servicio] || '0'))}`)
-            .join(' · ') || 'ninguna aún'}
-        </div>
-      )}
-
-      <button type="submit" className="admin-primary-button" disabled={guardando}>
-        {guardando ? 'Guardando…' : 'Guardar tarifas'}
-      </button>
-    </form>
   );
 }

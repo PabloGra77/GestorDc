@@ -46,6 +46,14 @@ interface Area {
   slug: string;
 }
 
+interface TarifaOps {
+  id: number;
+  servicio: string;
+  tipoServicio: 'sm' | 'pad';
+  valorUnitario: number;
+  activo: boolean;
+}
+
 /* ─── Constantes ─────────────────────────────────────────────── */
 const ROLES_DISPONIBLES = [
   { value: 'analista',      label: 'Analista del área' },
@@ -307,6 +315,11 @@ function TipoRow({ tipo, areas, editando, onAbrir, onCancelar, onGuardar, onTogg
   const [eAreasVisibles, setEAreasVisibles] = useState<'todas' | number[]>('todas');
   const [eErr, setEErr] = useState('');
 
+  // Tarifas OPS (solo para cuenta-cobro-ops)
+  const [eTarifas, setETarifas] = useState<TarifaOps[]>([]);
+  const [eTarifaValores, setETarifaValores] = useState<Record<string, string>>({});
+  const [cargandoTarifas, setCargandoTarifas] = useState(false);
+
   useEffect(() => {
     if (!editando) return;
     setENombre(tipo.nombre);
@@ -332,6 +345,23 @@ function TipoRow({ tipo, areas, editando, onAbrir, onCancelar, onGuardar, onTogg
     const av = cfg.areasVisibles;
     setEAreasVisibles(Array.isArray(av) ? av : 'todas');
     setEErr('');
+
+    // Cargar tarifas solo para cuenta-cobro-ops
+    if (tipo.slug === 'cuenta-cobro-ops') {
+      setCargandoTarifas(true);
+      api.get<TarifaOps[]>('/admin/tarifas-ops')
+        .then(({ data }) => {
+          setETarifas(data);
+          const init: Record<string, string> = {};
+          data.forEach((tr) => { init[tr.servicio] = String(tr.valorUnitario); });
+          setETarifaValores(init);
+        })
+        .catch(() => setEErr('No se pudieron cargar las tarifas OPS.'))
+        .finally(() => setCargandoTarifas(false));
+    } else {
+      setETarifas([]);
+      setETarifaValores({});
+    }
   }, [editando, tipo]);
 
   /* ── Helpers de topes ── */
@@ -374,6 +404,22 @@ function TipoRow({ tipo, areas, editando, onAbrir, onCancelar, onGuardar, onTogg
     if (!eNombre.trim()) { setEErr('El nombre es obligatorio.'); return; }
     if (!eSlug.trim()) { setEErr('El identificador (slug) es obligatorio.'); return; }
 
+    // Guardar tarifas OPS primero si aplica
+    if (eSlug === 'cuenta-cobro-ops' && eTarifas.length > 0) {
+      try {
+        const payload = eTarifas.map((t) => ({
+          servicio:      t.servicio,
+          tipoServicio:  t.tipoServicio,
+          valorUnitario: parseFloat((eTarifaValores[t.servicio] || '0').replace(/[^0-9.]/g, '')) || 0,
+          activo:        t.activo,
+        }));
+        await api.post('/admin/tarifas-ops', { tarifas: payload });
+      } catch {
+        setEErr('Error al guardar las tarifas OPS. Intenta de nuevo.');
+        return;
+      }
+    }
+
     const topesObj: Topes = {};
     if (topeNum('transporteTotal')) topesObj.transporteTotal = topeNum('transporteTotal');
     if (topeNum('hotelNoche'))      topesObj.hotelNoche      = topeNum('hotelNoche');
@@ -402,6 +448,7 @@ function TipoRow({ tipo, areas, editando, onAbrir, onCancelar, onGuardar, onTogg
 
   /* ── Resumen de topes (cuando no editando) ── */
   function resumenTopes(): string | null {
+    if (tipo.slug === 'cuenta-cobro-ops') return null;
     const t = tipo.configuracionTipo?.topes;
     if (!t || !Object.keys(t).length) return null;
     const partes: string[] = [];
@@ -551,67 +598,150 @@ function TipoRow({ tipo, areas, editando, onAbrir, onCancelar, onGuardar, onTogg
             </p>
           </div>
 
-          {/* ── Sección 3: Topes y límites de gasto ── */}
-          <div className="tipos-editor-section">
-            <h4>Topes y límites de gasto</h4>
-            <p className="admin-help-text">Define los montos máximos permitidos en cada categoría. Deja en blanco para sin límite.</p>
-            <div className="tipos-topes-grid">
-              <div className="leg-field">
-                <label>🚌 Transporte total (COP)</label>
-                <input type="text" inputMode="numeric" placeholder="Sin límite"
-                  value={fmtTope('transporteTotal')}
-                  onChange={(e) => setTope('transporteTotal', e.target.value)} />
-              </div>
-              <div className="leg-field">
-                <label>🏨 Hotel por noche (COP)</label>
-                <input type="text" inputMode="numeric" placeholder="Sin límite"
-                  value={fmtTope('hotelNoche')}
-                  onChange={(e) => setTope('hotelNoche', e.target.value)} />
-              </div>
-              <div className="leg-field">
-                <label>🍽 Alimentación por día (COP)</label>
-                <input type="text" inputMode="numeric" placeholder="Sin límite"
-                  value={fmtTope('comidaDia')}
-                  onChange={(e) => setTope('comidaDia', e.target.value)} />
-              </div>
-              <div className="leg-field">
-                <label>☀️ Desayuno (COP)</label>
-                <input type="text" inputMode="numeric" placeholder="Sin límite"
-                  value={fmtTope('desayuno')}
-                  onChange={(e) => setTope('desayuno', e.target.value)} />
-              </div>
-              <div className="leg-field">
-                <label>🌤 Almuerzo (COP)</label>
-                <input type="text" inputMode="numeric" placeholder="Sin límite"
-                  value={fmtTope('almuerzo')}
-                  onChange={(e) => setTope('almuerzo', e.target.value)} />
-              </div>
-              <div className="leg-field">
-                <label>🌙 Cena (COP)</label>
-                <input type="text" inputMode="numeric" placeholder="Sin límite"
-                  value={fmtTope('cena')}
-                  onChange={(e) => setTope('cena', e.target.value)} />
-              </div>
-              <div className="leg-field">
-                <label>📦 Otros gastos (COP)</label>
-                <input type="text" inputMode="numeric" placeholder="Sin límite"
-                  value={fmtTope('otrosGastos')}
-                  onChange={(e) => setTope('otrosGastos', e.target.value)} />
-              </div>
-              <div className="leg-field">
-                <label>💼 Total máximo por solicitud (COP)</label>
-                <input type="text" inputMode="numeric" placeholder="Sin límite"
-                  value={fmtTope('totalSolicitud')}
-                  onChange={(e) => setTope('totalSolicitud', e.target.value)} />
-              </div>
-              <div className="leg-field">
-                <label>📅 Días máximos por viaje</label>
-                <input type="number" min={1} max={365} placeholder="Sin límite"
-                  value={eTopes.diasMaximos ?? ''}
-                  onChange={(e) => setTope('diasMaximos', e.target.value)} style={{ width: 100 }} />
+          {/* ── Sección 3: Tarifas OPS o Topes de gasto ── */}
+          {eSlug === 'cuenta-cobro-ops' ? (
+
+            /* Tarifas por servicio (exclusivo de cuenta-cobro-ops) */
+            <div className="tipos-editor-section">
+              <h4>Tarifas por servicio OPS</h4>
+              <p className="admin-help-text">
+                Configura el valor unitario de cada servicio. Los servicios <strong>SM</strong> cobran
+                por atención (paciente); los demás cobran por sesión.<br />
+                El sistema usará estas tarifas para calcular el valor esperado al revisar la solicitud.
+              </p>
+
+              {cargandoTarifas ? (
+                <p className="admin-help-text">Cargando tarifas…</p>
+              ) : eTarifas.length === 0 ? (
+                <p className="admin-help-text">No hay servicios configurados. Ejecuta la migración SQL 013 y 014.</p>
+              ) : (
+                <>
+                  <h5 style={{ margin: '16px 0 6px', fontWeight: 600 }}>Servicios SM — valor por atención / paciente</h5>
+                  <table className="bandeja-items-table" style={{ width: '100%', marginBottom: 20 }}>
+                    <thead>
+                      <tr>
+                        <th style={{ textAlign: 'left' }}>Servicio</th>
+                        <th style={{ width: 200 }}>Valor unitario (COP)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {eTarifas.filter((t) => t.tipoServicio === 'sm').map((t) => (
+                        <tr key={t.servicio}>
+                          <td>{t.servicio}</td>
+                          <td>
+                            <input
+                              className="admin-input"
+                              type="text"
+                              inputMode="numeric"
+                              value={eTarifaValores[t.servicio] ?? '0'}
+                              onChange={(e) =>
+                                setETarifaValores((v) => ({ ...v, [t.servicio]: e.target.value.replace(/[^0-9.]/g, '') }))
+                              }
+                              style={{ margin: 0 }}
+                            />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+
+                  <h5 style={{ margin: '0 0 6px', fontWeight: 600 }}>Servicios generales / PAD — valor por sesión</h5>
+                  <table className="bandeja-items-table" style={{ width: '100%', marginBottom: 8 }}>
+                    <thead>
+                      <tr>
+                        <th style={{ textAlign: 'left' }}>Servicio</th>
+                        <th style={{ width: 200 }}>Valor unitario (COP)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {eTarifas.filter((t) => t.tipoServicio === 'pad').map((t) => (
+                        <tr key={t.servicio}>
+                          <td>{t.servicio}</td>
+                          <td>
+                            <input
+                              className="admin-input"
+                              type="text"
+                              inputMode="numeric"
+                              value={eTarifaValores[t.servicio] ?? '0'}
+                              onChange={(e) =>
+                                setETarifaValores((v) => ({ ...v, [t.servicio]: e.target.value.replace(/[^0-9.]/g, '') }))
+                              }
+                              style={{ margin: 0 }}
+                            />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </>
+              )}
+            </div>
+
+          ) : (
+
+            /* Topes y límites de gasto (tipos de viáticos y otros) */
+            <div className="tipos-editor-section">
+              <h4>Topes y límites de gasto</h4>
+              <p className="admin-help-text">Define los montos máximos permitidos en cada categoría. Deja en blanco para sin límite.</p>
+              <div className="tipos-topes-grid">
+                <div className="leg-field">
+                  <label>🚌 Transporte total (COP)</label>
+                  <input type="text" inputMode="numeric" placeholder="Sin límite"
+                    value={fmtTope('transporteTotal')}
+                    onChange={(e) => setTope('transporteTotal', e.target.value)} />
+                </div>
+                <div className="leg-field">
+                  <label>🏨 Hotel por noche (COP)</label>
+                  <input type="text" inputMode="numeric" placeholder="Sin límite"
+                    value={fmtTope('hotelNoche')}
+                    onChange={(e) => setTope('hotelNoche', e.target.value)} />
+                </div>
+                <div className="leg-field">
+                  <label>🍽 Alimentación por día (COP)</label>
+                  <input type="text" inputMode="numeric" placeholder="Sin límite"
+                    value={fmtTope('comidaDia')}
+                    onChange={(e) => setTope('comidaDia', e.target.value)} />
+                </div>
+                <div className="leg-field">
+                  <label>☀️ Desayuno (COP)</label>
+                  <input type="text" inputMode="numeric" placeholder="Sin límite"
+                    value={fmtTope('desayuno')}
+                    onChange={(e) => setTope('desayuno', e.target.value)} />
+                </div>
+                <div className="leg-field">
+                  <label>🌤 Almuerzo (COP)</label>
+                  <input type="text" inputMode="numeric" placeholder="Sin límite"
+                    value={fmtTope('almuerzo')}
+                    onChange={(e) => setTope('almuerzo', e.target.value)} />
+                </div>
+                <div className="leg-field">
+                  <label>🌙 Cena (COP)</label>
+                  <input type="text" inputMode="numeric" placeholder="Sin límite"
+                    value={fmtTope('cena')}
+                    onChange={(e) => setTope('cena', e.target.value)} />
+                </div>
+                <div className="leg-field">
+                  <label>📦 Otros gastos (COP)</label>
+                  <input type="text" inputMode="numeric" placeholder="Sin límite"
+                    value={fmtTope('otrosGastos')}
+                    onChange={(e) => setTope('otrosGastos', e.target.value)} />
+                </div>
+                <div className="leg-field">
+                  <label>💼 Total máximo por solicitud (COP)</label>
+                  <input type="text" inputMode="numeric" placeholder="Sin límite"
+                    value={fmtTope('totalSolicitud')}
+                    onChange={(e) => setTope('totalSolicitud', e.target.value)} />
+                </div>
+                <div className="leg-field">
+                  <label>📅 Días máximos por viaje</label>
+                  <input type="number" min={1} max={365} placeholder="Sin límite"
+                    value={eTopes.diasMaximos ?? ''}
+                    onChange={(e) => setTope('diasMaximos', e.target.value)} style={{ width: 100 }} />
+                </div>
               </div>
             </div>
-          </div>
+
+          )}
 
           {/* ── Sección 4: Visibilidad por área ── */}
           <div className="tipos-editor-section">
