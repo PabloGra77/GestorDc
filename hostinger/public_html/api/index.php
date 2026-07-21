@@ -113,6 +113,11 @@ $routes = [
     // Historial de auditoría (solo admin)
     ['GET',    '#^/historial$#',                                    'historial/find_all'],
 
+    // Informes de atenciones OPS (solo admin)
+    ['POST',   '#^/admin/informes-ops$#',                           'admin/informes_ops_subir'],
+    ['GET',    '#^/admin/informes-ops$#',                           'admin/informes_ops_listar'],
+    ['DELETE', '#^/admin/informes-ops/(?P<id>\d+)$#',              'admin/informes_ops_borrar'],
+
     // Radicados
     ['POST',   '#^/radicados$#',                                 'radicados/create'],
     ['POST',   '#^/radicados/cuentas-cobro-ops/solicitud$#',     'radicados/ops_solicitud'],

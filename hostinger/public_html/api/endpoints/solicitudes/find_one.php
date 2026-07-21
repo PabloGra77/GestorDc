@@ -61,6 +61,58 @@ $movStmt = $pdo->prepare(
 $movStmt->execute([':s' => $id]);
 $movimientos = $movStmt->fetchAll();
 
+// ── Comparación de atenciones OPS ──────────────────────────────────
+$comparacionOps = null;
+if (($r['tipo_slug'] ?? '') === 'cuenta-cobro-ops') {
+    $datos = json_decode($r['datos_formulario'] ?? '{}', true) ?: [];
+
+    // CC del profesional (solo dígitos)
+    $ccRaw = (string)($datos['numeroDocumento'] ?? $datos['numero_documento'] ?? '');
+    $cc    = preg_replace('/[^0-9]/', '', $ccRaw);
+
+    // Atenciones declaradas: sumar campo hc de cada fila de atencionesJson
+    $atencionesDeclaradas = 0;
+    $atJson = $datos['atencionesJson'] ?? null;
+    if ($atJson && is_string($atJson)) {
+        $filas = json_decode($atJson, true) ?: [];
+        foreach ($filas as $fila) {
+            $atencionesDeclaradas += (int)($fila['hc'] ?? 0);
+        }
+    }
+
+    $comparacionOps = [
+        'atencionesDeclaradas' => $atencionesDeclaradas,
+        'ccProfesional'        => $cc,
+        'sinInforme'           => true,
+        'informeId'            => null,
+        'informeNombre'        => null,
+        'periodoInforme'       => null,
+        'atencionesEnInforme'  => null,
+    ];
+
+    if ($cc) {
+        try {
+            $infStmt = $pdo->query(
+                "SELECT id, nombre, periodo_inicio, periodo_fin
+                 FROM informes_ops ORDER BY subido_en DESC LIMIT 1"
+            );
+            $inf = $infStmt->fetch();
+            if ($inf) {
+                $cntStmt = $pdo->prepare(
+                    "SELECT COUNT(*) FROM informe_atenciones_detalle
+                     WHERE informe_id = :inf AND cc_profesional = :cc"
+                );
+                $cntStmt->execute([':inf' => (int)$inf['id'], ':cc' => $cc]);
+                $comparacionOps['sinInforme']          = false;
+                $comparacionOps['informeId']           = (int)$inf['id'];
+                $comparacionOps['informeNombre']       = $inf['nombre'];
+                $comparacionOps['periodoInforme']      = trim(($inf['periodo_inicio'] ?? '') . ' / ' . ($inf['periodo_fin'] ?? ''), '/ ');
+                $comparacionOps['atencionesEnInforme'] = (int)$cntStmt->fetchColumn();
+            }
+        } catch (Throwable) {}
+    }
+}
+
 Response::json([
     'id'                  => (int)$r['id'],
     'numeroRadicado'      => $r['numero_radicado'],
@@ -97,4 +149,5 @@ Response::json([
         'visibilidad'    => $m['visibilidad'],
         'creadoEn'       => $m['creado_en'],
     ], $movimientos),
+    'comparacionOps'      => $comparacionOps,
 ]);

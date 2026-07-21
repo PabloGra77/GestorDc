@@ -48,10 +48,21 @@ interface Movimiento {
   creadoEn: string;
 }
 
+interface ComparacionOps {
+  atencionesDeclaradas: number;
+  ccProfesional: string;
+  sinInforme: boolean;
+  informeId: number | null;
+  informeNombre: string | null;
+  periodoInforme: string | null;
+  atencionesEnInforme: number | null;
+}
+
 interface Detalle {
   id: number;
   numeroRadicado: string;
   tipoNombre: string;
+  tipoSlug: string;
   areaNombre: string;
   solicitanteNombre: string | null;
   solicitanteCorreo: string | null;
@@ -68,6 +79,7 @@ interface Detalle {
   creadoEn: string;
   firmas?: Record<string, string> | null;
   plantillaPdf?: { bloques?: unknown[] } | null;
+  comparacionOps?: ComparacionOps | null;
 }
 
 interface AreaMini { id: number; nombre: string; activo: boolean }
@@ -447,6 +459,44 @@ export function BandejaPanel() {
                         </div>
                       );
                     })()}
+
+                    {/* ── Bloque comparación OPS ── */}
+                    {detalle.comparacionOps ? (() => {
+                      const cmp = detalle.comparacionOps!;
+                      const declaradas = cmp.atencionesDeclaradas;
+                      const enInforme  = cmp.atencionesEnInforme;
+                      const diff = enInforme != null ? enInforme - declaradas : null;
+                      const hayDiff = diff !== null && diff !== 0;
+                      return (
+                        <div className="bandeja-alertas" style={{ background: hayDiff ? '#FEF3C7' : undefined }}>
+                          <strong>Validación de atenciones OPS</strong>
+                          <ul>
+                            <li>CC profesional: <strong>{cmp.ccProfesional || '—'}</strong></li>
+                            <li>Atenciones declaradas por el profesional: <strong>{declaradas}</strong></li>
+                            {cmp.sinInforme ? (
+                              <li style={{ color: 'var(--text-secondary)' }}>Sin informe de atenciones cargado para este período.</li>
+                            ) : (
+                              <>
+                                <li>
+                                  Atenciones en informe ({cmp.informeNombre}
+                                  {cmp.periodoInforme ? ` · ${cmp.periodoInforme}` : ''}):
+                                  {' '}<strong>{enInforme}</strong>
+                                </li>
+                                {diff !== null && (
+                                  <li>
+                                    {diff === 0
+                                      ? 'Las atenciones coinciden exactamente.'
+                                      : diff > 0
+                                        ? <>El informe registra <strong>{diff} atenciones más</strong> de las declaradas.</>
+                                        : <>El informe registra <strong>{Math.abs(diff)} atenciones menos</strong> de las declaradas.</>}
+                                  </li>
+                                )}
+                              </>
+                            )}
+                          </ul>
+                        </div>
+                      );
+                    })() : null}
 
                     <div className="bandeja-formato-head">
                       <h4>Formato diligenciado</h4>

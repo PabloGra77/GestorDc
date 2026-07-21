@@ -16,13 +16,14 @@ import { LegalizacionConfigPanel } from '../admin/LegalizacionConfigPanel';
 import { TiposSolicitudPanel } from '../admin/TiposSolicitudPanel';
 import { ProfilePanel } from '../admin/ProfilePanel';
 import { HistorialPanel } from '../admin/HistorialPanel';
+import { InformesOpsPanel } from '../admin/InformesOpsPanel';
 import { InicioStats, InicioRecientes, SeguimientoRadicado } from './InicioStats';
 import { usePayopsLogo } from '../../hooks/usePayopsLogo';
 import type { Role } from '../../types/role';
 import type { Radicado, VerificarRadicadoResponse } from '../../types/radicado';
 import type { Usuario } from '../../types/usuario';
 
-type AdminModule = 'Usuarios' | 'Personal autorizado' | 'Roles' | 'Areas' | 'Usuarios en linea' | 'Configuracion' | 'Configuracion Legalizaciones' | 'Tipos de solicitud' | 'Historial';
+type AdminModule = 'Usuarios' | 'Personal autorizado' | 'Roles' | 'Areas' | 'Usuarios en linea' | 'Configuracion' | 'Configuracion Legalizaciones' | 'Tipos de solicitud' | 'Historial' | 'Informes OPS';
 
 const ROLE_PERMISSIONS_CATALOG = {
 	inicio: {
@@ -1296,7 +1297,7 @@ export function DashboardPage() {
 					</div>
 
 					<div className="admin-module-nav" role="tablist" aria-label="Módulos administrativos">
-						{(['Usuarios', 'Personal autorizado', 'Roles', 'Areas', 'Usuarios en linea', 'Configuracion', 'Configuracion Legalizaciones', 'Tipos de solicitud', 'Historial'] as AdminModule[]).map((module) => (
+						{(['Usuarios', 'Personal autorizado', 'Roles', 'Areas', 'Usuarios en linea', 'Configuracion', 'Configuracion Legalizaciones', 'Tipos de solicitud', 'Historial', 'Informes OPS'] as AdminModule[]).map((module) => (
 							<button
 								key={module}
 								type="button"
@@ -1684,6 +1685,13 @@ export function DashboardPage() {
 
 						{activeAdminModule === 'Historial' ? (
 							<HistorialPanel />
+						) : null}
+
+						{activeAdminModule === 'Informes OPS' ? (
+							<InformesOpsPanel
+								onMsg={(m) => setAdminMessage(m)}
+								onErr={(e) => setAdminError(e)}
+							/>
 						) : null}
 
 						{activeAdminModule === 'Usuarios' && canCrearUsuarios ? (

@@ -1,0 +1,211 @@
+import { FormEvent, useEffect, useRef, useState } from 'react';
+import { api } from '../../services/http/api';
+
+interface InformeOps {
+  id: number;
+  nombre: string;
+  periodoInicio: string | null;
+  periodoFin: string | null;
+  totalFilas: number;
+  subidoEn: string;
+  subidoPor: string | null;
+}
+
+interface Props {
+  onMsg: (m: string) => void;
+  onErr: (e: string) => void;
+}
+
+export function InformesOpsPanel({ onMsg, onErr }: Props) {
+  const [informes, setInformes] = useState<InformeOps[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [subiendo, setSubiendo] = useState(false);
+  const [borrando, setBorrando] = useState<number | null>(null);
+
+  // Formulario
+  const [nombre, setNombre] = useState('');
+  const [periodoInicio, setPeriodoInicio] = useState('');
+  const [periodoFin, setPeriodoFin] = useState('');
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  async function cargar() {
+    setLoading(true);
+    try {
+      const { data } = await api.get<InformeOps[]>('/admin/informes-ops');
+      setInformes(data);
+    } catch {
+      onErr('No se pudieron cargar los informes.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => { cargar(); }, []);
+
+  async function handleSubir(e: FormEvent) {
+    e.preventDefault();
+    onMsg(''); onErr('');
+    const file = fileRef.current?.files?.[0];
+    if (!file) { onErr('Selecciona un archivo CSV.'); return; }
+    if (!nombre.trim()) { onErr('Escribe un nombre para identificar el informe.'); return; }
+
+    const fd = new FormData();
+    fd.append('archivo', file);
+    fd.append('nombre', nombre.trim());
+    if (periodoInicio) fd.append('periodoInicio', periodoInicio);
+    if (periodoFin)   fd.append('periodoFin', periodoFin);
+
+    setSubiendo(true);
+    try {
+      const { data } = await api.post<{ totalFilas: number; nombre: string }>('/admin/informes-ops', fd, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      onMsg(`Informe "${data.nombre}" cargado con ${data.totalFilas.toLocaleString('es-CO')} atenciones.`);
+      setNombre(''); setPeriodoInicio(''); setPeriodoFin('');
+      if (fileRef.current) fileRef.current.value = '';
+      await cargar();
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      onErr(msg || 'Error al subir el informe.');
+    } finally {
+      setSubiendo(false);
+    }
+  }
+
+  async function handleBorrar(inf: InformeOps) {
+    if (!confirm(`¿Eliminar el informe "${inf.nombre}"? Se borrarán las ${inf.totalFilas.toLocaleString('es-CO')} atenciones asociadas.`)) return;
+    onMsg(''); onErr('');
+    setBorrando(inf.id);
+    try {
+      await api.delete(`/admin/informes-ops/${inf.id}`);
+      onMsg(`Informe "${inf.nombre}" eliminado.`);
+      await cargar();
+    } catch {
+      onErr('No se pudo eliminar el informe.');
+    } finally {
+      setBorrando(null);
+    }
+  }
+
+  const fmtFecha = (s: string | null) => s ? new Date(s + 'T00:00:00').toLocaleDateString('es-CO') : '—';
+  const fmtDt    = (s: string) => new Date(s).toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' });
+
+  return (
+    <div>
+      {/* ── Formulario de carga ── */}
+      <form className="admin-form card-surface" onSubmit={handleSubir}>
+        <h3 className="admin-section-title">Cargar informe de atenciones OPS</h3>
+
+        <p className="admin-help-text" style={{ marginBottom: 12 }}>
+          Sube el archivo CSV con las atenciones reales del período. Columnas requeridas:
+          <strong> cc_profesional</strong>, <strong>fecha_atencion</strong>, <strong>regional</strong>,
+          <strong> establecimiento</strong>, <strong>cc_paciente</strong>.
+          La primera fila debe ser el encabezado.
+        </p>
+
+        <div className="admin-form-row">
+          <label className="admin-label">
+            Nombre del informe *
+            <input
+              className="admin-input"
+              type="text"
+              value={nombre}
+              onChange={(e) => setNombre(e.target.value)}
+              placeholder="Ej: Informe agosto 2025"
+              required
+            />
+          </label>
+          <label className="admin-label">
+            Período inicio
+            <input
+              className="admin-input"
+              type="date"
+              value={periodoInicio}
+              onChange={(e) => setPeriodoInicio(e.target.value)}
+            />
+          </label>
+          <label className="admin-label">
+            Período fin
+            <input
+              className="admin-input"
+              type="date"
+              value={periodoFin}
+              onChange={(e) => setPeriodoFin(e.target.value)}
+            />
+          </label>
+        </div>
+
+        <div className="admin-form-row" style={{ marginTop: 8 }}>
+          <label className="admin-label" style={{ flex: '1 1 auto' }}>
+            Archivo CSV *
+            <input
+              ref={fileRef}
+              className="admin-input"
+              type="file"
+              accept=".csv,text/csv,text/plain"
+              required
+            />
+          </label>
+        </div>
+
+        <div style={{ marginTop: 12 }}>
+          <button type="submit" className="admin-primary-button" disabled={subiendo}>
+            {subiendo ? 'Procesando…' : 'Cargar informe'}
+          </button>
+        </div>
+      </form>
+
+      {/* ── Lista de informes cargados ── */}
+      <aside className="admin-side-list card-surface" style={{ marginTop: 24 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <h4 style={{ margin: 0 }}>Informes cargados</h4>
+          <button type="button" className="admin-ghost-button" onClick={cargar} disabled={loading}>
+            {loading ? 'Actualizando…' : '↺ Actualizar'}
+          </button>
+        </div>
+
+        {informes.length === 0 ? (
+          <p className="admin-help-text">Aún no hay informes cargados.</p>
+        ) : (
+          <table className="bandeja-items-table" style={{ width: '100%' }}>
+            <thead>
+              <tr>
+                <th style={{ textAlign: 'left' }}>Nombre</th>
+                <th>Período</th>
+                <th>Atenciones</th>
+                <th>Subido por</th>
+                <th>Fecha carga</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {informes.map((inf) => (
+                <tr key={inf.id}>
+                  <td><strong>{inf.nombre}</strong></td>
+                  <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
+                    {fmtFecha(inf.periodoInicio)} — {fmtFecha(inf.periodoFin)}
+                  </td>
+                  <td style={{ textAlign: 'center' }}>
+                    {inf.totalFilas.toLocaleString('es-CO')}
+                  </td>
+                  <td style={{ textAlign: 'center' }}>{inf.subidoPor || '—'}</td>
+                  <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>{fmtDt(inf.subidoEn)}</td>
+                  <td style={{ textAlign: 'right' }}>
+                    <button
+                      type="button"
+                      className="admin-danger-button"
+                      disabled={borrando === inf.id}
+                      onClick={() => handleBorrar(inf)}
+                    >
+                      {borrando === inf.id ? '…' : 'Eliminar'}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </aside>
+    </div>
+  );
+}
