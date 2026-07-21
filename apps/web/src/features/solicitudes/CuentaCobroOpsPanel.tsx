@@ -414,6 +414,7 @@ export function CuentaCobroOpsPanel({ onCreada, tipoSolicitudId, areaId }: Cuent
       } else {
         if (atencionesServicio.length === 0) return 'Agrega al menos una fila de atenciones.';
         for (const a of atencionesServicio) {
+          if (!a.numId.trim()) return 'El número de identificación del paciente es obligatorio en cada fila.';
           if (!a.servicio.trim()) return 'Cada fila debe tener un servicio seleccionado.';
           if (!a.sesiones.trim() || parseInt(a.sesiones) < 1) return 'El número de sesiones debe ser al menos 1.';
         }
@@ -731,22 +732,17 @@ export function CuentaCobroOpsPanel({ onCreada, tipoSolicitudId, areaId }: Cuent
                         onChange={(e) => setAtencionesServicio(p => p.map(x => x.id === a.id ? { ...x, apellidos: e.target.value } : x))} />
                     </div>
                     <div className="leg-field" style={{ flex: '0 0 130px' }}>
-                      <label>N° identificación <span style={{ opacity: 0.5 }}>(opc.)</span></label>
+                      <label>N° identificación <span className="req">*</span></label>
                       <input type="text" inputMode="numeric" placeholder="CC/TI" value={a.numId}
                         onChange={(e) => setAtencionesServicio(p => p.map(x => x.id === a.id ? { ...x, numId: e.target.value.replace(/\D/g, '') } : x))} />
                     </div>
                     <div className="leg-field" style={{ flex: '1 1 200px' }}>
                       <label>Servicio <span className="req">*</span></label>
-                      {tarifasOps.length > 0 ? (
-                        <select value={a.servicio}
-                          onChange={(e) => setAtencionesServicio(p => p.map(x => x.id === a.id ? { ...x, servicio: e.target.value } : x))}>
-                          <option value="">— Selecciona —</option>
-                          {tarifasOps.map(s => <option key={s} value={s}>{s}</option>)}
-                        </select>
-                      ) : (
-                        <input type="text" placeholder="Nombre del servicio" value={a.servicio}
-                          onChange={(e) => setAtencionesServicio(p => p.map(x => x.id === a.id ? { ...x, servicio: e.target.value } : x))} />
-                      )}
+                      <select value={a.servicio} disabled={tarifasOps.length === 0}
+                        onChange={(e) => setAtencionesServicio(p => p.map(x => x.id === a.id ? { ...x, servicio: e.target.value } : x))}>
+                        <option value="">{tarifasOps.length === 0 ? 'Cargando servicios…' : '— Selecciona —'}</option>
+                        {tarifasOps.map(s => <option key={s} value={s}>{s}</option>)}
+                      </select>
                     </div>
                     <div className="leg-field" style={{ flex: '0 0 100px' }}>
                       <label>Sesiones <span className="req">*</span></label>
