@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../../services/http/api';
-import { getAuthSession } from '../auth/auth.service';
 
 interface Props {
   onMsg: (m: string) => void;
@@ -118,8 +117,7 @@ export function ReportesPanel({ onMsg, onErr }: Props) {
     onMsg('');
     onErr('');
     try {
-      const token = getAuthSession()?.token || '';
-      const r = await fetch(path, { headers: { Authorization: `Bearer ${token}` } });
+      const r = await fetch(path, { credentials: 'include' });
       if (!r.ok) {
         const data = await r.json().catch(() => ({}));
         onErr((data as { message?: string }).message || 'No se pudo generar el informe.');

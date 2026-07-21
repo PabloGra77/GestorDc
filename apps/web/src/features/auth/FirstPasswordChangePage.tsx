@@ -50,7 +50,6 @@ export function FirstPasswordChangePage() {
       });
 
       saveAuthSession({
-        token: session.token,
         usuario: { ...session.usuario, debeCambiarPassword: false },
       });
 

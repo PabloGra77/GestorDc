@@ -70,8 +70,17 @@ Auditoria::registrar(
     $row['nombre_completo']
 );
 
+// Emitir cookie HttpOnly (inaccesible desde JavaScript)
+$secure = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off';
+setcookie('payops_token', $token, [
+    'expires'  => time() + 3600,
+    'path'     => '/',
+    'secure'   => $secure,
+    'httponly' => true,
+    'samesite' => 'Strict',
+]);
+
 Response::json([
-    'token' => $token,
     'expires_in' => 3600,
     'usuario' => [
         'id' => (int)$row['id'],

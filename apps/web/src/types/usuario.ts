@@ -20,7 +20,7 @@ export interface Usuario {
 }
 
 export interface AuthSession {
-	/** JWT Bearer token — incluir en header Authorization de cada petición autenticada */
-	token: string;
+	/** @deprecated Token ya no se usa en frontend — viaja en cookie HttpOnly */
+	token?: string;
 	usuario: Usuario;
 }

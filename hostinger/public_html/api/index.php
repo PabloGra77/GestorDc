@@ -31,6 +31,7 @@ $routes = [
 
     // Auth
     ['POST',   '#^/auth/login$#',                                'auth/login'],
+    ['POST',   '#^/auth/logout$#',                               'auth/logout'],
     ['POST',   '#^/auth/password-reset/request$#',               'auth/password_reset_request'],
     ['POST',   '#^/auth/password-reset/confirm$#',               'auth/password_reset_confirm'],
     ['POST',   '#^/auth/change-initial-password$#',              'auth/change_initial_password'],

@@ -17,6 +17,67 @@ if (!preg_match('/^[a-f0-9]{32}\.(pdf|jpg|png|webp)$/i', $id)) {
 
 // Sanitizar para prevenir Path Traversal
 $id = basename($id);
+
+// ── PHP-05: Verificar que el usuario tiene derecho a ver este archivo ──
+{
+    $uid  = (int)($jwt['sub'] ?? 0);
+    $uuid = pathinfo($id, PATHINFO_FILENAME); // hex sin extensión
+
+    $pdo = Db::pdo();
+
+    // Cargar rol y nivel del usuario
+    $uStmt = $pdo->prepare(
+        "SELECT u.area_id, u.nivel_aprobacion, r.nombre AS rol
+         FROM usuarios u INNER JOIN roles r ON r.id = u.rol_id WHERE u.id = :id LIMIT 1"
+    );
+    $uStmt->execute([':id' => $uid]);
+    $uRow     = $uStmt->fetch();
+    $esAdmin  = strtolower(trim($uRow['rol'] ?? '')) === 'administrador';
+
+    if (!$esAdmin) {
+        $pat       = '%' . $uuid . '%';
+        $userArea  = (int)($uRow['area_id'] ?? 0);
+        $userNivel = (string)($uRow['nivel_aprobacion'] ?? '');
+        $ok        = false;
+
+        // ¿Es el solicitante de alguna solicitud que contiene este archivo?
+        $s = $pdo->prepare(
+            "SELECT 1 FROM solicitudes
+             WHERE (datos_formulario LIKE :p OR documentos LIKE :p2)
+               AND solicitante_usuario_id = :u LIMIT 1"
+        );
+        $s->execute([':p' => $pat, ':p2' => $pat, ':u' => $uid]);
+        if ($s->fetch()) $ok = true;
+
+        // ¿Ha actuado como validador en alguna solicitud que contiene este archivo?
+        if (!$ok) {
+            $s = $pdo->prepare(
+                "SELECT 1 FROM solicitudes s
+                 INNER JOIN solicitud_movimientos m ON m.solicitud_id = s.id
+                 WHERE (s.datos_formulario LIKE :p OR s.documentos LIKE :p2)
+                   AND m.usuario_id = :u LIMIT 1"
+            );
+            $s->execute([':p' => $pat, ':p2' => $pat, ':u' => $uid]);
+            if ($s->fetch()) $ok = true;
+        }
+
+        // ¿Es validador en turno de alguna solicitud que contiene este archivo?
+        if (!$ok && $userNivel !== '') {
+            $s = $pdo->prepare(
+                "SELECT 1 FROM solicitudes
+                 WHERE (datos_formulario LIKE :p OR documentos LIKE :p2)
+                   AND paso_actual = :niv
+                   AND (:cont = 'contabilidad' OR area_id = :area) LIMIT 1"
+            );
+            $s->execute([':p' => $pat, ':p2' => $pat, ':niv' => $userNivel, ':cont' => $userNivel, ':area' => $userArea]);
+            if ($s->fetch()) $ok = true;
+        }
+
+        if (!$ok) {
+            Response::error('No tienes permiso para ver este archivo', 403);
+        }
+    }
+}
 $path = __DIR__ . '/../../uploads/' . $id;
 
 // Verificar que el path resuelto está DENTRO del directorio uploads

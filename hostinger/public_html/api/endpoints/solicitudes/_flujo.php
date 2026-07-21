@@ -36,9 +36,16 @@ final class FlujoHelpers
 
         // Admin puede actuar siempre. Contabilidad ve todas las areas.
         // Otros niveles requieren que su nivel coincida con el paso actual Y que el area coincida.
+        // Autorizador de visto bueno: puede actuar cuando paso_actual = 'autorizador_visto_bueno'
+        // y su ID coincide con datosFormulario.autorizadorId.
         $puede = false;
         if ($esAdmin) {
             $puede = true;
+        } elseif ($pasoActual === 'autorizador_visto_bueno') {
+            $datos = json_decode($sol['datos_formulario'] ?? '{}', true) ?: [];
+            if ((int)($datos['autorizadorId'] ?? 0) === $usuarioId) {
+                $puede = true;
+            }
         } elseif ($nivelUsuario === $pasoActual) {
             if ($nivelUsuario === 'contabilidad') {
                 $puede = true; // contabilidad ve todas las areas

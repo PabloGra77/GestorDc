@@ -97,7 +97,8 @@ final class Auth
 {
     public static function requireUser(): array
     {
-        $token = Jwt::bearer();
+        // Preferir cookie HttpOnly; caer en Authorization header para compatibilidad
+        $token = Jwt::bearer() ?? (isset($_COOKIE['payops_token']) ? trim($_COOKIE['payops_token']) : null);
         if (!$token) {
             Response::error('No autenticado', 401);
         }

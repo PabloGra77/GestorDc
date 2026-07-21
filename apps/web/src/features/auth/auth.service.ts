@@ -45,7 +45,9 @@ export async function changeInitialPassword(payload: ChangeInitialPasswordPayloa
 }
 
 export function saveAuthSession(session: AuthSession) {
-  localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(session));
+  // Guardar solo datos de usuario; el token viaja en cookie HttpOnly y no debe persistirse
+  const { token: _ignored, ...rest } = session;
+  localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(rest));
 }
 
 export function getAuthSession(): AuthSession | null {
@@ -65,6 +67,8 @@ export function getAuthSession(): AuthSession | null {
 
 export function clearAuthSession() {
   localStorage.removeItem(AUTH_STORAGE_KEY);
+  // Limpiar la cookie HttpOnly del servidor (fire-and-forget)
+  api.post('/auth/logout').catch(() => {});
 }
 
 export function getAuthErrorMessage(error: unknown) {
