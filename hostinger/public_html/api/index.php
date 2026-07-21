@@ -118,6 +118,10 @@ $routes = [
     ['GET',    '#^/admin/informes-ops$#',                           'admin/informes_ops_listar'],
     ['DELETE', '#^/admin/informes-ops/(?P<id>\d+)$#',              'admin/informes_ops_borrar'],
 
+    // Tarifas OPS por servicio (solo admin)
+    ['GET',    '#^/admin/tarifas-ops$#',                            'admin/tarifas_ops_listar'],
+    ['POST',   '#^/admin/tarifas-ops$#',                            'admin/tarifas_ops_guardar'],
+
     // Radicados
     ['POST',   '#^/radicados$#',                                 'radicados/create'],
     ['POST',   '#^/radicados/cuentas-cobro-ops/solicitud$#',     'radicados/ops_solicitud'],

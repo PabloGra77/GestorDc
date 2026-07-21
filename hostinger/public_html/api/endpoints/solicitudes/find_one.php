@@ -80,14 +80,21 @@ if (($r['tipo_slug'] ?? '') === 'cuenta-cobro-ops') {
         }
     }
 
+    // Valor declarado por el profesional
+    $valorDeclaradoRaw = (string)($datos['valorCobrar'] ?? '');
+    $valorDeclarado    = (float)preg_replace('/[^0-9.]/', '', $valorDeclaradoRaw);
+
     $comparacionOps = [
         'atencionesDeclaradas' => $atencionesDeclaradas,
+        'valorDeclarado'       => $valorDeclarado,
         'ccProfesional'        => $cc,
         'sinInforme'           => true,
         'informeId'            => null,
         'informeNombre'        => null,
         'periodoInforme'       => null,
         'atencionesEnInforme'  => null,
+        'valorCalculado'       => null,
+        'desglose'             => [],
     ];
 
     if ($cc) {
@@ -98,16 +105,49 @@ if (($r['tipo_slug'] ?? '') === 'cuenta-cobro-ops') {
             );
             $inf = $infStmt->fetch();
             if ($inf) {
-                $cntStmt = $pdo->prepare(
-                    "SELECT COUNT(*) FROM informe_atenciones_detalle
-                     WHERE informe_id = :inf AND cc_profesional = :cc"
+                $infId = (int)$inf['id'];
+
+                // Desglose por servicio con tarifa
+                $dsgStmt = $pdo->prepare(
+                    "SELECT d.servicio,
+                            SUM(d.numero_sesiones) AS total_sesiones,
+                            COALESCE(t.valor_unitario, 0) AS tarifa,
+                            COALESCE(t.tipo_servicio, 'sm') AS tipo_servicio
+                     FROM informe_atenciones_detalle d
+                     LEFT JOIN tarifas_ops t ON t.servicio = d.servicio
+                     WHERE d.informe_id = :inf AND d.cc_profesional = :cc
+                     GROUP BY d.servicio, t.valor_unitario, t.tipo_servicio
+                     ORDER BY d.servicio"
                 );
-                $cntStmt->execute([':inf' => (int)$inf['id'], ':cc' => $cc]);
+                $dsgStmt->execute([':inf' => $infId, ':cc' => $cc]);
+                $desglose = $dsgStmt->fetchAll();
+
+                $atencionesEnInforme = 0;
+                $valorCalculado      = 0.0;
+                $desgloseArr         = [];
+
+                foreach ($desglose as $ds) {
+                    $sesiones = (int)$ds['total_sesiones'];
+                    $tarifa   = (float)$ds['tarifa'];
+                    $subtotal = $sesiones * $tarifa;
+                    $atencionesEnInforme += $sesiones;
+                    $valorCalculado      += $subtotal;
+                    $desgloseArr[]        = [
+                        'servicio'      => $ds['servicio'] ?? 'Sin servicio',
+                        'tipoServicio'  => $ds['tipo_servicio'],
+                        'sesiones'      => $sesiones,
+                        'tarifa'        => $tarifa,
+                        'subtotal'      => $subtotal,
+                    ];
+                }
+
                 $comparacionOps['sinInforme']          = false;
-                $comparacionOps['informeId']           = (int)$inf['id'];
+                $comparacionOps['informeId']           = $infId;
                 $comparacionOps['informeNombre']       = $inf['nombre'];
                 $comparacionOps['periodoInforme']      = trim(($inf['periodo_inicio'] ?? '') . ' / ' . ($inf['periodo_fin'] ?? ''), '/ ');
-                $comparacionOps['atencionesEnInforme'] = (int)$cntStmt->fetchColumn();
+                $comparacionOps['atencionesEnInforme'] = $atencionesEnInforme;
+                $comparacionOps['valorCalculado']      = $valorCalculado;
+                $comparacionOps['desglose']            = $desgloseArr;
             }
         } catch (Throwable) {}
     }

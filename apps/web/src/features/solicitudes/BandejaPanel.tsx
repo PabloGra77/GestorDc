@@ -48,14 +48,25 @@ interface Movimiento {
   creadoEn: string;
 }
 
+interface DesgloseServicio {
+  servicio: string;
+  tipoServicio: 'sm' | 'pad';
+  sesiones: number;
+  tarifa: number;
+  subtotal: number;
+}
+
 interface ComparacionOps {
   atencionesDeclaradas: number;
+  valorDeclarado: number;
   ccProfesional: string;
   sinInforme: boolean;
   informeId: number | null;
   informeNombre: string | null;
   periodoInforme: string | null;
   atencionesEnInforme: number | null;
+  valorCalculado: number | null;
+  desglose: DesgloseServicio[];
 }
 
 interface Detalle {
@@ -462,38 +473,107 @@ export function BandejaPanel() {
 
                     {/* ── Bloque comparación OPS ── */}
                     {detalle.comparacionOps ? (() => {
-                      const cmp = detalle.comparacionOps!;
-                      const declaradas = cmp.atencionesDeclaradas;
-                      const enInforme  = cmp.atencionesEnInforme;
-                      const diff = enInforme != null ? enInforme - declaradas : null;
-                      const hayDiff = diff !== null && diff !== 0;
+                      const cmp          = detalle.comparacionOps!;
+                      const declaradas   = cmp.atencionesDeclaradas;
+                      const enInforme    = cmp.atencionesEnInforme;
+                      const diff         = enInforme != null ? enInforme - declaradas : null;
+                      const hayDiff      = diff !== null && diff !== 0;
+                      const fmtCOP       = (n: number) => n.toLocaleString('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
+                      const valDec       = cmp.valorDeclarado ?? 0;
+                      const valCalc      = cmp.valorCalculado ?? null;
+                      const diffVal      = valCalc != null ? valCalc - valDec : null;
+                      const hayDiffVal   = diffVal !== null && Math.abs(diffVal) > 1;
+                      const hayTarifas   = (cmp.desglose ?? []).some((d) => d.tarifa > 0);
                       return (
-                        <div className="bandeja-alertas" style={{ background: hayDiff ? '#FEF3C7' : undefined }}>
-                          <strong>Validación de atenciones OPS</strong>
-                          <ul>
-                            <li>CC profesional: <strong>{cmp.ccProfesional || '—'}</strong></li>
-                            <li>Atenciones declaradas por el profesional: <strong>{declaradas}</strong></li>
-                            {cmp.sinInforme ? (
-                              <li style={{ color: 'var(--text-secondary)' }}>Sin informe de atenciones cargado para este período.</li>
-                            ) : (
-                              <>
-                                <li>
-                                  Atenciones en informe ({cmp.informeNombre}
-                                  {cmp.periodoInforme ? ` · ${cmp.periodoInforme}` : ''}):
-                                  {' '}<strong>{enInforme}</strong>
+                        <div className="bandeja-leg-gastos">
+                          <h4>Validación de atenciones OPS</h4>
+
+                          {/* Resumen de atenciones */}
+                          <div className="bandeja-alertas" style={{ background: hayDiff ? '#FEF3C7' : undefined, marginBottom: 10 }}>
+                            <ul>
+                              <li>CC profesional: <strong>{cmp.ccProfesional || '—'}</strong></li>
+                              <li>Atenciones/sesiones declaradas: <strong>{declaradas}</strong></li>
+                              {cmp.sinInforme ? (
+                                <li style={{ color: 'var(--text-secondary)' }}>
+                                  Sin informe de atenciones cargado — sube un informe en <em>Administrador → Informes OPS</em>.
                                 </li>
-                                {diff !== null && (
+                              ) : (
+                                <>
                                   <li>
-                                    {diff === 0
-                                      ? 'Las atenciones coinciden exactamente.'
-                                      : diff > 0
-                                        ? <>El informe registra <strong>{diff} atenciones más</strong> de las declaradas.</>
-                                        : <>El informe registra <strong>{Math.abs(diff)} atenciones menos</strong> de las declaradas.</>}
+                                    En informe <em>{cmp.informeNombre}{cmp.periodoInforme ? ` (${cmp.periodoInforme})` : ''}</em>:{' '}
+                                    <strong>{enInforme}</strong>
                                   </li>
-                                )}
-                              </>
-                            )}
-                          </ul>
+                                  {diff !== null && (
+                                    <li>
+                                      {diff === 0
+                                        ? 'Las cantidades coinciden.'
+                                        : diff > 0
+                                          ? <>El informe tiene <strong>{diff} más</strong> de las declaradas.</>
+                                          : <>El informe tiene <strong>{Math.abs(diff)} menos</strong> de las declaradas.</>}
+                                    </li>
+                                  )}
+                                  {valCalc != null && hayTarifas && (
+                                    <li style={{ marginTop: 4 }}>
+                                      Valor declarado: <strong>{fmtCOP(valDec)}</strong>
+                                      {' · '}
+                                      Valor calculado por tarifas: <strong>{fmtCOP(valCalc)}</strong>
+                                      {hayDiffVal && (
+                                        <> — <span style={{ color: diffVal! > 0 ? 'var(--success)' : 'var(--danger)' }}>
+                                          diferencia {fmtCOP(Math.abs(diffVal!))}
+                                          {diffVal! > 0 ? ' a favor del profesional' : ' por debajo de lo calculado'}
+                                        </span></>
+                                      )}
+                                    </li>
+                                  )}
+                                </>
+                              )}
+                            </ul>
+                          </div>
+
+                          {/* Desglose por servicio */}
+                          {!cmp.sinInforme && (cmp.desglose ?? []).length > 0 && (
+                            <table className="bandeja-items-table bandeja-leg-table">
+                              <thead>
+                                <tr>
+                                  <th style={{ textAlign: 'left' }}>Servicio</th>
+                                  <th>Tipo</th>
+                                  <th>Atenciones/sesiones</th>
+                                  {hayTarifas && <><th>Tarifa</th><th>Subtotal</th></>}
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {(cmp.desglose ?? []).map((d, i) => (
+                                  <tr key={i}>
+                                    <td>{d.servicio}</td>
+                                    <td style={{ textAlign: 'center' }}>
+                                      <span className="leg-ocr-badge">
+                                        {d.tipoServicio === 'pad' ? 'PAD' : 'SM'}
+                                      </span>
+                                    </td>
+                                    <td style={{ textAlign: 'center' }}>{d.sesiones}</td>
+                                    {hayTarifas && (
+                                      <>
+                                        <td style={{ textAlign: 'right' }}>
+                                          {d.tarifa > 0 ? fmtCOP(d.tarifa) : <span style={{ color: 'var(--text-secondary)' }}>sin tarifa</span>}
+                                        </td>
+                                        <td style={{ textAlign: 'right' }}>
+                                          {d.tarifa > 0 ? fmtCOP(d.subtotal) : '—'}
+                                        </td>
+                                      </>
+                                    )}
+                                  </tr>
+                                ))}
+                              </tbody>
+                              {hayTarifas && valCalc != null && (
+                                <tfoot>
+                                  <tr>
+                                    <td colSpan={3}><strong>Total calculado</strong></td>
+                                    <td colSpan={2} style={{ textAlign: 'right' }}><strong>{fmtCOP(valCalc)}</strong></td>
+                                  </tr>
+                                </tfoot>
+                              )}
+                            </table>
+                          )}
                         </div>
                       );
                     })() : null}
