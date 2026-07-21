@@ -9,7 +9,7 @@ $pdo = Db::pdo();
 
 $stmt = $pdo->query(
     "SELECT i.id, i.nombre, i.periodo_inicio, i.periodo_fin,
-            i.total_filas, i.subido_en,
+            i.total_filas, i.subido_en, i.tipo_plantilla,
             u.nombre_completo AS subido_por
      FROM informes_ops i
      LEFT JOIN usuarios u ON u.id = i.subido_por_id
@@ -20,11 +20,12 @@ $stmt = $pdo->query(
 $rows = $stmt->fetchAll();
 
 Response::json(array_map(fn($r) => [
-    'id'           => (int)$r['id'],
-    'nombre'       => $r['nombre'],
+    'id'            => (int)$r['id'],
+    'nombre'        => $r['nombre'],
     'periodoInicio' => $r['periodo_inicio'],
-    'periodoFin'   => $r['periodo_fin'],
-    'totalFilas'   => (int)$r['total_filas'],
-    'subidoEn'     => $r['subido_en'],
-    'subidoPor'    => $r['subido_por'],
+    'periodoFin'    => $r['periodo_fin'],
+    'totalFilas'    => (int)$r['total_filas'],
+    'subidoEn'      => $r['subido_en'],
+    'subidoPor'     => $r['subido_por'],
+    'tipoPlantilla' => $r['tipo_plantilla'] ?? 'ppl',
 ], $rows));

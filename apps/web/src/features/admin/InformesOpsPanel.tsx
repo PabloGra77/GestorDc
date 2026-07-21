@@ -9,6 +9,7 @@ interface InformeOps {
   totalFilas: number;
   subidoEn: string;
   subidoPor: string | null;
+  tipoPlantilla: 'ppl' | 'servicio';
 }
 
 interface Props {
@@ -26,9 +27,10 @@ export function InformesOpsPanel({ onMsg, onErr }: Props) {
   const [loading, setLoading]     = useState(false);
   const [subiendo, setSubiendo]   = useState(false);
   const [borrando, setBorrando]   = useState<number | null>(null);
-  const [nombre, setNombre]       = useState('');
-  const [periodoInicio, setPi]    = useState('');
-  const [periodoFin, setPf]       = useState('');
+  const [nombre, setNombre]             = useState('');
+  const [periodoInicio, setPi]          = useState('');
+  const [periodoFin, setPf]             = useState('');
+  const [tipoPlantilla, setTipoPlant]   = useState<'ppl' | 'servicio'>('ppl');
   const fileRef = useRef<HTMLInputElement>(null);
 
   async function cargar() {
@@ -52,6 +54,7 @@ export function InformesOpsPanel({ onMsg, onErr }: Props) {
     const fd = new FormData();
     fd.append('archivo', file);
     fd.append('nombre', nombre.trim());
+    fd.append('tipoPlantilla', tipoPlantilla);
     if (periodoInicio) fd.append('periodoInicio', periodoInicio);
     if (periodoFin)    fd.append('periodoFin', periodoFin);
 
@@ -87,15 +90,31 @@ export function InformesOpsPanel({ onMsg, onErr }: Props) {
       {/* Formulario de carga */}
       <form className="admin-form card-surface" onSubmit={handleSubir}>
         <h3 className="admin-section-title">Cargar informe de atenciones OPS</h3>
-        <p className="admin-help-text" style={{ marginBottom: 12 }}>
-          El CSV debe tener encabezado. Columnas reconocidas:
-          <br />
-          <strong>Todos los servicios:</strong> cc_profesional, servicio
-          <br />
-          <strong>Servicios SM</strong> (por paciente): + fecha_atencion, regional, establecimiento, cc_paciente
-          <br />
-          <strong>Servicios generales / PAD</strong> (por sesiones): + numero_sesiones
-        </p>
+
+        <div className="admin-form-row" style={{ marginBottom: 12 }}>
+          <label className="admin-label" style={{ flex: '1 1 auto' }}>
+            Tipo de plantilla *
+            <select className="admin-input" value={tipoPlantilla}
+              onChange={(e) => setTipoPlant(e.target.value as 'ppl' | 'servicio')}>
+              <option value="ppl">Atenciones realizadas en PPL</option>
+              <option value="servicio">Atenciones realizadas por servicio</option>
+            </select>
+          </label>
+        </div>
+
+        {tipoPlantilla === 'ppl' ? (
+          <p className="admin-help-text" style={{ marginBottom: 12 }}>
+            <strong>Atenciones realizadas en PPL</strong> — columnas del CSV:<br />
+            cc_profesional, fecha_atencion, regional, establecimiento, cc_paciente, servicio<br />
+            <em>Cada fila = 1 atención / 1 paciente.</em>
+          </p>
+        ) : (
+          <p className="admin-help-text" style={{ marginBottom: 12 }}>
+            <strong>Atenciones realizadas por servicio</strong> — columnas del CSV:<br />
+            cc_profesional, nombres_paciente, apellidos_paciente, numero_identificacion, servicio, numero_sesiones<br />
+            <em>Cada fila = N sesiones de un servicio para un paciente.</em>
+          </p>
+        )}
 
         <div className="admin-form-row">
           <label className="admin-label">
@@ -146,6 +165,7 @@ export function InformesOpsPanel({ onMsg, onErr }: Props) {
             <thead>
               <tr>
                 <th style={{ textAlign: 'left' }}>Nombre</th>
+                <th>Tipo</th>
                 <th>Período</th>
                 <th>Atenciones/sesiones</th>
                 <th>Subido por</th>
@@ -157,6 +177,9 @@ export function InformesOpsPanel({ onMsg, onErr }: Props) {
               {informes.map((inf) => (
                 <tr key={inf.id}>
                   <td><strong>{inf.nombre}</strong></td>
+                  <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
+                    {inf.tipoPlantilla === 'servicio' ? 'Por servicio' : 'PPL'}
+                  </td>
                   <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
                     {fmtFecha(inf.periodoInicio)} — {fmtFecha(inf.periodoFin)}
                   </td>

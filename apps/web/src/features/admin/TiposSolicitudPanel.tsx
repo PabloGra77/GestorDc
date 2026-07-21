@@ -615,65 +615,33 @@ function TipoRow({ tipo, areas, editando, onAbrir, onCancelar, onGuardar, onTogg
               ) : eTarifas.length === 0 ? (
                 <p className="admin-help-text">No hay servicios configurados. Ejecuta la migración SQL 013 y 014.</p>
               ) : (
-                <>
-                  <h5 style={{ margin: '16px 0 6px', fontWeight: 600 }}>Servicios SM — valor por atención / paciente</h5>
-                  <table className="bandeja-items-table" style={{ width: '100%', marginBottom: 20 }}>
-                    <thead>
-                      <tr>
-                        <th style={{ textAlign: 'left' }}>Servicio</th>
-                        <th style={{ width: 200 }}>Valor unitario (COP)</th>
+                <table className="bandeja-items-table" style={{ width: '100%', marginBottom: 8 }}>
+                  <thead>
+                    <tr>
+                      <th style={{ textAlign: 'left' }}>Servicio</th>
+                      <th style={{ width: 200 }}>Valor unitario (COP)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {eTarifas.map((t) => (
+                      <tr key={t.servicio}>
+                        <td>{t.servicio}</td>
+                        <td>
+                          <input
+                            className="admin-input"
+                            type="text"
+                            inputMode="numeric"
+                            value={eTarifaValores[t.servicio] ?? '0'}
+                            onChange={(e) =>
+                              setETarifaValores((v) => ({ ...v, [t.servicio]: e.target.value.replace(/[^0-9.]/g, '') }))
+                            }
+                            style={{ margin: 0 }}
+                          />
+                        </td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      {eTarifas.filter((t) => t.tipoServicio === 'sm').map((t) => (
-                        <tr key={t.servicio}>
-                          <td>{t.servicio}</td>
-                          <td>
-                            <input
-                              className="admin-input"
-                              type="text"
-                              inputMode="numeric"
-                              value={eTarifaValores[t.servicio] ?? '0'}
-                              onChange={(e) =>
-                                setETarifaValores((v) => ({ ...v, [t.servicio]: e.target.value.replace(/[^0-9.]/g, '') }))
-                              }
-                              style={{ margin: 0 }}
-                            />
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-
-                  <h5 style={{ margin: '0 0 6px', fontWeight: 600 }}>Servicios generales / PAD — valor por sesión</h5>
-                  <table className="bandeja-items-table" style={{ width: '100%', marginBottom: 8 }}>
-                    <thead>
-                      <tr>
-                        <th style={{ textAlign: 'left' }}>Servicio</th>
-                        <th style={{ width: 200 }}>Valor unitario (COP)</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {eTarifas.filter((t) => t.tipoServicio === 'pad').map((t) => (
-                        <tr key={t.servicio}>
-                          <td>{t.servicio}</td>
-                          <td>
-                            <input
-                              className="admin-input"
-                              type="text"
-                              inputMode="numeric"
-                              value={eTarifaValores[t.servicio] ?? '0'}
-                              onChange={(e) =>
-                                setETarifaValores((v) => ({ ...v, [t.servicio]: e.target.value.replace(/[^0-9.]/g, '') }))
-                              }
-                              style={{ margin: 0 }}
-                            />
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </>
+                    ))}
+                  </tbody>
+                </table>
               )}
             </div>
 

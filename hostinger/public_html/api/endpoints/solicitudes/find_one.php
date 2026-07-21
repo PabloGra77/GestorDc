@@ -80,13 +80,9 @@ if (($r['tipo_slug'] ?? '') === 'cuenta-cobro-ops') {
         }
     }
 
-    // Valor declarado por el profesional
-    $valorDeclaradoRaw = (string)($datos['valorCobrar'] ?? '');
-    $valorDeclarado    = (float)preg_replace('/[^0-9.]/', '', $valorDeclaradoRaw);
-
     $comparacionOps = [
         'atencionesDeclaradas' => $atencionesDeclaradas,
-        'valorDeclarado'       => $valorDeclarado,
+        'valorDeclarado'       => null,
         'ccProfesional'        => $cc,
         'sinInforme'           => true,
         'informeId'            => null,

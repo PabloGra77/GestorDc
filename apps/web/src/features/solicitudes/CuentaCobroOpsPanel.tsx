@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { api } from '../../services/http/api';
 import { SignaturePad } from '../../components/SignaturePad';
 import { BANCOS_COLOMBIA } from '../../utils/bancos';
-import { formatearMiles } from '../../utils/numeroALetras';
 import { getAuthSession } from '../auth/auth.service';
 
 interface CuentaCobroOpsPanelProps {
@@ -248,8 +247,7 @@ export function CuentaCobroOpsPanel({ onCreada, tipoSolicitudId, areaId }: Cuent
   const [fechaInicioContrato, setFechaInicioContrato] = useState('');
   const [fechaFinContrato, setFechaFinContrato] = useState('');
 
-  // ── Paso 2: Cobro y atenciones ───────────────────────────────────────────────
-  const [valorCobrar, setValorCobrar] = useState('');
+  // ── Paso 2: Atenciones ───────────────────────────────────────────────────────
   const [atenciones, setAtenciones] = useState<AtencionSede[]>([defaultAtencion()]);
   const [conNotasAcl, setConNotasAcl] = useState(false);
   const [notasAcl, setNotasAcl] = useState<NotaAclaratoria[]>([defaultNota()]);
@@ -381,7 +379,6 @@ export function CuentaCobroOpsPanel({ onCreada, tipoSolicitudId, areaId }: Cuent
       if (periodoFin < periodoInicio) return 'La fecha fin del período no puede ser anterior a la de inicio.';
     }
     if (paso === 2) {
-      if (!valorCobrar.trim()) return 'Ingresa el valor a cobrar en este período.';
       for (const a of atenciones) {
         if (!a.fecha) return 'Cada fila de atenciones debe tener una fecha.';
         if (!a.hc.trim()) return 'Indica el número de HC cargadas en cada fecha.';
@@ -435,7 +432,6 @@ export function CuentaCobroOpsPanel({ onCreada, tipoSolicitudId, areaId }: Cuent
         datos: {
           periodoInicio, periodoFin,
           fechaInicioContrato, fechaFinContrato,
-          valorCobrar,
           atencionesJson: JSON.stringify(atenciones),
           conNotasAclaratorias: conNotasAcl ? 'si' : 'no',
           notasAclaratorias: conNotasAcl ? JSON.stringify(notasAcl) : '[]',
@@ -485,14 +481,14 @@ export function CuentaCobroOpsPanel({ onCreada, tipoSolicitudId, areaId }: Cuent
         <p>{msg}</p>
         <p className="leg-nota">Puedes hacer seguimiento en <strong>Mis solicitudes</strong>.</p>
         <button type="button" className="admin-primary-button"
-          onClick={() => { setMsg(''); setPaso(1); setValorCobrar(''); setAtenciones([defaultAtencion()]); setConNotasAcl(false); setNotasAcl([defaultNota()]); setComentariosAdicionales(''); setDatosConfirmados(false); setFirma(''); setOpsAlDia(false); setEsNuevo(false); }}>
+          onClick={() => { setMsg(''); setPaso(1); setAtenciones([defaultAtencion()]); setConNotasAcl(false); setNotasAcl([defaultNota()]); setComentariosAdicionales(''); setDatosConfirmados(false); setFirma(''); setOpsAlDia(false); setEsNuevo(false); }}>
           Nueva cuenta de cobro
         </button>
       </div>
     );
   }
 
-  const pasos = ['Período', 'Cobro y atenciones', 'Tus datos', 'Documentos', 'Firma'];
+  const pasos = ['Período', 'Atenciones', 'Tus datos', 'Documentos', 'Firma'];
   const nombreCompleto = [formPrimerNombre, formSegundoNombre, formPrimerApellido, formSegundoApellido].filter(Boolean).join(' ');
 
   return (
@@ -539,25 +535,16 @@ export function CuentaCobroOpsPanel({ onCreada, tipoSolicitudId, areaId }: Cuent
 
           <div className="leg-actions">
             <button type="button" className="admin-primary-button" onClick={siguiente}>
-              Continuar → Cobro y atenciones
+              Continuar → Atenciones
             </button>
           </div>
         </div>
       )}
 
-      {/* ═══ Paso 2: Cobro y atenciones ═══ */}
+      {/* ═══ Paso 2: Atenciones ═══ */}
       {paso === 2 && (
         <div className="leg-form card-surface">
-          <h3>Cobro y atenciones</h3>
-
-          {/* Valor */}
-          <div className="leg-field">
-            <label>Valor a cobrar en este período <span className="req">*</span></label>
-            <input type="text" inputMode="numeric" value={valorCobrar}
-              onChange={(e) => setValorCobrar(e.target.value.replace(/\D/g, ''))}
-              placeholder="Valor en pesos colombianos" />
-            {valorCobrar && <span className="leg-nota">$ {formatearMiles(valorCobrar)}</span>}
-          </div>
+          <h3>Atenciones realizadas en PPL</h3>
 
           {/* ── Atenciones por sede ── */}
           <div className="ops-atenciones-section">
@@ -958,7 +945,6 @@ export function CuentaCobroOpsPanel({ onCreada, tipoSolicitudId, areaId }: Cuent
             <h4>Resumen de la cuenta de cobro</h4>
             <div className="ops-resumen-grid">
               <span>Período:</span><strong>{periodoInicio} — {periodoFin}</strong>
-              <span>Valor a cobrar:</span><strong>$ {formatearMiles(valorCobrar)}</strong>
               <span>Fechas de atención:</span>
               <strong>
                 {atenciones.filter(a => a.fecha && a.hc).map(a => `${a.fecha} ${a.sede} (${a.hc} HC)`).join(', ') || '—'}
