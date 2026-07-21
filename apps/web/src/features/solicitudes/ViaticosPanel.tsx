@@ -3,7 +3,7 @@ import { api } from '../../services/http/api';
 import { formatearMiles } from '../../utils/numeroALetras';
 import { SignaturePad } from '../../components/SignaturePad';
 import { useOcrDocument, validarOcrContraDato } from '../../hooks/useOcrDocument';
-import { DEPTOS, TODAS_CIUDADES } from './colombiaData';
+import { DEPTOS } from './colombiaData';
 import { MapaRuta } from './MapaRuta';
 
 /* ─── Precios de referencia por ruta ────────────────────────── */
@@ -472,27 +472,16 @@ export function ViaticosPanel({ onCreada, areaId }: { onCreada?: (info: { id: nu
       if (esIdaVuelta && fechaRegreso && fechaRegreso < fechaIda) return 'La fecha de regreso debe ser posterior a la de ida';
     }
     if (paso === 3) {
-      if (!valorIda.replace(/\D/g, '')) return tipoViatico === 'anticipo' ? 'Ingresa el costo estimado del transporte de ida' : 'Ingresa el valor del tiquete de ida';
-      if (esIdaVuelta && !valorVuelta.replace(/\D/g, '')) return tipoViatico === 'anticipo' ? 'Ingresa el costo estimado del transporte de regreso' : 'Ingresa el valor del tiquete de regreso';
-      if (tipoViatico === 'legalizar') {
-        if (!empresaIda.trim()) return 'Ingresa la empresa de transporte (tiquete de ida)';
-        if (!numDocIda.trim()) return tipoTrIda === 'aereo' ? 'Ingresa el número de vuelo' : 'Ingresa el número del tiquete';
-        if (esIdaVuelta) {
-          if (!empresaVuelta.trim()) return 'Ingresa la empresa de transporte (tiquete de regreso)';
-          if (!numDocVuelta.trim()) return tipoTrVuelta === 'aereo' ? 'Ingresa el número de vuelo de regreso' : 'Ingresa el número del tiquete de regreso';
-        }
-        if (!facturaTransporte?.archivoId) return 'Adjunta el tiquete o comprobante de transporte';
-      }
+      if (!valorIda.replace(/\D/g, '')) return 'Ingresa el costo estimado del transporte de ida';
+      if (esIdaVuelta && !valorVuelta.replace(/\D/g, '')) return 'Ingresa el costo estimado del transporte de regreso';
     }
     if (paso === 4) {
       if (tieneHospedaje) {
         if (!hotelNombre.trim()) return 'Ingresa el nombre del hotel';
         if (!hotelEntrada || !hotelSalida) return 'Ingresa las fechas de entrada y salida del hotel';
         if (!hotelValorNoche) return 'Ingresa el valor por noche del hospedaje';
-        if (tipoViatico === 'legalizar' && !facturaHotel?.archivoId) return 'Adjunta la factura del hotel';
       }
       const tieneComidas = (parseInt(diasDesayuno) || 0) > 0 || (parseInt(diasAlmuerzo) || 0) > 0 || (parseInt(diasCena) || 0) > 0;
-      if (tieneComidas && tipoViatico === 'legalizar' && !facturaComidas?.archivoId) return 'Adjunta el soporte de alimentación';
     }
     if (paso === 5) {
       if (!firma) return 'La firma digital es obligatoria';
@@ -504,7 +493,7 @@ export function ViaticosPanel({ onCreada, areaId }: { onCreada?: (info: { id: nu
   function anterior() { setErr(''); setPaso((p) => Math.max(1, p - 1) as 1|2|3|4|5); }
 
   function resetear() {
-    setPaso(1); setTipoViatico(''); setAutorizadorInput(''); setAutorizadorId(0); setAutorizadorNombre(''); setMotivoViaje('');
+    setPaso(1); setTipoViatico('anticipo'); setAutorizadorInput(''); setAutorizadorId(0); setAutorizadorNombre(''); setMotivoViaje('');
     setCiudadOrigen(''); setCiudadDestino(''); setFechaIda(''); setFechaRegreso(''); setEsIdaVuelta(true);
     setEmpresaIda(''); setNumDocIda(''); setCodResIda(''); setTramoIda(''); setPuestoIda(''); setHrSalidaIda(''); setHrLlegadaIda(''); setValorIda('');
     setEmpresaVuelta(''); setNumDocVuelta(''); setCodResVuelta(''); setTramoVuelta(''); setPuestoVuelta(''); setHrSalidaVuelta(''); setHrLlegadaVuelta(''); setValorVuelta('');
@@ -577,9 +566,7 @@ export function ViaticosPanel({ onCreada, areaId }: { onCreada?: (info: { id: nu
     }
   }
 
-  const PASOS = tipoViatico === 'anticipo'
-    ? ['Tipo y autorización', 'Detalles del viaje', 'Costos estimados', 'Hospedaje y comidas', 'Resumen y firma']
-    : ['Tipo y autorización', 'Detalles del viaje', 'Tiquetes de transporte', 'Alojamiento y comidas', 'Resumen y firma'];
+  const PASOS = ['Tipo y autorización', 'Detalles del viaje', 'Costos estimados', 'Hospedaje y comidas', 'Resumen y firma'];
 
   if (msg) {
     return (

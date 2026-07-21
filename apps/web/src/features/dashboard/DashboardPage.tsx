@@ -133,11 +133,8 @@ export function DashboardPage() {
 	const [editingRoleId, setEditingRoleId] = useState<number | null>(null);
 	const [referenciaRadicado, setReferenciaRadicado] = useState('');
 	const [asuntoRadicado, setAsuntoRadicado] = useState('');
-	const [verificarBusqueda, setVerificarBusqueda] = useState('');
 	const [radicadoMessage, setRadicadoMessage] = useState('');
 	const [radicadoError, setRadicadoError] = useState('');
-	const [verificacionRadicado, setVerificacionRadicado] = useState<Radicado | null>(null);
-	const [isVerificadoSinResultado, setIsVerificadoSinResultado] = useState(false);
 	const [isComposeRadicadoOpen, setIsComposeRadicadoOpen] = useState(false);
 	const [composeParaDestinos, setComposeParaDestinos] = useState<string[]>([]);
 	const [composeParaInput, setComposeParaInput] = useState('');
@@ -182,8 +179,6 @@ export function DashboardPage() {
 		return permisosModulo.includes(permiso);
 	};
 
-	const canRealizarSolicitudes = tienePermiso('inicio', 'realizarSolicitudes');
-	const canVerificarRadicados = tienePermiso('inicio', 'verificarRadicados');
 	const canCrearUsuarios = esAdmin || tienePermiso('panelAdministrador', 'crearUsuarios');
 	const canCrearRoles = tienePermiso('panelAdministrador', 'crearRoles');
 	const totalUsuariosActivos = useMemo(() => usuarios.filter((usuario) => usuario.activo).length, [usuarios]);
@@ -336,8 +331,10 @@ export function DashboardPage() {
 		}
 
 		editor.focus();
-		const url = window.prompt('URL del enlace', 'https://');
-		if (!url) {
+		const url = (window.prompt('URL del enlace', 'https://') ?? '').trim();
+		if (!url) return;
+		if (!/^(https?:|mailto:)/i.test(url)) {
+			alert('Solo se permiten URLs que empiecen con http://, https:// o mailto:');
 			return;
 		}
 
@@ -852,40 +849,6 @@ export function DashboardPage() {
 			setComposeAdjuntos([]);
 			setIsComposeRadicadoOpen(false);
 			setRadicadoMessage(`Radicado ${response.data.numero} creado correctamente.`);
-		} catch (error) {
-			setRadicadoError(getErrorMessage(error));
-		}
-	}
-
-	async function handleVerifyRadicado(event: FormEvent<HTMLFormElement>) {
-		event.preventDefault();
-		setRadicadoMessage('');
-		setRadicadoError('');
-		setVerificacionRadicado(null);
-		setIsVerificadoSinResultado(false);
-
-		if (!verificarBusqueda.trim()) {
-			setRadicadoError('Ingresa numero o referencia para verificar.');
-			return;
-		}
-
-		try {
-			const termino = verificarBusqueda.trim();
-			const response = await api.get<VerificarRadicadoResponse>('/radicados/verificar', {
-				params: {
-					numero: termino,
-					referencia: termino,
-				},
-			});
-
-			if (!response.data.existe || !response.data.radicado) {
-				setIsVerificadoSinResultado(true);
-				setRadicadoMessage('No existe un radicado con los datos consultados.');
-				return;
-			}
-
-			setVerificacionRadicado(response.data.radicado);
-			setRadicadoMessage('Radicado encontrado.');
 		} catch (error) {
 			setRadicadoError(getErrorMessage(error));
 		}
