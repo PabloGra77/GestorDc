@@ -54,6 +54,15 @@ interface TarifaOps {
   activo: boolean;
 }
 
+interface TarifasViaticos {
+  precioAereo: number;
+  precioTerrestre: number;
+  precioDesayuno: number;
+  precioAlmuerzo: number;
+  precioCena: number;
+  precioHospedaje: number;
+}
+
 /* ─── Constantes ─────────────────────────────────────────────── */
 const ROLES_DISPONIBLES = [
   { value: 'analista',      label: 'Analista del área' },
@@ -320,6 +329,14 @@ function TipoRow({ tipo, areas, editando, onAbrir, onCancelar, onGuardar, onTogg
   const [eTarifaValores, setETarifaValores] = useState<Record<string, string>>({});
   const [cargandoTarifas, setCargandoTarifas] = useState(false);
 
+  // Tarifas viáticos (solo para viaticos)
+  const [eTarifasV, setETarifasV] = useState<TarifasViaticos>({
+    precioAereo: 0, precioTerrestre: 0,
+    precioDesayuno: 0, precioAlmuerzo: 0, precioCena: 0,
+    precioHospedaje: 0,
+  });
+  const [cargandoTarifasV, setCargandoTarifasV] = useState(false);
+
   useEffect(() => {
     if (!editando) return;
     setENombre(tipo.nombre);
@@ -346,7 +363,7 @@ function TipoRow({ tipo, areas, editando, onAbrir, onCancelar, onGuardar, onTogg
     setEAreasVisibles(Array.isArray(av) ? av : 'todas');
     setEErr('');
 
-    // Cargar tarifas solo para cuenta-cobro-ops
+    // Cargar tarifas según tipo
     if (tipo.slug === 'cuenta-cobro-ops') {
       setCargandoTarifas(true);
       api.get<TarifaOps[]>('/admin/tarifas-ops')
@@ -361,6 +378,14 @@ function TipoRow({ tipo, areas, editando, onAbrir, onCancelar, onGuardar, onTogg
     } else {
       setETarifas([]);
       setETarifaValores({});
+    }
+
+    if (tipo.slug === 'viaticos') {
+      setCargandoTarifasV(true);
+      api.get<TarifasViaticos>('/admin/tarifas-viaticos')
+        .then(({ data }) => setETarifasV(data))
+        .catch(() => {})
+        .finally(() => setCargandoTarifasV(false));
     }
   }, [editando, tipo]);
 
@@ -420,6 +445,16 @@ function TipoRow({ tipo, areas, editando, onAbrir, onCancelar, onGuardar, onTogg
       }
     }
 
+    // Guardar tarifas de viáticos si aplica
+    if (eSlug === 'viaticos') {
+      try {
+        await api.post('/admin/tarifas-viaticos', eTarifasV);
+      } catch {
+        setEErr('Error al guardar las tarifas de viáticos. Intenta de nuevo.');
+        return;
+      }
+    }
+
     const topesObj: Topes = {};
     if (topeNum('transporteTotal')) topesObj.transporteTotal = topeNum('transporteTotal');
     if (topeNum('hotelNoche'))      topesObj.hotelNoche      = topeNum('hotelNoche');
@@ -448,7 +483,7 @@ function TipoRow({ tipo, areas, editando, onAbrir, onCancelar, onGuardar, onTogg
 
   /* ── Resumen de topes (cuando no editando) ── */
   function resumenTopes(): string | null {
-    if (tipo.slug === 'cuenta-cobro-ops') return null;
+    if (tipo.slug === 'cuenta-cobro-ops' || tipo.slug === 'viaticos') return null;
     const t = tipo.configuracionTipo?.topes;
     if (!t || !Object.keys(t).length) return null;
     const partes: string[] = [];
@@ -599,7 +634,47 @@ function TipoRow({ tipo, areas, editando, onAbrir, onCancelar, onGuardar, onTogg
           </div>
 
           {/* ── Sección 3: Tarifas OPS o Topes de gasto ── */}
-          {eSlug === 'cuenta-cobro-ops' ? (
+          {eSlug === 'viaticos' ? (
+
+            /* Tarifas fijas de viáticos */
+            <div className="tipos-editor-section">
+              <h4>Tarifas de viáticos</h4>
+              <p className="admin-help-text">
+                Define los montos fijos que se asignan automáticamente al profesional según el tipo de transporte,
+                comida y hospedaje. El formulario de solicitud usará estos valores sin que el usuario los pueda editar.
+              </p>
+              {cargandoTarifasV ? (
+                <p className="admin-help-text">Cargando tarifas…</p>
+              ) : (
+                <div className="tipos-topes-grid">
+                  {([
+                    { key: 'precioAereo',     label: '✈ Transporte aéreo (por tiquete)'   },
+                    { key: 'precioTerrestre', label: '🚌 Transporte terrestre (por tiquete)' },
+                    { key: 'precioDesayuno',  label: '☀️ Desayuno (por día)'               },
+                    { key: 'precioAlmuerzo',  label: '🌤 Almuerzo (por día)'               },
+                    { key: 'precioCena',      label: '🌙 Cena (por día)'                   },
+                    { key: 'precioHospedaje', label: '🏨 Hospedaje (por noche)'             },
+                  ] as { key: keyof TarifasViaticos; label: string }[]).map(({ key, label }) => (
+                    <div key={key} className="leg-field">
+                      <label>{label}</label>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        className="admin-input"
+                        placeholder="$ 0"
+                        value={eTarifasV[key] > 0 ? formatearMiles(eTarifasV[key]) : ''}
+                        onChange={(e) => {
+                          const n = parseFloat(e.target.value.replace(/\D/g, '')) || 0;
+                          setETarifasV((prev) => ({ ...prev, [key]: n }));
+                        }}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+          ) : eSlug === 'cuenta-cobro-ops' ? (
 
             /* Tarifas por servicio (exclusivo de cuenta-cobro-ops) */
             <div className="tipos-editor-section">

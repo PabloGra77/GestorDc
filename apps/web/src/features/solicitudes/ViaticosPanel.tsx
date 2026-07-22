@@ -6,103 +6,18 @@ import { useOcrDocument, validarOcrContraDato } from '../../hooks/useOcrDocument
 import { DEPTOS } from './colombiaData';
 import { MapaRuta } from './MapaRuta';
 
-/* ─── Precios de referencia por ruta ────────────────────────── */
-const IATA_MAP: Record<string, string> = {
-  'Bogotá': 'BOG', 'Medellín': 'MDE', 'Cali': 'CLO', 'Cartagena': 'CTG',
-  'Barranquilla': 'BAQ', 'Bucaramanga': 'BGA', 'Pereira': 'PEI',
-  'Santa Marta': 'SMR', 'Cúcuta': 'CUC', 'Manizales': 'MZL',
-  'Armenia': 'AXM', 'Ibagué': 'IBE', 'Montería': 'MTR',
-  'Villavicencio': 'VVC', 'Pasto': 'PSO', 'Neiva': 'HEI',
-  'Valledupar': 'VUP', 'San Andrés': 'ADZ', 'Popayán': 'PPN',
-  'Leticia': 'LET', 'Yopal': 'EYP', 'Riohacha': 'RCH',
-};
-
-interface PrecioRef { aereo?: [number, number]; terrestre?: [number, number] }
-
-const PRECIOS_REF: Record<string, PrecioRef> = {
-  'BOG-MDE': { aereo: [220000, 580000], terrestre: [50000, 120000] },
-  'BOG-CTG': { aereo: [260000, 640000], terrestre: [200000, 340000] },
-  'BOG-CLO': { aereo: [200000, 560000], terrestre: [80000, 175000] },
-  'BOG-BAQ': { aereo: [245000, 630000], terrestre: [220000, 390000] },
-  'BOG-BGA': { aereo: [185000, 480000], terrestre: [55000, 135000] },
-  'BOG-PEI': { aereo: [165000, 430000], terrestre: [32000, 68000] },
-  'BOG-SMR': { aereo: [255000, 620000], terrestre: [235000, 400000] },
-  'BOG-MZL': { aereo: [175000, 450000], terrestre: [32000, 72000] },
-  'BOG-CUC': { aereo: [210000, 545000], terrestre: [130000, 245000] },
-  'BOG-VVC': { aereo: [160000, 405000], terrestre: [50000, 115000] },
-  'BOG-PSO': { aereo: [230000, 590000], terrestre: [180000, 310000] },
-  'BOG-HEI': { aereo: [195000, 500000], terrestre: [80000, 155000] },
-  'BOG-MTR': { aereo: [235000, 600000], terrestre: [165000, 290000] },
-  'BOG-AXM': { aereo: [165000, 430000], terrestre: [28000, 60000] },
-  'BOG-IBE': { terrestre: [22000, 48000] },
-  'BOG-ADZ': { aereo: [280000, 720000] },
-  'BOG-LET': { aereo: [340000, 900000] },
-  'MDE-CTG': { aereo: [235000, 595000], terrestre: [150000, 275000] },
-  'MDE-CLO': { aereo: [195000, 500000], terrestre: [55000, 125000] },
-  'MDE-BAQ': { aereo: [230000, 575000], terrestre: [140000, 265000] },
-  'MDE-BGA': { aereo: [200000, 510000], terrestre: [80000, 165000] },
-  'MDE-SMR': { aereo: [245000, 610000], terrestre: [170000, 310000] },
-  'MDE-CUC': { aereo: [215000, 555000], terrestre: [110000, 220000] },
-  'CTG-BAQ': { terrestre: [28000, 65000] },
-  'CTG-SMR': { terrestre: [38000, 80000] },
-  'CLO-PEI': { aereo: [160000, 405000], terrestre: [28000, 58000] },
-  'CLO-MZL': { terrestre: [32000, 68000] },
-  'CLO-BAQ': { aereo: [220000, 560000], terrestre: [240000, 410000] },
-  'BGA-CUC': { terrestre: [45000, 90000] },
-  'PEI-MZL': { terrestre: [12000, 28000] },
-};
-
-function getPreciosRef(origen: string, destino: string): PrecioRef | null {
-  const o = IATA_MAP[origen] || origen.slice(0, 3).toUpperCase();
-  const d = IATA_MAP[destino] || destino.slice(0, 3).toUpperCase();
-  return PRECIOS_REF[`${o}-${d}`] || PRECIOS_REF[`${d}-${o}`] || null;
-}
-
-/* ─── Precios de referencia de hoteles por ciudad ─────────────── */
-const HOTELES_REF: Record<string, { min: number; max: number; nota: string }> = {
-  'Bogotá':         { min: 80000,  max: 450000, nota: 'Zona Rosa, Chapinero, Usaquén, Candelaria' },
-  'Medellín':       { min: 70000,  max: 350000, nota: 'El Poblado, Laureles, Centro' },
-  'Cartagena':      { min: 120000, max: 700000, nota: 'Centro Histórico, Bocagrande, Getsemaní' },
-  'Barranquilla':   { min: 80000,  max: 300000, nota: 'Norte, El Prado, Riomar' },
-  'Cali':           { min: 70000,  max: 280000, nota: 'Granada, San Fernando, Ciudad Jardín' },
-  'Bucaramanga':    { min: 65000,  max: 250000, nota: 'Cabecera, Sotomayor, Cañaveral' },
-  'Santa Marta':    { min: 100000, max: 500000, nota: 'El Rodadero, Bello Horizonte, Centro' },
-  'Pereira':        { min: 60000,  max: 220000, nota: 'Pinares, Cerritos, Centro' },
-  'Manizales':      { min: 60000,  max: 200000, nota: 'Cable, La Enea, Chipre' },
-  'Armenia':        { min: 55000,  max: 180000, nota: 'Centro, Pinares de San Martín' },
-  'Ibagué':         { min: 55000,  max: 180000, nota: 'Centro, Picaleña' },
-  'Neiva':          { min: 60000,  max: 190000, nota: 'Centro, Quirinal' },
-  'Villavicencio':  { min: 65000,  max: 210000, nota: 'Maracos, Villa Bolívar' },
-  'Montería':       { min: 60000,  max: 200000, nota: 'Centro, La Castellana' },
-  'Pasto':          { min: 55000,  max: 180000, nota: 'Centro, El Norte' },
-  'Valledupar':     { min: 70000,  max: 220000, nota: 'Centro, Los Músicos' },
-  'Cúcuta':         { min: 60000,  max: 200000, nota: 'Cúcuta Norte, Centro' },
-  'Popayán':        { min: 50000,  max: 170000, nota: 'Centro Histórico, Bolívar' },
-  'Tunja':          { min: 50000,  max: 160000, nota: 'Centro, Samán del Norte' },
-  'San Andrés':     { min: 150000, max: 800000, nota: 'Sector Norte, Centro, West View' },
-  'Leticia':        { min: 90000,  max: 300000, nota: 'Centro, Tabatinga' },
-  'Sincelejo':      { min: 55000,  max: 170000, nota: 'Centro, La Florida' },
-  'Riohacha':       { min: 70000,  max: 250000, nota: 'Centro, Manaure' },
-};
-
-function getHotelOpciones(ciudad: string): { categoria: string; icono: string; precio: number; zona: string }[] {
-  const ref = HOTELES_REF[ciudad];
-  if (!ref) return [];
-  const { min, max, nota } = ref;
-  const rango = max - min;
-  return [
-    { categoria: 'Económico',  icono: '🏠', precio: min,                                                          zona: nota },
-    { categoria: 'Estándar',   icono: '🏨', precio: Math.round((min + rango * 0.30) / 1000) * 1000,               zona: nota },
-    { categoria: 'Confort',    icono: '🏩', precio: Math.round((min + rango * 0.65) / 1000) * 1000,               zona: nota },
-    { categoria: 'Superior',   icono: '⭐', precio: max,                                                          zona: nota },
-  ];
-}
-
 /* ─── Tipos ─────────────────────────────────────────────────── */
+interface TarifasViaticos {
+  precioAereo: number;
+  precioTerrestre: number;
+  precioDesayuno: number;
+  precioAlmuerzo: number;
+  precioCena: number;
+  precioHospedaje: number;
+}
+
 interface UsuarioSugerido { id: number; nombreCompleto: string; rol: string; area: string | null; }
 interface FacturaAdj { archivoId: string; nombre: string; alertas: string[]; }
-interface TramoViaje { tipo: 'vuelo' | 'bus'; empresa: string; origen: string; destino: string; salida: string; llegada: string; duracion: string; precio: number; }
-interface OpcionViaje { id: string; tipo: 'vuelo' | 'bus' | 'vuelo_escala' | 'multimodal'; empresa: string; salida: string; llegada: string; duracion: string; precio: number; esEstimado: boolean; tramos?: TramoViaje[]; notaRuta?: string; }
 
 /* ─── Helpers ───────────────────────────────────────────────── */
 async function prepararImagen(file: File): Promise<File> {
@@ -139,117 +54,28 @@ async function subirArchivo(file: File): Promise<string> {
   return r.data.id;
 }
 
-function fmtValor(v: string) {
-  const n = parseInt(v.replace(/\D/g, '')) || 0;
-  return n > 0 ? formatearMiles(n) : '';
-}
-
-/* ─── Sub-formulario de tiquete ────────────────────────────── */
-interface TiqueteFormProps {
-  titulo: string;
-  ciudadOrigen: string;
-  ciudadDestino: string;
-  fecha: string;
-  tipo: 'aereo' | 'terrestre';
-  onTipo: (v: 'aereo' | 'terrestre') => void;
-  empresa: string; onEmpresa: (v: string) => void;
-  numDoc: string; onNumDoc: (v: string) => void;
-  codReserva: string; onCodReserva: (v: string) => void;
-  tramo: string; onTramo: (v: string) => void;
-  puesto: string; onPuesto: (v: string) => void;
-  horaSalida: string; onHoraSalida: (v: string) => void;
-  horaLlegada: string; onHoraLlegada: (v: string) => void;
-  valor: string; onValor: (v: string) => void;
-  modoEstimacion?: boolean;
-}
-
-function TiqueteForm({
-  titulo, ciudadOrigen, ciudadDestino, fecha, tipo, onTipo,
-  empresa, onEmpresa, numDoc, onNumDoc, codReserva, onCodReserva,
-  tramo, onTramo, puesto, onPuesto,
-  horaSalida, onHoraSalida, horaLlegada, onHoraLlegada,
-  valor, onValor, modoEstimacion = false,
-}: TiqueteFormProps) {
+/* ─── Bloque de tipo de transporte ─────────────────────────── */
+function TipoTransporteBloque({
+  titulo, tipo, onTipo, tarifas,
+}: { titulo: string; tipo: 'aereo' | 'terrestre'; onTipo: (v: 'aereo' | 'terrestre') => void; tarifas: TarifasViaticos | null }) {
+  const precio = tarifas ? (tipo === 'aereo' ? tarifas.precioAereo : tarifas.precioTerrestre) : 0;
   return (
     <div className="viatico-tiquete-bloque">
       <div className="viatico-tiquete-titulo">{titulo}</div>
-      <p className="leg-nota">{ciudadOrigen} → {ciudadDestino} · {fecha}</p>
-
-      {/* Tipo de transporte */}
       <div className="leg-field">
         <label>Tipo de transporte *</label>
         <div className="viaticos-tipo-transport-row">
-          <button type="button"
-            className={`viatico-tr-btn${tipo === 'aereo' ? ' selected' : ''}`}
-            onClick={() => onTipo('aereo')}>
+          <button type="button" className={`viatico-tr-btn${tipo === 'aereo' ? ' selected' : ''}`} onClick={() => onTipo('aereo')}>
             ✈ Aéreo
           </button>
-          <button type="button"
-            className={`viatico-tr-btn${tipo === 'terrestre' ? ' selected' : ''}`}
-            onClick={() => onTipo('terrestre')}>
+          <button type="button" className={`viatico-tr-btn${tipo === 'terrestre' ? ' selected' : ''}`} onClick={() => onTipo('terrestre')}>
             🚌 Terrestre
           </button>
         </div>
       </div>
-
-      <div className="leg-gasto-fields">
-        <div className="leg-field">
-          <label>Empresa transportadora{modoEstimacion ? '' : ' *'}</label>
-          <input type="text" value={empresa} onChange={(e) => onEmpresa(e.target.value)}
-            placeholder={tipo === 'aereo' ? 'Ej: Avianca, LATAM, Aero República' : 'Ej: COOFLOTAX, Flota Magdalena'} />
-        </div>
-
-        {!modoEstimacion && (
-          <div className="leg-field">
-            <label>{tipo === 'aereo' ? 'Número de vuelo *' : 'Número de tiquete *'}</label>
-            <input type="text" value={numDoc} onChange={(e) => onNumDoc(e.target.value.toUpperCase())}
-              placeholder={tipo === 'aereo' ? 'Ej: AV 8001, P5 7506' : 'Ej: DEST4-83964'} />
-          </div>
-        )}
-
-        {!modoEstimacion && tipo === 'aereo' && (
-          <div className="leg-field">
-            <label>Código de reserva</label>
-            <input type="text" value={codReserva} onChange={(e) => onCodReserva(e.target.value.toUpperCase())}
-              placeholder="Ej: J48SQO" maxLength={10} />
-          </div>
-        )}
-
-        {!modoEstimacion && tipo === 'terrestre' && (
-          <>
-            <div className="leg-field">
-              <label>Tramo / Ruta</label>
-              <input type="text" value={tramo} onChange={(e) => onTramo(e.target.value)}
-                placeholder="Ej: SANTA ROSA - DUITAMA" />
-            </div>
-            <div className="leg-field">
-              <label>Puesto / Silla</label>
-              <input type="text" value={puesto} onChange={(e) => onPuesto(e.target.value)}
-                placeholder="Ej: 3, 12A" maxLength={6} />
-            </div>
-          </>
-        )}
-
-        {!modoEstimacion && (
-          <div className="leg-field">
-            <label>Hora de salida</label>
-            <input type="time" value={horaSalida} onChange={(e) => onHoraSalida(e.target.value)} />
-          </div>
-        )}
-
-        {!modoEstimacion && (
-          <div className="leg-field">
-            <label>Hora de llegada</label>
-            <input type="time" value={horaLlegada} onChange={(e) => onHoraLlegada(e.target.value)} />
-          </div>
-        )}
-
-        <div className="leg-field">
-          <label>{modoEstimacion ? 'Costo estimado ($) *' : 'Valor total del tiquete ($) *'}</label>
-          <input type="text" inputMode="numeric" value={fmtValor(valor) ? `$${fmtValor(valor)}` : ''}
-            onChange={(e) => onValor(e.target.value.replace(/\D/g, ''))}
-            placeholder="$ 0" />
-        </div>
+      <div className="viatico-tarifa-fija-display">
+        <span>Tarifa {tipo === 'aereo' ? 'aéreo' : 'terrestre'}:</span>
+        <strong>{tarifas ? `$${formatearMiles(precio)} COP` : 'Cargando…'}</strong>
       </div>
     </div>
   );
@@ -258,6 +84,9 @@ function TiqueteForm({
 /* ─── Panel Viáticos ────────────────────────────────────────── */
 export function ViaticosPanel({ onCreada, areaId }: { onCreada?: (info: { id: number; numeroRadicado: string }) => void; areaId?: number }) {
   const [paso, setPaso] = useState<1 | 2 | 3 | 4 | 5>(1);
+
+  /* Tarifas fijas del admin */
+  const [tarifas, setTarifas] = useState<TarifasViaticos | null>(null);
 
   /* Paso 1 */
   const [tipoViatico, setTipoViatico] = useState<'anticipo' | 'legalizar' | ''>('anticipo');
@@ -277,8 +106,10 @@ export function ViaticosPanel({ onCreada, areaId }: { onCreada?: (info: { id: nu
   const [fechaIda, setFechaIda] = useState('');
   const [fechaRegreso, setFechaRegreso] = useState('');
 
-  /* Paso 3 — tiquete IDA */
+  /* Paso 3 — tipo de transporte */
   const [tipoTrIda, setTipoTrIda] = useState<'aereo' | 'terrestre'>('aereo');
+  const [tipoTrVuelta, setTipoTrVuelta] = useState<'aereo' | 'terrestre'>('aereo');
+  /* Solo para legalización */
   const [empresaIda, setEmpresaIda] = useState('');
   const [numDocIda, setNumDocIda] = useState('');
   const [codResIda, setCodResIda] = useState('');
@@ -286,10 +117,6 @@ export function ViaticosPanel({ onCreada, areaId }: { onCreada?: (info: { id: nu
   const [puestoIda, setPuestoIda] = useState('');
   const [hrSalidaIda, setHrSalidaIda] = useState('');
   const [hrLlegadaIda, setHrLlegadaIda] = useState('');
-  const [valorIda, setValorIda] = useState('');
-
-  /* Paso 3 — tiquete VUELTA */
-  const [tipoTrVuelta, setTipoTrVuelta] = useState<'aereo' | 'terrestre'>('aereo');
   const [empresaVuelta, setEmpresaVuelta] = useState('');
   const [numDocVuelta, setNumDocVuelta] = useState('');
   const [codResVuelta, setCodResVuelta] = useState('');
@@ -297,8 +124,6 @@ export function ViaticosPanel({ onCreada, areaId }: { onCreada?: (info: { id: nu
   const [puestoVuelta, setPuestoVuelta] = useState('');
   const [hrSalidaVuelta, setHrSalidaVuelta] = useState('');
   const [hrLlegadaVuelta, setHrLlegadaVuelta] = useState('');
-  const [valorVuelta, setValorVuelta] = useState('');
-
   const [facturaTransporte, setFacturaTransporte] = useState<FacturaAdj | null>(null);
   const [subiendoTransporte, setSubiendoTransporte] = useState(false);
 
@@ -307,17 +132,13 @@ export function ViaticosPanel({ onCreada, areaId }: { onCreada?: (info: { id: nu
   const [hotelNombre, setHotelNombre] = useState('');
   const [hotelEntrada, setHotelEntrada] = useState('');
   const [hotelSalida, setHotelSalida] = useState('');
-  const [hotelValorNoche, setHotelValorNoche] = useState('');
   const [facturaHotel, setFacturaHotel] = useState<FacturaAdj | null>(null);
   const [subiendoHotel, setSubiendoHotel] = useState(false);
 
-  /* Paso 4 — alimentación */
+  /* Paso 4 — alimentación (solo días; precio viene de tarifas) */
   const [diasDesayuno, setDiasDesayuno] = useState('');
-  const [valorDesayuno, setValorDesayuno] = useState('');
   const [diasAlmuerzo, setDiasAlmuerzo] = useState('');
-  const [valorAlmuerzo, setValorAlmuerzo] = useState('');
   const [diasCena, setDiasCena] = useState('');
-  const [valorCena, setValorCena] = useState('');
   const [facturaComidas, setFacturaComidas] = useState<FacturaAdj | null>(null);
   const [subiendoComidas, setSubiendoComidas] = useState(false);
 
@@ -334,7 +155,9 @@ export function ViaticosPanel({ onCreada, areaId }: { onCreada?: (info: { id: nu
 
   const { procesarArchivo } = useOcrDocument();
 
+  /* Cargar tarifas y usuarios */
   useEffect(() => {
+    api.get<TarifasViaticos>('/tarifas-viaticos').then((r) => setTarifas(r.data)).catch(() => {});
     api.get<UsuarioSugerido[]>('/usuarios/nombres').then((r) => setUsuarios(r.data)).catch(() => {});
   }, []);
 
@@ -351,49 +174,31 @@ export function ViaticosPanel({ onCreada, areaId }: { onCreada?: (info: { id: nu
     setShowSugeridos(false);
   }
 
-  const preciosRef = useMemo(() => getPreciosRef(ciudadOrigen, ciudadDestino), [ciudadOrigen, ciudadDestino]);
+  /* Precio unitario de transporte según tipo seleccionado */
+  const precioIda    = tarifas ? (tipoTrIda    === 'aereo' ? tarifas.precioAereo : tarifas.precioTerrestre) : 0;
+  const precioVuelta = tarifas ? (tipoTrVuelta === 'aereo' ? tarifas.precioAereo : tarifas.precioTerrestre) : 0;
 
-  /* ─── API precios de viaje ──────────────────────────────────── */
-  const [opcionesViaje, setOpcionesViaje] = useState<OpcionViaje[]>([]);
-  const [opcionesRegreso, setOpcionesRegreso] = useState<OpcionViaje[]>([]);
-  const [cargandoPrecios, setCargandoPrecios] = useState(false);
-  const [fuentePrecios, setFuentePrecios] = useState<'api' | 'estimado' | null>(null);
-  const [esMultimodalRuta, setEsMultimodalRuta] = useState(false);
-  const [aeropuertoConexion, setAeropuertoConexion] = useState<string | null>(null);
+  /* Cálculos */
+  const totalTransporte = useMemo(() => precioIda + (esIdaVuelta ? precioVuelta : 0), [precioIda, precioVuelta, esIdaVuelta]);
 
-  useEffect(() => {
-    if (paso !== 3 || tipoViatico !== 'anticipo' || !ciudadOrigen || !ciudadDestino || !fechaIda) return;
-    let cancelled = false;
-    setCargandoPrecios(true);
-    setOpcionesViaje([]);
-    setOpcionesRegreso([]);
-    setEsMultimodalRuta(false);
-    setAeropuertoConexion(null);
-    const qs = new URLSearchParams({
-      origen: ciudadOrigen,
-      destino: ciudadDestino,
-      fecha_ida: fechaIda,
-      ...(esIdaVuelta && fechaRegreso ? { fecha_regreso: fechaRegreso } : {}),
-    });
-    api.get<{ opciones: OpcionViaje[]; opcionesRegreso: OpcionViaje[]; fuente: string; esMultimodal?: boolean; aeropuertoConexion?: string | null }>(`/viajes/buscar?${qs}`)
-      .then((r) => {
-        if (cancelled) return;
-        setOpcionesViaje(r.data.opciones ?? []);
-        setOpcionesRegreso(r.data.opcionesRegreso ?? []);
-        setFuentePrecios(r.data.fuente === 'api' ? 'api' : 'estimado');
-        setEsMultimodalRuta(!!r.data.esMultimodal);
-        setAeropuertoConexion(r.data.aeropuertoConexion ?? null);
-      })
-      .catch(() => { /* silencioso: usará PRECIOS_REF estático */ })
-      .finally(() => { if (!cancelled) setCargandoPrecios(false); });
-    return () => { cancelled = true; };
-  }, [paso, ciudadOrigen, ciudadDestino, fechaIda, fechaRegreso, esIdaVuelta]);
+  const noches = useMemo(() => {
+    if (!tieneHospedaje || !hotelEntrada || !hotelSalida) return 0;
+    return Math.max(0, Math.round((new Date(hotelSalida).getTime() - new Date(hotelEntrada).getTime()) / 86400000));
+  }, [tieneHospedaje, hotelEntrada, hotelSalida]);
 
-  const totalTransporte = useMemo(() => {
-    const ida = parseInt(valorIda.replace(/\D/g, '')) || 0;
-    const vuelta = esIdaVuelta ? (parseInt(valorVuelta.replace(/\D/g, '')) || 0) : 0;
-    return ida + vuelta;
-  }, [valorIda, valorVuelta, esIdaVuelta]);
+  const precioHospedaje = tarifas?.precioHospedaje ?? 0;
+  const totalHospedaje  = useMemo(() => tieneHospedaje ? precioHospedaje * noches : 0, [tieneHospedaje, precioHospedaje, noches]);
+
+  const totalComidas = useMemo(() => {
+    const pd = tarifas?.precioDesayuno ?? 0;
+    const pa = tarifas?.precioAlmuerzo ?? 0;
+    const pc = tarifas?.precioCena     ?? 0;
+    return (parseInt(diasDesayuno) || 0) * pd
+         + (parseInt(diasAlmuerzo) || 0) * pa
+         + (parseInt(diasCena)     || 0) * pc;
+  }, [diasDesayuno, diasAlmuerzo, diasCena, tarifas]);
+
+  const totalGeneral = useMemo(() => totalTransporte + totalHospedaje + totalComidas, [totalTransporte, totalHospedaje, totalComidas]);
 
   const subirFactura = useCallback(async (
     file: File,
@@ -401,7 +206,7 @@ export function ViaticosPanel({ onCreada, areaId }: { onCreada?: (info: { id: nu
     contexto: { valor?: number; ciudad?: string; fecha?: string },
   ) => {
     const setSubiendo = tipo === 'transporte' ? setSubiendoTransporte : tipo === 'hotel' ? setSubiendoHotel : setSubiendoComidas;
-    const setFactura = tipo === 'transporte' ? setFacturaTransporte : tipo === 'hotel' ? setFacturaHotel : setFacturaComidas;
+    const setFactura  = tipo === 'transporte' ? setFacturaTransporte  : tipo === 'hotel' ? setFacturaHotel  : setFacturaComidas;
     setSubiendo(true);
     try {
       const archivoId = await subirArchivo(file);
@@ -414,7 +219,6 @@ export function ViaticosPanel({ onCreada, areaId }: { onCreada?: (info: { id: nu
         if (contexto.valor && contexto.valor > 0) {
           const limpio = String(contexto.valor).replace(/\D/g, '');
           if (limpio.length >= 4) {
-            // Precios colombianos: el OCR puede leer "184.000" → quitar separadores para comparar
             const ocrFlat = texto.replace(/[.,\s]/g, '');
             if (!ocrFlat.includes(limpio)) alertas.push(`El valor $${formatearMiles(contexto.valor)} no se identificó claramente en el soporte.`);
           }
@@ -432,30 +236,16 @@ export function ViaticosPanel({ onCreada, areaId }: { onCreada?: (info: { id: nu
       const isServerError = (ex as { response?: unknown })?.response !== undefined;
       const errMsg = isServerError
         ? (serverMsg?.toLowerCase().includes('tamaño') || serverMsg?.toLowerCase().includes('excede')
-            ? 'El archivo es demasiado grande para Hostinger. Usa JPG, PNG o PDF de menos de 10 MB.'
+            ? 'El archivo es demasiado grande. Usa JPG, PNG o PDF de menos de 10 MB.'
             : serverMsg?.toLowerCase().includes('tipo') || serverMsg?.toLowerCase().includes('formato')
-              ? 'Formato no permitido por Hostinger. Solo JPG, PNG, WEBP o PDF.'
-              : `Error en el servidor de Hostinger${serverMsg ? ': ' + serverMsg : '. Intenta de nuevo o contacta al administrador.'}`)
+              ? 'Formato no permitido. Solo JPG, PNG, WEBP o PDF.'
+              : `Error en el servidor${serverMsg ? ': ' + serverMsg : '. Intenta de nuevo.'}`)
         : 'No se pudo subir el archivo. Verifica tu conexión e inténtalo de nuevo.';
       setFactura({ archivoId: '', nombre: '', alertas: [errMsg] });
     } finally {
       setSubiendo(false);
     }
   }, [procesarArchivo]);
-
-  /* Cálculos */
-  const noches = useMemo(() => {
-    if (!tieneHospedaje || !hotelEntrada || !hotelSalida) return 0;
-    return Math.max(0, Math.round((new Date(hotelSalida).getTime() - new Date(hotelEntrada).getTime()) / 86400000));
-  }, [tieneHospedaje, hotelEntrada, hotelSalida]);
-
-  const totalHospedaje = useMemo(() => tieneHospedaje ? (parseInt(hotelValorNoche) || 0) * noches : 0, [tieneHospedaje, hotelValorNoche, noches]);
-  const totalComidas = useMemo(() => {
-    return (parseInt(diasDesayuno) || 0) * (parseInt(valorDesayuno) || 0)
-      + (parseInt(diasAlmuerzo) || 0) * (parseInt(valorAlmuerzo) || 0)
-      + (parseInt(diasCena) || 0) * (parseInt(valorCena) || 0);
-  }, [diasDesayuno, valorDesayuno, diasAlmuerzo, valorAlmuerzo, diasCena, valorCena]);
-  const totalGeneral = useMemo(() => totalTransporte + totalHospedaje + totalComidas, [totalTransporte, totalHospedaje, totalComidas]);
 
   function validarPaso(): string {
     if (paso === 1) {
@@ -472,16 +262,19 @@ export function ViaticosPanel({ onCreada, areaId }: { onCreada?: (info: { id: nu
       if (esIdaVuelta && fechaRegreso && fechaRegreso < fechaIda) return 'La fecha de regreso debe ser posterior a la de ida';
     }
     if (paso === 3) {
-      if (!valorIda.replace(/\D/g, '')) return 'Ingresa el costo estimado del transporte de ida';
-      if (esIdaVuelta && !valorVuelta.replace(/\D/g, '')) return 'Ingresa el costo estimado del transporte de regreso';
+      if (tipoViatico === 'legalizar') {
+        if (!empresaIda.trim()) return 'Ingresa la empresa transportadora de ida';
+        if (!numDocIda.trim()) return `Ingresa el ${tipoTrIda === 'aereo' ? 'número de vuelo' : 'número de tiquete'} de ida`;
+        if (esIdaVuelta && !empresaVuelta.trim()) return 'Ingresa la empresa transportadora de regreso';
+        if (esIdaVuelta && !numDocVuelta.trim()) return `Ingresa el ${tipoTrVuelta === 'aereo' ? 'número de vuelo' : 'número de tiquete'} de regreso`;
+        if (!facturaTransporte?.archivoId) return 'Adjunta el tiquete o comprobante de transporte';
+      }
     }
     if (paso === 4) {
       if (tieneHospedaje) {
         if (!hotelNombre.trim()) return 'Ingresa el nombre del hotel';
         if (!hotelEntrada || !hotelSalida) return 'Ingresa las fechas de entrada y salida del hotel';
-        if (!hotelValorNoche) return 'Ingresa el valor por noche del hospedaje';
       }
-      const tieneComidas = (parseInt(diasDesayuno) || 0) > 0 || (parseInt(diasAlmuerzo) || 0) > 0 || (parseInt(diasCena) || 0) > 0;
     }
     if (paso === 5) {
       if (!firma) return 'La firma digital es obligatoria';
@@ -495,12 +288,12 @@ export function ViaticosPanel({ onCreada, areaId }: { onCreada?: (info: { id: nu
   function resetear() {
     setPaso(1); setTipoViatico('anticipo'); setAutorizadorInput(''); setAutorizadorId(0); setAutorizadorNombre(''); setMotivoViaje('');
     setCiudadOrigen(''); setCiudadDestino(''); setFechaIda(''); setFechaRegreso(''); setEsIdaVuelta(true);
-    setEmpresaIda(''); setNumDocIda(''); setCodResIda(''); setTramoIda(''); setPuestoIda(''); setHrSalidaIda(''); setHrLlegadaIda(''); setValorIda('');
-    setEmpresaVuelta(''); setNumDocVuelta(''); setCodResVuelta(''); setTramoVuelta(''); setPuestoVuelta(''); setHrSalidaVuelta(''); setHrLlegadaVuelta(''); setValorVuelta('');
-    setFacturaTransporte(null); setTieneHospedaje(false); setHotelNombre(''); setHotelEntrada(''); setHotelSalida(''); setHotelValorNoche(''); setFacturaHotel(null);
-    setDiasDesayuno(''); setValorDesayuno(''); setDiasAlmuerzo(''); setValorAlmuerzo(''); setDiasCena(''); setValorCena(''); setFacturaComidas(null);
+    setTipoTrIda('aereo'); setTipoTrVuelta('aereo');
+    setEmpresaIda(''); setNumDocIda(''); setCodResIda(''); setTramoIda(''); setPuestoIda(''); setHrSalidaIda(''); setHrLlegadaIda('');
+    setEmpresaVuelta(''); setNumDocVuelta(''); setCodResVuelta(''); setTramoVuelta(''); setPuestoVuelta(''); setHrSalidaVuelta(''); setHrLlegadaVuelta('');
+    setFacturaTransporte(null); setTieneHospedaje(false); setHotelNombre(''); setHotelEntrada(''); setHotelSalida(''); setFacturaHotel(null);
+    setDiasDesayuno(''); setDiasAlmuerzo(''); setDiasCena(''); setFacturaComidas(null);
     setFirma(''); setMsg('');
-    setOpcionesViaje([]); setOpcionesRegreso([]); setFuentePrecios(null);
   }
 
   async function enviar() {
@@ -513,16 +306,16 @@ export function ViaticosPanel({ onCreada, areaId }: { onCreada?: (info: { id: nu
       const tipos = await api.get<Array<{ id: number; slug: string; nombre: string }>>('/tipos');
       const tipo = tipos.data.find((t) => norm(t.slug) === 'viaticos' || norm(t.nombre) === 'viaticos');
       if (!tipo) {
-        setErr('No se encontró el tipo "Viáticos". El administrador debe crearlo en Panel → Tipos de solicitud con slug "viaticos".');
+        setErr('No se encontró el tipo "Viáticos". El administrador debe crearlo con slug "viaticos".');
         return;
       }
       const docs: Record<string, unknown> = {};
       if (facturaTransporte?.archivoId) docs['tiquete'] = { archivoId: facturaTransporte.archivoId, nombre: facturaTransporte.nombre, ocrAlertas: facturaTransporte.alertas };
-      if (facturaHotel?.archivoId) docs['hotel'] = { archivoId: facturaHotel.archivoId, nombre: facturaHotel.nombre, ocrAlertas: facturaHotel.alertas };
-      if (facturaComidas?.archivoId) docs['comidas'] = { archivoId: facturaComidas.archivoId, nombre: facturaComidas.nombre, ocrAlertas: facturaComidas.alertas };
+      if (facturaHotel?.archivoId)      docs['hotel']   = { archivoId: facturaHotel.archivoId,      nombre: facturaHotel.nombre,      ocrAlertas: facturaHotel.alertas };
+      if (facturaComidas?.archivoId)    docs['comidas'] = { archivoId: facturaComidas.archivoId,    nombre: facturaComidas.nombre,    ocrAlertas: facturaComidas.alertas };
 
-      const tiqueteIda = { tipo: tipoTrIda, empresa: empresaIda, numDoc: numDocIda, codReserva: codResIda, tramo: tramoIda, puesto: puestoIda, horaSalida: hrSalidaIda, horaLlegada: hrLlegadaIda, valor: valorIda.replace(/\D/g, '') };
-      const tiqueteVuelta = esIdaVuelta ? { tipo: tipoTrVuelta, empresa: empresaVuelta, numDoc: numDocVuelta, codReserva: codResVuelta, tramo: tramoVuelta, puesto: puestoVuelta, horaSalida: hrSalidaVuelta, horaLlegada: hrLlegadaVuelta, valor: valorVuelta.replace(/\D/g, '') } : null;
+      const tiqueteIda = { tipo: tipoTrIda, empresa: empresaIda, numDoc: numDocIda, codReserva: codResIda, tramo: tramoIda, puesto: puestoIda, horaSalida: hrSalidaIda, horaLlegada: hrLlegadaIda, valor: String(precioIda) };
+      const tiqueteVuelta = esIdaVuelta ? { tipo: tipoTrVuelta, empresa: empresaVuelta, numDoc: numDocVuelta, codReserva: codResVuelta, tramo: tramoVuelta, puesto: puestoVuelta, horaSalida: hrSalidaVuelta, horaLlegada: hrLlegadaVuelta, valor: String(precioVuelta) } : null;
 
       const r = await api.post<{ id: number; numeroRadicado: string }>('/solicitudes', {
         tipoSolicitudId: tipo.id,
@@ -542,16 +335,16 @@ export function ViaticosPanel({ onCreada, areaId }: { onCreada?: (info: { id: nu
           tieneHospedaje: String(tieneHospedaje),
           hotelNombre: tieneHospedaje ? hotelNombre : '',
           hotelEntrada: tieneHospedaje ? hotelEntrada : '',
-          hotelSalida: tieneHospedaje ? hotelSalida : '',
-          hotelValorNoche: tieneHospedaje ? hotelValorNoche : '',
-          hotelNoches: tieneHospedaje ? String(noches) : '0',
-          diasDesayuno, valorDesayuno,
-          diasAlmuerzo, valorAlmuerzo,
-          diasCena, valorCena,
+          hotelSalida:  tieneHospedaje ? hotelSalida  : '',
+          hotelNoches:  tieneHospedaje ? String(noches) : '0',
+          hotelValorNoche: tieneHospedaje ? String(precioHospedaje) : '0',
+          diasDesayuno, valorDesayuno: String(tarifas?.precioDesayuno ?? 0),
+          diasAlmuerzo, valorAlmuerzo: String(tarifas?.precioAlmuerzo ?? 0),
+          diasCena,     valorCena:     String(tarifas?.precioCena     ?? 0),
           totalTransporte: String(totalTransporte),
-          totalHospedaje: String(totalHospedaje),
-          totalComidas: String(totalComidas),
-          totalGeneral: String(totalGeneral),
+          totalHospedaje:  String(totalHospedaje),
+          totalComidas:    String(totalComidas),
+          totalGeneral:    String(totalGeneral),
         },
         documentos: docs,
         firmas: { profesional: firma },
@@ -566,7 +359,7 @@ export function ViaticosPanel({ onCreada, areaId }: { onCreada?: (info: { id: nu
     }
   }
 
-  const PASOS = ['Tipo y autorización', 'Detalles del viaje', 'Costos estimados', 'Hospedaje y comidas', 'Resumen y firma'];
+  const PASOS = ['Tipo y autorización', 'Detalles del viaje', 'Transporte', 'Hospedaje y comidas', 'Resumen y firma'];
 
   if (msg) {
     return (
@@ -579,6 +372,8 @@ export function ViaticosPanel({ onCreada, areaId }: { onCreada?: (info: { id: nu
       </div>
     );
   }
+
+
 
   return (
     <div className="leg-panel">
@@ -598,6 +393,26 @@ export function ViaticosPanel({ onCreada, areaId }: { onCreada?: (info: { id: nu
       {paso === 1 && (
         <div className="leg-form card-surface">
           <h3>Tipo de viático y autorización</h3>
+
+          <div className="leg-field">
+            <label>¿Qué tipo de viático necesitas? *</label>
+            <div className="leg-radio-group">
+              <label className="leg-radio-item">
+                <input type="radio" name="tipoViatico" checked={tipoViatico === 'anticipo'} onChange={() => setTipoViatico('anticipo')} />
+                <div>
+                  <strong>Solicitud de anticipo</strong>
+                  <span className="leg-radio-desc">Pide el dinero antes del viaje. Luego debes legalizarlo con tiquetes y facturas.</span>
+                </div>
+              </label>
+              <label className="leg-radio-item">
+                <input type="radio" name="tipoViatico" checked={tipoViatico === 'legalizar'} onChange={() => setTipoViatico('legalizar')} />
+                <div>
+                  <strong>Legalización de viático</strong>
+                  <span className="leg-radio-desc">Ya realizaste el viaje y quieres reembolso o legalizar un anticipo previo.</span>
+                </div>
+              </label>
+            </div>
+          </div>
 
           <div className="leg-field" style={{ marginTop: 16 }}>
             <label>Motivo / propósito del viaje *</label>
@@ -658,9 +473,7 @@ export function ViaticosPanel({ onCreada, areaId }: { onCreada?: (info: { id: nu
             </div>
           </div>
 
-          {/* Selectores departamento → ciudad */}
           <div className="viaje-ciudad-grid">
-            {/* Origen */}
             <div className="viaje-ciudad-bloque">
               <div className="leg-field">
                 <label>Departamento de origen *</label>
@@ -680,7 +493,6 @@ export function ViaticosPanel({ onCreada, areaId }: { onCreada?: (info: { id: nu
               </div>
             </div>
 
-            {/* Destino */}
             <div className="viaje-ciudad-bloque">
               <div className="leg-field">
                 <label>Departamento de destino *</label>
@@ -700,7 +512,6 @@ export function ViaticosPanel({ onCreada, areaId }: { onCreada?: (info: { id: nu
               </div>
             </div>
 
-            {/* Fechas */}
             <div className="leg-field">
               <label>Fecha de ida *</label>
               <input type="date" value={fechaIda} onChange={(e) => setFechaIda(e.target.value)} required />
@@ -714,7 +525,6 @@ export function ViaticosPanel({ onCreada, areaId }: { onCreada?: (info: { id: nu
             )}
           </div>
 
-          {/* Mapa + clima (se muestra apenas hay origen o destino seleccionado) */}
           {(ciudadOrigen || ciudadDestino) && (
             <MapaRuta origen={ciudadOrigen} destino={ciudadDestino} fecha={fechaIda || new Date().toISOString().slice(0, 10)} />
           )}
@@ -722,215 +532,126 @@ export function ViaticosPanel({ onCreada, areaId }: { onCreada?: (info: { id: nu
           <div className="leg-actions">
             <button type="button" className="admin-ghost-button" onClick={anterior}>← Atrás</button>
             <button type="button" className="admin-primary-button" onClick={siguiente}>
-              Continuar → Datos del tiquete
+              Continuar → Transporte
             </button>
           </div>
         </div>
       )}
 
-      {/* ── PASO 3: Tiquetes / Estimación ── */}
+      {/* ── PASO 3: Transporte ── */}
       {paso === 3 && (
         <div className="leg-form card-surface">
-          <h3>{tipoViatico === 'anticipo' ? 'Estimación de costos de transporte' : 'Datos del tiquete de transporte'}</h3>
-          {tipoViatico === 'anticipo'
-            ? <p className="leg-nota">Selecciona o ingresa el costo estimado del transporte. <strong>No necesitas el tiquete todavía</strong> — al recibir el anticipo deberás legalizarlo con los tiquetes reales.</p>
-            : <p className="leg-nota">Ingresa los datos exactos de tu tiquete o comprobante de viaje.</p>
-          }
+          <h3>Transporte</h3>
+          <p className="leg-nota">
+            {tipoViatico === 'anticipo'
+              ? 'Selecciona el tipo de transporte. Las tarifas están configuradas por el administrador.'
+              : 'Selecciona el tipo de transporte e ingresa los datos del tiquete.'}
+          </p>
 
-          {/* Buscador de precios — solo para anticipo (en legalización ya tienes el tiquete real) */}
-          <div className="viatico-ref-box" style={tipoViatico !== 'anticipo' ? { display: 'none' } : undefined}>
-            {cargandoPrecios ? (
-              <div className="viatico-buscando">
-                <span className="viatico-buscando-spin">⏳</span>
-                <div>
-                  <strong>Buscando opciones de viaje…</strong>
-                  <p>{ciudadOrigen} → {ciudadDestino}</p>
-                </div>
-              </div>
-            ) : opcionesViaje.length > 0 ? (
-              <>
-                <div className="viatico-ref-titulo">
-                  🔍 Opciones de viaje · {ciudadOrigen} → {ciudadDestino}
-                  {fuentePrecios === 'api' && <span className="viatico-fuente-badge">Precios actualizados</span>}
-                  {fuentePrecios === 'estimado' && <span className="viatico-fuente-badge viatico-fuente-est">Precios de referencia</span>}
-                </div>
-                {esMultimodalRuta && aeropuertoConexion && (
-                  <div className="viatico-multimodal-aviso">
-                    ✈🚌 <strong>{ciudadDestino}</strong> no tiene aeropuerto propio. Las opciones combinan vuelo a <strong>{aeropuertoConexion}</strong> + bus hasta el destino.
-                  </div>
-                )}
-                <p className="leg-nota" style={{ marginBottom: 8 }}>Selecciona una opción para <strong>llenar automáticamente</strong> los datos del tiquete de <strong>ida</strong>.</p>
-                <div className="viatico-opciones-lista">
-                  {opcionesViaje.slice(0, 7).map((op) => (
-                    <button
-                      key={op.id}
-                      type="button"
-                      className={`viatico-opcion-item viatico-opcion-btn${op.tipo === 'multimodal' ? ' viatico-opcion-multi' : ''}`}
-                      onClick={() => {
-                        setTipoTrIda(op.tipo === 'bus' ? 'terrestre' : 'aereo');
-                        setEmpresaIda(op.empresa);
-                        if (op.salida && op.salida !== '—') setHrSalidaIda(op.salida);
-                        if (op.llegada && op.llegada !== '—') setHrLlegadaIda(op.llegada);
-                        setValorIda(String(op.precio));
-                      }}
-                    >
-                      <span className="viatico-opcion-icono">{op.tipo === 'multimodal' ? '✈🚌' : op.tipo === 'bus' ? '🚌' : '✈'}</span>
-                      <div className="viatico-opcion-info">
-                        <strong>{op.empresa}</strong>
-                        {op.tipo === 'multimodal' && op.tramos ? (
-                          <span className="viatico-multi-tramos">
-                            {op.tramos.map((t, ti) => (
-                              <span key={ti} className="viatico-multi-tramo">
-                                {t.tipo === 'vuelo' ? '✈' : '🚌'} {t.empresa}: {t.salida}→{t.llegada} ({t.duracion}) · ${formatearMiles(t.precio)}
-                              </span>
-                            ))}
-                          </span>
-                        ) : (
-                          <span>{op.salida !== '—' ? op.salida : ''}{op.llegada !== '—' ? ` → ${op.llegada}` : ''}{op.duracion !== '—' ? ` · ${op.duracion}` : ''}</span>
-                        )}
-                        {op.tipo === 'multimodal' && (
-                          <span className="viatico-multi-total">Total viaje: {op.salida} → {op.llegada} · {op.duracion}</span>
-                        )}
-                      </div>
-                      <div className="viatico-opcion-precio">${formatearMiles(op.precio)}</div>
-                      <span className="viatico-usar-tag">Usar ↓</span>
-                    </button>
-                  ))}
-                </div>
-                {/* Opciones de regreso */}
-                {esIdaVuelta && opcionesRegreso.length > 0 && (
-                  <>
-                    <p className="leg-nota" style={{ margin: '10px 0 6px' }}>Opciones de <strong>regreso</strong> · {ciudadDestino} → {ciudadOrigen}:</p>
-                    <div className="viatico-opciones-lista">
-                      {opcionesRegreso.slice(0, 5).map((op) => (
-                        <button
-                          key={op.id}
-                          type="button"
-                          className={`viatico-opcion-item viatico-opcion-btn viatico-opcion-regreso${op.tipo === 'multimodal' ? ' viatico-opcion-multi' : ''}`}
-                          onClick={() => {
-                            setTipoTrVuelta(op.tipo === 'bus' ? 'terrestre' : 'aereo');
-                            setEmpresaVuelta(op.empresa);
-                            if (op.salida && op.salida !== '—') setHrSalidaVuelta(op.salida);
-                            if (op.llegada && op.llegada !== '—') setHrLlegadaVuelta(op.llegada);
-                            setValorVuelta(String(op.precio));
-                          }}
-                        >
-                          <span className="viatico-opcion-icono">{op.tipo === 'multimodal' ? '✈🚌' : op.tipo === 'bus' ? '🚌' : '✈'}</span>
-                          <div className="viatico-opcion-info">
-                            <strong>{op.empresa}</strong>
-                            {op.tipo === 'multimodal' && op.tramos ? (
-                              <span className="viatico-multi-tramos">
-                                {op.tramos.map((t, ti) => (
-                                  <span key={ti} className="viatico-multi-tramo">
-                                    {t.tipo === 'vuelo' ? '✈' : '🚌'} {t.empresa}: {t.salida}→{t.llegada} ({t.duracion}) · ${formatearMiles(t.precio)}
-                                  </span>
-                                ))}
-                              </span>
-                            ) : (
-                              <span>{op.salida !== '—' ? op.salida : ''}{op.llegada !== '—' ? ` → ${op.llegada}` : ''}{op.duracion !== '—' ? ` · ${op.duracion}` : ''}</span>
-                            )}
-                            {op.tipo === 'multimodal' && (
-                              <span className="viatico-multi-total">Total viaje: {op.salida} → {op.llegada} · {op.duracion}</span>
-                            )}
-                          </div>
-                          <div className="viatico-opcion-precio">${formatearMiles(op.precio)}</div>
-                          <span className="viatico-usar-tag">Usar ↓</span>
-                        </button>
-                      ))}
-                    </div>
-                  </>
-                )}
-                {/* Validación en tiempo real contra precios de API */}
-                {(() => {
-                  const v = parseInt(valorIda.replace(/\D/g, '')) || 0;
-                  if (v === 0) return null;
-                  const filtradas = opcionesViaje.filter((o) => tipoTrIda === 'aereo' ? o.tipo !== 'bus' : o.tipo === 'bus');
-                  if (filtradas.length === 0) return null;
-                  const precios = filtradas.map((o) => o.precio);
-                  const maxRef = Math.max(...precios) * 1.4;
-                  const minRef = Math.min(...precios) * 0.7;
-                  if (v > maxRef) return <div className="viatico-precio-alerta">⚠ ${formatearMiles(v)} supera el rango de referencia para esta ruta. El aprobador revisará.</div>;
-                  if (v >= minRef) return <div className="viatico-precio-ok">✓ Precio dentro del rango de referencia para esta ruta.</div>;
-                  return null;
-                })()}
-              </>
-            ) : preciosRef ? (
-              <>
-                <div className="viatico-ref-titulo">📊 Precios habituales para esta ruta</div>
-                <div className="viatico-ref-opciones">
-                  {preciosRef.aereo && (
-                    <div className="viatico-ref-opcion">
-                      <span className="viatico-ref-icon">✈</span>
-                      <div>
-                        <div className="viatico-ref-tipo">Aéreo · {ciudadOrigen} → {ciudadDestino}</div>
-                        <div className="viatico-ref-rango">${formatearMiles(preciosRef.aereo[0])} – ${formatearMiles(preciosRef.aereo[1])} COP</div>
-                      </div>
-                    </div>
-                  )}
-                  {preciosRef.terrestre && (
-                    <div className="viatico-ref-opcion">
-                      <span className="viatico-ref-icon">🚌</span>
-                      <div>
-                        <div className="viatico-ref-tipo">Terrestre · {ciudadOrigen} → {ciudadDestino}</div>
-                        <div className="viatico-ref-rango">${formatearMiles(preciosRef.terrestre[0])} – ${formatearMiles(preciosRef.terrestre[1])} COP</div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </>
-            ) : ciudadOrigen && ciudadDestino && fechaIda ? (
-              <div className="viatico-buscando">
-                <span>🔍</span>
-                <div>
-                  <strong>Cargando opciones…</strong>
-                  <p>Consultando precios de referencia para {ciudadOrigen} → {ciudadDestino}</p>
-                </div>
-              </div>
-            ) : null}
-          </div>
+          {!tarifas && <p className="admin-help-text">Cargando tarifas…</p>}
+          {tarifas && (tarifas.precioAereo === 0 && tarifas.precioTerrestre === 0) && (
+            <div className="viatico-anticipo-aviso">
+              El administrador aún no ha configurado las tarifas de viáticos. Los valores aparecerán en $0.
+            </div>
+          )}
 
-          <TiqueteForm
-            titulo={esIdaVuelta ? '🛫 Tiquete de ida' : '🛫 Tiquete'}
-            ciudadOrigen={ciudadOrigen} ciudadDestino={ciudadDestino} fecha={fechaIda}
-            tipo={tipoTrIda} onTipo={setTipoTrIda}
-            empresa={empresaIda} onEmpresa={setEmpresaIda}
-            numDoc={numDocIda} onNumDoc={setNumDocIda}
-            codReserva={codResIda} onCodReserva={setCodResIda}
-            tramo={tramoIda} onTramo={setTramoIda}
-            puesto={puestoIda} onPuesto={setPuestoIda}
-            horaSalida={hrSalidaIda} onHoraSalida={setHrSalidaIda}
-            horaLlegada={hrLlegadaIda} onHoraLlegada={setHrLlegadaIda}
-            valor={valorIda} onValor={setValorIda}
-            modoEstimacion={tipoViatico === 'anticipo'}
+          <TipoTransporteBloque
+            titulo={esIdaVuelta ? '🛫 Ida' : '🛫 Tiquete'}
+            tipo={tipoTrIda}
+            onTipo={setTipoTrIda}
+            tarifas={tarifas}
           />
+
+          {/* Detalles solo para legalización */}
+          {tipoViatico === 'legalizar' && (
+            <div className="leg-gasto-fields" style={{ marginTop: 8 }}>
+              <div className="leg-field">
+                <label>Empresa transportadora *</label>
+                <input type="text" value={empresaIda} onChange={(e) => setEmpresaIda(e.target.value)}
+                  placeholder={tipoTrIda === 'aereo' ? 'Ej: Avianca, LATAM' : 'Ej: COOFLOTAX, Flota Magdalena'} />
+              </div>
+              <div className="leg-field">
+                <label>{tipoTrIda === 'aereo' ? 'Número de vuelo *' : 'Número de tiquete *'}</label>
+                <input type="text" value={numDocIda} onChange={(e) => setNumDocIda(e.target.value.toUpperCase())}
+                  placeholder={tipoTrIda === 'aereo' ? 'Ej: AV 8001' : 'Ej: DEST4-83964'} />
+              </div>
+              {tipoTrIda === 'aereo' && (
+                <div className="leg-field">
+                  <label>Código de reserva</label>
+                  <input type="text" value={codResIda} onChange={(e) => setCodResIda(e.target.value.toUpperCase())} placeholder="Ej: J48SQO" maxLength={10} />
+                </div>
+              )}
+              {tipoTrIda === 'terrestre' && (
+                <>
+                  <div className="leg-field">
+                    <label>Tramo / Ruta</label>
+                    <input type="text" value={tramoIda} onChange={(e) => setTramoIda(e.target.value)} placeholder="Ej: SANTA ROSA - DUITAMA" />
+                  </div>
+                  <div className="leg-field">
+                    <label>Puesto / Silla</label>
+                    <input type="text" value={puestoIda} onChange={(e) => setPuestoIda(e.target.value)} placeholder="Ej: 3, 12A" maxLength={6} />
+                  </div>
+                </>
+              )}
+              <div className="leg-field">
+                <label>Hora de salida</label>
+                <input type="time" value={hrSalidaIda} onChange={(e) => setHrSalidaIda(e.target.value)} />
+              </div>
+              <div className="leg-field">
+                <label>Hora de llegada</label>
+                <input type="time" value={hrLlegadaIda} onChange={(e) => setHrLlegadaIda(e.target.value)} />
+              </div>
+            </div>
+          )}
 
           {esIdaVuelta && (
             <>
-              <TiqueteForm
-                titulo="🛬 Tiquete de regreso"
-                ciudadOrigen={ciudadDestino} ciudadDestino={ciudadOrigen} fecha={fechaRegreso}
-                tipo={tipoTrVuelta} onTipo={setTipoTrVuelta}
-                empresa={empresaVuelta} onEmpresa={setEmpresaVuelta}
-                numDoc={numDocVuelta} onNumDoc={setNumDocVuelta}
-                codReserva={codResVuelta} onCodReserva={setCodResVuelta}
-                tramo={tramoVuelta} onTramo={setTramoVuelta}
-                puesto={puestoVuelta} onPuesto={setPuestoVuelta}
-                horaSalida={hrSalidaVuelta} onHoraSalida={setHrSalidaVuelta}
-                horaLlegada={hrLlegadaVuelta} onHoraLlegada={setHrLlegadaVuelta}
-                valor={valorVuelta} onValor={setValorVuelta}
-                modoEstimacion={tipoViatico === 'anticipo'}
+              <TipoTransporteBloque
+                titulo="🛬 Regreso"
+                tipo={tipoTrVuelta}
+                onTipo={setTipoTrVuelta}
+                tarifas={tarifas}
               />
-              {/* Validación precio regreso contra opciones API */}
-              {opcionesRegreso.length > 0 && valorVuelta && (() => {
-                const v = parseInt(valorVuelta.replace(/\D/g, '')) || 0;
-                if (v === 0) return null;
-                const filtradas = opcionesRegreso.filter((o) => tipoTrVuelta === 'aereo' ? o.tipo !== 'bus' : o.tipo === 'bus');
-                if (filtradas.length === 0) return null;
-                const precios = filtradas.map((o) => o.precio);
-                if (v > Math.max(...precios) * 1.4) return <div className="viatico-precio-alerta">⚠ Regreso ${formatearMiles(v)}: supera el rango de referencia.</div>;
-                if (v >= Math.min(...precios) * 0.7) return <div className="viatico-precio-ok">✓ Precio de regreso dentro del rango de referencia.</div>;
-                return null;
-              })()}
+              {tipoViatico === 'legalizar' && (
+                <div className="leg-gasto-fields" style={{ marginTop: 8 }}>
+                  <div className="leg-field">
+                    <label>Empresa transportadora *</label>
+                    <input type="text" value={empresaVuelta} onChange={(e) => setEmpresaVuelta(e.target.value)}
+                      placeholder={tipoTrVuelta === 'aereo' ? 'Ej: Avianca, LATAM' : 'Ej: COOFLOTAX, Flota Magdalena'} />
+                  </div>
+                  <div className="leg-field">
+                    <label>{tipoTrVuelta === 'aereo' ? 'Número de vuelo *' : 'Número de tiquete *'}</label>
+                    <input type="text" value={numDocVuelta} onChange={(e) => setNumDocVuelta(e.target.value.toUpperCase())}
+                      placeholder={tipoTrVuelta === 'aereo' ? 'Ej: AV 8001' : 'Ej: DEST4-83964'} />
+                  </div>
+                  {tipoTrVuelta === 'aereo' && (
+                    <div className="leg-field">
+                      <label>Código de reserva</label>
+                      <input type="text" value={codResVuelta} onChange={(e) => setCodResVuelta(e.target.value.toUpperCase())} placeholder="Ej: J48SQO" maxLength={10} />
+                    </div>
+                  )}
+                  {tipoTrVuelta === 'terrestre' && (
+                    <>
+                      <div className="leg-field">
+                        <label>Tramo / Ruta</label>
+                        <input type="text" value={tramoVuelta} onChange={(e) => setTramoVuelta(e.target.value)} placeholder="Ej: DUITAMA - SANTA ROSA" />
+                      </div>
+                      <div className="leg-field">
+                        <label>Puesto / Silla</label>
+                        <input type="text" value={puestoVuelta} onChange={(e) => setPuestoVuelta(e.target.value)} placeholder="Ej: 3, 12A" maxLength={6} />
+                      </div>
+                    </>
+                  )}
+                  <div className="leg-field">
+                    <label>Hora de salida</label>
+                    <input type="time" value={hrSalidaVuelta} onChange={(e) => setHrSalidaVuelta(e.target.value)} />
+                  </div>
+                  <div className="leg-field">
+                    <label>Hora de llegada</label>
+                    <input type="time" value={hrLlegadaVuelta} onChange={(e) => setHrLlegadaVuelta(e.target.value)} />
+                  </div>
+                </div>
+              )}
             </>
           )}
 
@@ -943,7 +664,7 @@ export function ViaticosPanel({ onCreada, areaId }: { onCreada?: (info: { id: nu
           {/* Adjuntar tiquete — solo para legalización */}
           {tipoViatico === 'anticipo' ? (
             <div className="viatico-anticipo-aviso" style={{ marginTop: 20 }}>
-              <strong>No necesitas adjuntar tiquete ahora.</strong> Al recibir el anticipo, la plataforma te pedirá que lo legalices con los tiquetes y facturas reales. Si sobra dinero, deberás devolverlo.
+              <strong>No necesitas adjuntar tiquete ahora.</strong> Al recibir el anticipo, la plataforma te pedirá que lo legalices con los tiquetes y facturas reales.
             </div>
           ) : (
             <div className="leg-factura-section" style={{ marginTop: 20 }}>
@@ -957,7 +678,6 @@ export function ViaticosPanel({ onCreada, areaId }: { onCreada?: (info: { id: nu
                   </span>
                 )}
               </div>
-              <p className="leg-nota" style={{ marginBottom: 8 }}>Sube una foto o PDF del tiquete (aéreo o terrestre).</p>
               <div className="leg-factura-actions">
                 {subiendoTransporte
                   ? <span className="leg-validando">Subiendo y analizando…</span>
@@ -998,7 +718,7 @@ export function ViaticosPanel({ onCreada, areaId }: { onCreada?: (info: { id: nu
         <div className="leg-form card-surface">
           <h3>{tipoViatico === 'anticipo' ? 'Estimación de hospedaje y alimentación' : 'Alojamiento y alimentación'}</h3>
           {tipoViatico === 'anticipo' && (
-            <p className="leg-nota">Ingresa los costos <strong>estimados</strong>. No necesitas adjuntar facturas ahora — lo harás al legalizar el anticipo.</p>
+            <p className="leg-nota">Indica los días / noches que necesitas. Los valores son las tarifas fijas configuradas.</p>
           )}
 
           {/* HOSPEDAJE */}
@@ -1009,35 +729,6 @@ export function ViaticosPanel({ onCreada, areaId }: { onCreada?: (info: { id: nu
               {tipoViatico === 'anticipo' ? 'El viaje requerirá hospedaje' : 'El viaje requirió / requerirá hospedaje'}
             </label>
           </div>
-
-          {/* Opciones de hotel por ciudad – mismo estilo que opciones de viaje */}
-          {tieneHospedaje && ciudadDestino && HOTELES_REF[ciudadDestino] && (
-            <div className="viatico-hotel-opciones">
-              <div className="viatico-ref-titulo">
-                🏨 Opciones de hospedaje · {ciudadDestino}
-              </div>
-              <p className="leg-nota" style={{ marginBottom: 8 }}>Selecciona una categoría para <strong>llenar automáticamente</strong> el valor por noche.</p>
-              <div className="viatico-opciones-lista">
-                {getHotelOpciones(ciudadDestino).map((h) => (
-                  <button
-                    key={h.categoria}
-                    type="button"
-                    className={`viatico-opcion-item viatico-opcion-btn${parseInt(hotelValorNoche) === h.precio ? ' viatico-opcion-selected' : ''}`}
-                    onClick={() => setHotelValorNoche(String(h.precio))}
-                  >
-                    <span className="viatico-opcion-icono">{h.icono}</span>
-                    <div className="viatico-opcion-info">
-                      <strong>{h.categoria}</strong>
-                      <span>{h.zona}</span>
-                    </div>
-                    <div className="viatico-opcion-precio">${formatearMiles(h.precio)}<small>/noche</small></div>
-                    <span className="viatico-usar-tag">Usar ↓</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
 
           {tieneHospedaje && (
             <>
@@ -1057,17 +748,14 @@ export function ViaticosPanel({ onCreada, areaId }: { onCreada?: (info: { id: nu
                   <input type="date" value={hotelSalida} min={hotelEntrada}
                     onChange={(e) => setHotelSalida(e.target.value)} required />
                 </div>
-                <div className="leg-field">
-                  <label>Valor por noche ($) *</label>
-                  <input type="text" inputMode="numeric" value={hotelValorNoche}
-                    onChange={(e) => setHotelValorNoche(e.target.value.replace(/\D/g, ''))}
-                    placeholder="0" required />
-                </div>
               </div>
               {noches > 0 && (
                 <div className="viatico-total-linea">
-                  🏨 {noches} noche(s) × ${formatearMiles(parseInt(hotelValorNoche) || 0)} = <strong>${formatearMiles(totalHospedaje)}</strong>
+                  🏨 {noches} noche(s) × ${formatearMiles(precioHospedaje)}/noche = <strong>${formatearMiles(totalHospedaje)}</strong>
                 </div>
+              )}
+              {noches === 0 && hotelEntrada && hotelSalida && (
+                <p className="leg-nota" style={{ color: 'var(--error, #c0392b)' }}>La fecha de salida debe ser posterior a la de entrada.</p>
               )}
               {tipoViatico === 'legalizar' && (
                 <div className="leg-factura-section">
@@ -1110,14 +798,14 @@ export function ViaticosPanel({ onCreada, areaId }: { onCreada?: (info: { id: nu
 
           {/* ALIMENTACIÓN */}
           <div className="viaticos-seccion-titulo" style={{ marginTop: 24 }}>🍽 Alimentación</div>
-          <p className="leg-nota">{tipoViatico === 'anticipo' ? 'Estima los días y costo por tipo de comida.' : 'Ingresa los días y valor por tipo de comida que cubre el viático.'}</p>
+          <p className="leg-nota">Indica el número de días por tipo de comida. Las tarifas son fijas.</p>
 
           <div className="viaticos-comidas-grid">
             {([
-              { key: 'desayuno', icon: '☀️', label: 'Desayunos', dias: diasDesayuno, setDias: setDiasDesayuno, valor: valorDesayuno, setValor: setValorDesayuno },
-              { key: 'almuerzo', icon: '🌤', label: 'Almuerzos', dias: diasAlmuerzo, setDias: setDiasAlmuerzo, valor: valorAlmuerzo, setValor: setValorAlmuerzo },
-              { key: 'cena', icon: '🌙', label: 'Cenas', dias: diasCena, setDias: setDiasCena, valor: valorCena, setValor: setValorCena },
-            ] as Array<{ key: string; icon: string; label: string; dias: string; setDias: (v: string) => void; valor: string; setValor: (v: string) => void }>).map(({ key, icon, label, dias, setDias, valor, setValor }) => (
+              { key: 'desayuno', icon: '☀️', label: 'Desayunos', dias: diasDesayuno, setDias: setDiasDesayuno, precio: tarifas?.precioDesayuno ?? 0 },
+              { key: 'almuerzo', icon: '🌤',  label: 'Almuerzos', dias: diasAlmuerzo, setDias: setDiasAlmuerzo, precio: tarifas?.precioAlmuerzo ?? 0 },
+              { key: 'cena',    icon: '🌙',   label: 'Cenas',     dias: diasCena,     setDias: setDiasCena,     precio: tarifas?.precioCena     ?? 0 },
+            ] as Array<{ key: string; icon: string; label: string; dias: string; setDias: (v: string) => void; precio: number }>).map(({ key, icon, label, dias, setDias, precio }) => (
               <div key={key} className="viaticos-comida-item">
                 <div className="viaticos-comida-header">
                   <span>{icon}</span>
@@ -1125,13 +813,11 @@ export function ViaticosPanel({ onCreada, areaId }: { onCreada?: (info: { id: nu
                 </div>
                 <div className="viaticos-comida-inputs">
                   <input type="number" min="0" max="30" value={dias} onChange={(e) => setDias(e.target.value)} placeholder="Días" />
-                  <span className="viaticos-comida-x">×</span>
-                  <input type="text" inputMode="numeric" value={valor}
-                    onChange={(e) => setValor(e.target.value.replace(/\D/g, ''))} placeholder="$ por día" />
+                  <span className="viaticos-comida-x">× ${formatearMiles(precio)}/día</span>
                 </div>
-                {(parseInt(dias) || 0) > 0 && (parseInt(valor) || 0) > 0 && (
+                {(parseInt(dias) || 0) > 0 && precio > 0 && (
                   <div className="viaticos-comida-subtotal">
-                    = ${formatearMiles((parseInt(dias) || 0) * (parseInt(valor) || 0))}
+                    = ${formatearMiles((parseInt(dias) || 0) * precio)}
                   </div>
                 )}
               </div>
@@ -1215,12 +901,12 @@ export function ViaticosPanel({ onCreada, areaId }: { onCreada?: (info: { id: nu
             <h4>Transporte</h4>
             <div className="leg-resumen-row">
               <span>Ida:</span>
-              <strong>{tipoTrIda === 'aereo' ? '✈' : '🚌'} {empresaIda} — {numDocIda}{codResIda ? ` (Res. ${codResIda})` : ''} — ${formatearMiles(parseInt(valorIda.replace(/\D/g,''))||0)}</strong>
+              <strong>{tipoTrIda === 'aereo' ? '✈ Aéreo' : '🚌 Terrestre'} — ${formatearMiles(precioIda)}</strong>
             </div>
             {esIdaVuelta && (
               <div className="leg-resumen-row">
                 <span>Regreso:</span>
-                <strong>{tipoTrVuelta === 'aereo' ? '✈' : '🚌'} {empresaVuelta} — {numDocVuelta}{codResVuelta ? ` (Res. ${codResVuelta})` : ''} — ${formatearMiles(parseInt(valorVuelta.replace(/\D/g,''))||0)}</strong>
+                <strong>{tipoTrVuelta === 'aereo' ? '✈ Aéreo' : '🚌 Terrestre'} — ${formatearMiles(precioVuelta)}</strong>
               </div>
             )}
 
@@ -1230,7 +916,7 @@ export function ViaticosPanel({ onCreada, areaId }: { onCreada?: (info: { id: nu
                 <div className="leg-resumen-row"><span>Hotel:</span> <strong>{hotelNombre}</strong></div>
                 <div className="leg-resumen-row">
                   <span>Costo:</span>
-                  <strong>{noches} noche(s) × ${formatearMiles(parseInt(hotelValorNoche) || 0)} = ${formatearMiles(totalHospedaje)}</strong>
+                  <strong>{noches} noche(s) × ${formatearMiles(precioHospedaje)} = ${formatearMiles(totalHospedaje)}</strong>
                 </div>
               </>
             )}
@@ -1238,9 +924,9 @@ export function ViaticosPanel({ onCreada, areaId }: { onCreada?: (info: { id: nu
             {totalComidas > 0 && (
               <>
                 <h4>Alimentación</h4>
-                {(parseInt(diasDesayuno) || 0) > 0 && <div className="leg-resumen-row"><span>Desayunos:</span> <strong>{diasDesayuno} × ${formatearMiles(parseInt(valorDesayuno)||0)} = ${formatearMiles((parseInt(diasDesayuno)||0)*(parseInt(valorDesayuno)||0))}</strong></div>}
-                {(parseInt(diasAlmuerzo) || 0) > 0 && <div className="leg-resumen-row"><span>Almuerzos:</span> <strong>{diasAlmuerzo} × ${formatearMiles(parseInt(valorAlmuerzo)||0)} = ${formatearMiles((parseInt(diasAlmuerzo)||0)*(parseInt(valorAlmuerzo)||0))}</strong></div>}
-                {(parseInt(diasCena) || 0) > 0 && <div className="leg-resumen-row"><span>Cenas:</span> <strong>{diasCena} × ${formatearMiles(parseInt(valorCena)||0)} = ${formatearMiles((parseInt(diasCena)||0)*(parseInt(valorCena)||0))}</strong></div>}
+                {(parseInt(diasDesayuno) || 0) > 0 && <div className="leg-resumen-row"><span>Desayunos:</span> <strong>{diasDesayuno} × ${formatearMiles(tarifas?.precioDesayuno ?? 0)} = ${formatearMiles((parseInt(diasDesayuno)||0)*(tarifas?.precioDesayuno??0))}</strong></div>}
+                {(parseInt(diasAlmuerzo) || 0) > 0 && <div className="leg-resumen-row"><span>Almuerzos:</span> <strong>{diasAlmuerzo} × ${formatearMiles(tarifas?.precioAlmuerzo ?? 0)} = ${formatearMiles((parseInt(diasAlmuerzo)||0)*(tarifas?.precioAlmuerzo??0))}</strong></div>}
+                {(parseInt(diasCena) || 0) > 0    && <div className="leg-resumen-row"><span>Cenas:</span>     <strong>{diasCena}     × ${formatearMiles(tarifas?.precioCena     ?? 0)} = ${formatearMiles((parseInt(diasCena)    ||0)*(tarifas?.precioCena    ??0))}</strong></div>}
               </>
             )}
 
@@ -1250,7 +936,7 @@ export function ViaticosPanel({ onCreada, areaId }: { onCreada?: (info: { id: nu
             </div>
             {tipoViatico === 'anticipo' && (
               <div className="viatico-anticipo-aviso" style={{ marginTop: 12 }}>
-                Al recibir este anticipo, deberás <strong>legalizarlo en la plataforma</strong> adjuntando los tiquetes y facturas reales. Si quedó dinero sin usar, deberás reportarlo y devolverlo.
+                Al recibir este anticipo, deberás <strong>legalizarlo en la plataforma</strong> adjuntando los tiquetes y facturas reales.
               </div>
             )}
           </div>

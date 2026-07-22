@@ -125,6 +125,11 @@ $routes = [
     // Tarifas OPS — lista pública para cualquier usuario autenticado
     ['GET',    '#^/tarifas-ops$#',                                  'tarifas_ops_listar_pub'],
 
+    // Tarifas viáticos (admin configura, usuarios leen)
+    ['GET',    '#^/admin/tarifas-viaticos$#',                       'admin/tarifas_viaticos_obtener'],
+    ['POST',   '#^/admin/tarifas-viaticos$#',                       'admin/tarifas_viaticos_guardar'],
+    ['GET',    '#^/tarifas-viaticos$#',                             'tarifas_viaticos_pub'],
+
     // Radicados
     ['POST',   '#^/radicados$#',                                 'radicados/create'],
     ['POST',   '#^/radicados/cuentas-cobro-ops/solicitud$#',     'radicados/ops_solicitud'],
