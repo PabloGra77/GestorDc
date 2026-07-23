@@ -43,7 +43,16 @@ $uStmt->execute([':id' => (int)$jwt['sub']]);
 $user = $uStmt->fetch();
 if (!$user) Response::error('Usuario no encontrado', 404);
 
-$siguiente = FlujoHelpers::siguientePaso($sol['flujo_aprobacion'] ?? '[]', 'autorizador_visto_bueno');
+// autorizador_visto_bueno was prepended dynamically in create.php and is NOT stored
+// in tipos_solicitud.flujo_aprobacion — rebuild the effective flujo before searching.
+$flujoEfectivo = json_decode($sol['flujo_aprobacion'] ?? '[]', true) ?: [];
+usort($flujoEfectivo, fn($a, $b) => ($a['orden'] ?? 0) <=> ($b['orden'] ?? 0));
+if (($flujoEfectivo[0]['rol'] ?? '') !== 'autorizador_visto_bueno') {
+    foreach ($flujoEfectivo as &$_fp) { $_fp['orden'] = (int)($_fp['orden'] ?? 0) + 1; }
+    unset($_fp);
+    array_unshift($flujoEfectivo, ['rol' => 'autorizador_visto_bueno', 'label' => 'Visto bueno del autorizador', 'orden' => 1]);
+}
+$siguiente = FlujoHelpers::siguientePaso(json_encode($flujoEfectivo), 'autorizador_visto_bueno');
 
 $pdo->beginTransaction();
 try {

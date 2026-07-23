@@ -12223,6 +12223,8 @@ body[data-weather="tormenta"]::after {
   flex-direction: column;
   gap: 0;
   min-height: 0;
+  min-width: 0;
+  width: 100%;
 }
 
 /* Cabecera */
@@ -12308,6 +12310,7 @@ body[data-weather="tormenta"]::after {
 /* Contenido */
 .rad2-content {
   min-height: 0;
+  min-width: 0;
 }
 
 /* Tablero — KPI grid */
@@ -12475,7 +12478,8 @@ body[data-weather="tormenta"]::after {
 
 /* Mobile Radicaciones */
 @media (max-width: 640px) {
-  .rad2-shell { padding: 0; }
+  .rad2-shell { padding: 0; overflow-x: hidden; }
+  .rad2-content { overflow-x: hidden; }
   .rad2-header { padding-bottom: 12px; }
   .rad2-titulo { font-size: 17px; }
   .rad2-subtitulo { font-size: 11.5px; }
@@ -12518,6 +12522,16 @@ body[data-weather="tormenta"]::after {
   .rad2-table td:nth-child(5),
   .rad2-table th:nth-child(6),
   .rad2-table td:nth-child(6) { display: none; }
+
+  /* Bandeja: ajustes para paneles internos en mobile */
+  .bandeja-panel { overflow-x: hidden; }
+  .bandeja-item-body { padding: 14px; }
+  .bandeja-item-head { padding: 14px 16px; gap: 10px; }
+  .bandeja-datos {
+    grid-template-columns: 1fr;
+  }
+  .bandeja-dato { padding: 10px 12px; }
+  .bandeja-formato-head { flex-direction: column; align-items: flex-start; gap: 8px; }
 }
 
 /* Topbar minimal — oculta en todos los breakpoints (Sidebar maneja todo) */
