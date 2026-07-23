@@ -30,16 +30,19 @@ final class FlujoHelpers
         $user = $uStmt->fetch();
         if (!$user) Response::error('Usuario no encontrado', 404);
 
-        $esAdmin = strtolower(trim($user['rol'] ?? '')) === 'administrador';
-        $pasoActual = $sol['paso_actual'] ?? '';
+        $rolNorm     = strtolower(trim($user['rol'] ?? ''));
+        $esAdmin     = $rolNorm === 'administrador';
+        $esGerente   = $rolNorm === 'gerente';
+        $pasoActual  = $sol['paso_actual'] ?? '';
         $nivelUsuario = $user['nivel_aprobacion'] ?? '';
 
-        // Admin puede actuar siempre. Contabilidad ve todas las areas.
+        // Admin y gerente pueden actuar en cualquier solicitud.
+        // Contabilidad ve todas las areas en su paso.
         // Otros niveles requieren que su nivel coincida con el paso actual Y que el area coincida.
         // Autorizador de visto bueno: puede actuar cuando paso_actual = 'autorizador_visto_bueno'
         // y su ID coincide con datosFormulario.autorizadorId.
         $puede = false;
-        if ($esAdmin) {
+        if ($esAdmin || $esGerente) {
             $puede = true;
         } elseif ($pasoActual === 'autorizador_visto_bueno') {
             $datos = json_decode($sol['datos_formulario'] ?? '{}', true) ?: [];

@@ -107,6 +107,16 @@ if ($areasVisiblesConfig === 'todas') {
     $areaSolicitud = (int)$tipo['area_id'];
 }
 
+// Cuando la solicitud designa un autorizador (autorizadorId en el formulario), siempre
+// usar el área del creador como área de la solicitud. Esto garantiza que la cadena
+// jerárquica del creador (coordinador/director de su área) pueda validarla luego del
+// visto bueno, independientemente del área fija que tenga configurada el tipo.
+$_autorizadorIdCheck = (int)($datosFormulario['autorizadorId'] ?? 0);
+if ($_autorizadorIdCheck > 0 && (int)($usuario['area_id'] ?? 0) > 0) {
+    $areaSolicitud = (int)$usuario['area_id'];
+}
+unset($_autorizadorIdCheck);
+
 // Limite: maximo 2 anticipos abiertos
 if ($esAnticipo) {
     $lim = $pdo->prepare(
