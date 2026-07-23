@@ -134,6 +134,7 @@ $routes = [
     ['GET',    '#^/push/vapid-key$#',                              'push/vapid_key'],
     ['POST',   '#^/push/subscribe$#',                              'push/subscribe'],
     ['DELETE', '#^/push/unsubscribe$#',                            'push/unsubscribe'],
+    ['GET',    '#^/push/status$#',                                 'push/status'],
 
     // Radicados
     ['POST',   '#^/radicados$#',                                 'radicados/create'],

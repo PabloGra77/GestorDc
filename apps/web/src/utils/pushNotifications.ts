@@ -18,6 +18,20 @@ async function sendToServer(sub: PushSubscription): Promise<void> {
   });
 }
 
+/** Compares a PushSubscription's applicationServerKey with a base64url VAPID key. */
+function keyMatchesVapid(sub: PushSubscription, vapidBase64Url: string): boolean {
+  try {
+    const subKey = sub.options?.applicationServerKey;
+    if (!subKey) return false;
+    const subBytes = new Uint8Array(subKey as ArrayBuffer);
+    const newBytes = urlBase64ToUint8Array(vapidBase64Url);
+    if (subBytes.length !== newBytes.length) return false;
+    return subBytes.every((b, i) => b === newBytes[i]);
+  } catch {
+    return false;
+  }
+}
+
 export function isPushSupported(): boolean {
   return (
     'serviceWorker' in navigator &&
@@ -30,19 +44,31 @@ export async function subscribeToPush(): Promise<boolean> {
   if (!isPushSupported()) return false;
   try {
     const permission = await Notification.requestPermission();
-    if (permission !== 'granted') return false;
+    if (permission !== 'granted') {
+      console.warn('[push] permission not granted:', permission);
+      return false;
+    }
 
     const keyRes = await api.get<{ publicKey: string | null }>('/push/vapid-key');
     const vapidKey = keyRes.data.publicKey;
-    if (!vapidKey) return false;
+    if (!vapidKey) {
+      console.warn('[push] server returned no VAPID public key');
+      return false;
+    }
 
     const reg = await navigator.serviceWorker.ready;
-
-    // Re-use existing subscription if present (send it again to keep server in sync)
     const existing = await reg.pushManager.getSubscription();
+
     if (existing) {
-      await sendToServer(existing).catch(() => {});
-      return true;
+      // If the server's VAPID key changed, unsubscribe so we resubscribe with the new key
+      if (!keyMatchesVapid(existing, vapidKey)) {
+        console.warn('[push] VAPID key mismatch — resubscribing');
+        await existing.unsubscribe();
+      } else {
+        // Key matches — just ensure server has it
+        await sendToServer(existing).catch((e) => console.warn('[push] re-save failed:', e));
+        return true;
+      }
     }
 
     const sub = await reg.pushManager.subscribe({
@@ -50,9 +76,10 @@ export async function subscribeToPush(): Promise<boolean> {
       applicationServerKey: urlBase64ToUint8Array(vapidKey),
     });
     await sendToServer(sub);
+    console.info('[push] subscribed OK');
     return true;
   } catch (e) {
-    console.warn('[push] subscribe:', e);
+    console.warn('[push] subscribe error:', e);
     return false;
   }
 }

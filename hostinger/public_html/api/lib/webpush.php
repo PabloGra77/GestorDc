@@ -3,12 +3,21 @@ declare(strict_types=1);
 
 /**
  * Web Push via VAPID (RFC 8292).
- * Sends empty-payload pushes — no AES-GCM needed, avoids complex encryption.
- * The service worker wakes up and shows a hardcoded notification.
+ * Sends empty-payload pushes — the service worker wakes and shows a notification.
+ *
+ * VAPID keys are generated on first call to ensureKeys() and stored in `configuracion`.
+ * A pre-generated P-256 key pair is embedded as fallback in case the server's OpenSSL
+ * does not support EC key generation (common on some shared-hosting setups).
  */
 final class WebPushSender
 {
     private const SUBJECT = 'mailto:estadistica@goleman.edu.co';
+
+    // Pre-generated P-256 VAPID key pair (fallback when openssl_pkey_new fails).
+    // These are fixed for this installation — safe to commit since VAPID public keys
+    // are deliberately public; the private key here grants only push delivery rights.
+    private const FALLBACK_PUB = 'BEHLG5ru2XAfqiJZxrd1JqUpK2u-8-vo8bCszUa6WPGQL7V5NbQS5sMsVhSun55PxNav5LEAEnTYhSEeD5G8owc';
+    private const FALLBACK_PEM = "-----BEGIN EC PRIVATE KEY-----\nMHcCAQEEINEkB2dTzubeI4SKc7BbQMRB58eWxA9ys8vKQMFw+eF7oAoGCCqGSM49\nAwEHoUQDQgAEQcsbmu7ZcB+qIlnGt3UmpSkra77z6+jxsKzNRrpY8ZAvtXk1tBLm\nwyxWFK6fnk/E1q/ksQASdNiFIR4PkbyjBw==\n-----END EC PRIVATE KEY-----\n";
 
     /** Returns base64url-encoded VAPID public key, or null if not initialised yet. */
     public static function getPublicKey(): ?string
@@ -16,27 +25,53 @@ final class WebPushSender
         return Settings::get('vapid.public_key');
     }
 
-    /** Generates and persists VAPID key pair if not already present. */
+    /**
+     * Generates (or seeds fallback) VAPID key pair and stores in DB.
+     * Safe to call on every request — returns immediately if keys already exist.
+     */
     public static function ensureKeys(): bool
     {
-        if (Settings::get('vapid.public_key') !== null) return true;
+        // If keys exist AND the private key is actually loadable, we're good
+        $existingPub = Settings::get('vapid.public_key');
+        $existingPem = Settings::get('vapid.private_pem');
+        if ($existingPub !== null && $existingPem !== null) {
+            $testKey = @openssl_pkey_get_private($existingPem);
+            if ($testKey !== false && $testKey !== null) return true;
+            // Stored private key is not loadable — clear and regenerate
+            error_log('[webpush] stored private key invalid, regenerating VAPID keys');
+            Settings::set('vapid.public_key',  null);
+            Settings::set('vapid.private_pem', null);
+        }
+
+        // Attempt OpenSSL EC key generation
+        $generated = false;
+        $pubBase64Url = '';
+        $privPem      = '';
 
         $config = ['private_key_type' => OPENSSL_KEYTYPE_EC, 'curve_name' => 'prime256v1'];
-        $key = openssl_pkey_new($config);
-        if ($key === false) { error_log('[webpush] openssl_pkey_new failed'); return false; }
+        $key = @openssl_pkey_new($config);
+        if ($key !== false) {
+            @openssl_pkey_export($key, $privPem);
+            $details = @openssl_pkey_get_details($key);
+            $pubDer = base64_decode(str_replace(
+                ['-----BEGIN PUBLIC KEY-----', '-----END PUBLIC KEY-----', "\n", "\r"],
+                '',
+                (string)($details['key'] ?? '')
+            ));
+            // SubjectPublicKeyInfo DER: last 65 bytes are 04 || X || Y
+            if (strlen($pubDer) >= 65 && $privPem !== '') {
+                $rawPub       = substr($pubDer, -65);
+                $pubBase64Url = rtrim(strtr(base64_encode($rawPub), '+/', '-_'), '=');
+                $generated    = true;
+            }
+        }
 
-        openssl_pkey_export($key, $privPem);
-        $details = openssl_pkey_get_details($key);
-        $pubDer = base64_decode(str_replace(
-            ['-----BEGIN PUBLIC KEY-----', '-----END PUBLIC KEY-----', "\n", "\r"],
-            '',
-            (string)($details['key'] ?? '')
-        ));
-        if (strlen($pubDer) < 65) { error_log('[webpush] DER key too short'); return false; }
-
-        // Uncompressed EC point: 0x04 + 32 bytes X + 32 bytes Y (last 65 bytes of SubjectPublicKeyInfo DER)
-        $rawPub       = substr($pubDer, -65);
-        $pubBase64Url = rtrim(strtr(base64_encode($rawPub), '+/', '-_'), '=');
+        if (!$generated) {
+            // Fallback to pre-generated P-256 key pair
+            error_log('[webpush] openssl EC generation failed — using embedded fallback keys');
+            $pubBase64Url = self::FALLBACK_PUB;
+            $privPem      = self::FALLBACK_PEM;
+        }
 
         Settings::set('vapid.public_key',  $pubBase64Url);
         Settings::set('vapid.private_pem', $privPem);
@@ -69,18 +104,23 @@ final class WebPushSender
     public static function notificar(PDO $pdo, array $usuarioIds): void
     {
         if (empty($usuarioIds)) return;
+
         $pubKey  = Settings::get('vapid.public_key');
         $privPem = Settings::get('vapid.private_pem');
         if (!$pubKey || !$privPem) {
             if (!self::ensureKeys()) return;
             $pubKey  = Settings::get('vapid.public_key');
             $privPem = Settings::get('vapid.private_pem');
-            if (!$pubKey || !$privPem) return;
+            if (!$pubKey || !$privPem) { error_log('[webpush] no VAPID keys available'); return; }
         }
 
-        $privKey = openssl_pkey_get_private($privPem);
-        if (!$privKey) return;
+        $privKey = @openssl_pkey_get_private($privPem);
+        if ($privKey === false || $privKey === null) {
+            error_log('[webpush] could not load private key from PEM');
+            return;
+        }
 
+        self::ensureTable($pdo);
         try {
             $placeholders = implode(',', array_fill(0, count($usuarioIds), '?'));
             $stmt = $pdo->prepare(
@@ -89,13 +129,19 @@ final class WebPushSender
             $stmt->execute(array_values($usuarioIds));
             $subs = $stmt->fetchAll();
         } catch (Throwable $e) {
-            error_log('[webpush] DB: ' . $e->getMessage());
+            error_log('[webpush] DB fetch subs: ' . $e->getMessage());
+            return;
+        }
+
+        if (empty($subs)) {
+            error_log('[webpush] no subscriptions found for usuarios: ' . implode(',', $usuarioIds));
             return;
         }
 
         $expired = [];
         foreach ($subs as $sub) {
             $code = self::sendOne((string)$sub['endpoint'], $privKey, $pubKey);
+            error_log('[webpush] sendOne => HTTP ' . $code . ' for user_sub_id=' . $sub['id']);
             if ($code === 404 || $code === 410) $expired[] = (string)$sub['endpoint'];
         }
         foreach ($expired as $ep) self::unsubscribe($pdo, $ep);
@@ -136,35 +182,42 @@ final class WebPushSender
 
     // ─── Private helpers ───────────────────────────────────────────────────────
 
-    /** Send one empty-payload push. Returns HTTP response code. */
+    /** Send one empty-payload push. Returns HTTP response code (0 on curl error). */
     private static function sendOne(string $endpoint, $privKey, string $pubKey): int
     {
         try {
             $parsedUrl = parse_url($endpoint);
             $origin = ($parsedUrl['scheme'] ?? 'https') . '://' . ($parsedUrl['host'] ?? '');
-            if (!$origin) return 0;
+            if (!$origin || $origin === '://') return 0;
 
             $jwt = self::vapidJwt($origin, $privKey);
 
             $ch = curl_init($endpoint);
             curl_setopt_array($ch, [
-                CURLOPT_CUSTOMREQUEST  => 'POST',
+                CURLOPT_POST           => true,
                 CURLOPT_POSTFIELDS     => '',
                 CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_TIMEOUT        => 10,
+                CURLOPT_TIMEOUT        => 15,
+                CURLOPT_FOLLOWLOCATION => false,
                 CURLOPT_HTTPHEADER     => [
                     'Authorization: vapid t=' . $jwt . ',k=' . $pubKey,
+                    'Content-Type: application/octet-stream',
+                    'Content-Length: 0',
                     'TTL: 86400',
                     'Urgency: normal',
-                    'Content-Length: 0',
                 ],
             ]);
-            curl_exec($ch);
-            $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $response = curl_exec($ch);
+            $code     = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $curlErr  = curl_error($ch);
             curl_close($ch);
+
+            if ($curlErr) {
+                error_log('[webpush] curl error: ' . $curlErr);
+            }
             return $code;
         } catch (Throwable $e) {
-            error_log('[webpush] sendOne: ' . $e->getMessage());
+            error_log('[webpush] sendOne exception: ' . $e->getMessage());
             return 0;
         }
     }
@@ -189,15 +242,15 @@ final class WebPushSender
      */
     private static function derToRaw(string $der): string
     {
-        $pos = 2;              // skip SEQUENCE tag + length
-        $pos++;                // skip INTEGER tag (0x02) for r
+        $pos  = 2;                          // skip SEQUENCE tag + 1-byte length
+        $pos++;                             // skip INTEGER tag for r
         $rLen = ord($der[$pos++]);
-        $r = substr($der, $pos, $rLen);
+        $r    = substr($der, $pos, $rLen);
         $pos += $rLen;
-        $pos++;                // skip INTEGER tag (0x02) for s
+        $pos++;                             // skip INTEGER tag for s
         $sLen = ord($der[$pos++]);
-        $s = substr($der, $pos, $sLen);
-        // Normalise each to exactly 32 bytes (P-256 field size)
+        $s    = substr($der, $pos, $sLen);
+        // Pad/trim each component to exactly 32 bytes (P-256 field size)
         $r = str_pad(ltrim($r, "\x00"), 32, "\x00", STR_PAD_LEFT);
         $s = str_pad(ltrim($s, "\x00"), 32, "\x00", STR_PAD_LEFT);
         return $r . $s;
@@ -205,16 +258,20 @@ final class WebPushSender
 
     private static function ensureTable(PDO $pdo): void
     {
-        $pdo->exec(
-            "CREATE TABLE IF NOT EXISTS push_subscriptions (
-               id          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-               usuario_id  INT UNSIGNED NOT NULL,
-               endpoint    TEXT NOT NULL,
-               p256dh      VARCHAR(500) NOT NULL,
-               auth        VARCHAR(100) NOT NULL,
-               created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-               UNIQUE KEY uq_endpoint (endpoint(512))
-             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
-        );
+        try {
+            $pdo->exec(
+                "CREATE TABLE IF NOT EXISTS push_subscriptions (
+                   id          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                   usuario_id  INT UNSIGNED NOT NULL,
+                   endpoint    TEXT NOT NULL,
+                   p256dh      VARCHAR(500) NOT NULL,
+                   auth        VARCHAR(100) NOT NULL,
+                   created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                   UNIQUE KEY uq_endpoint (endpoint(512))
+                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
+            );
+        } catch (Throwable $e) {
+            error_log('[webpush] ensureTable: ' . $e->getMessage());
+        }
     }
 }
