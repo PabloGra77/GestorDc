@@ -202,6 +202,7 @@ export function BandejaPanel({ initialOpenId }: { initialOpenId?: number } = {})
   const [loadingDetalle, setLoadingDetalle] = useState(false);
   const [comentario, setComentario] = useState('');
   const [firmaValidador, setFirmaValidador] = useState('');
+  const [firmaVistoBueno, setFirmaVistoBueno] = useState('');
   const [accionando, setAccionando] = useState<string | null>(null);
   const [areas, setAreas] = useState<AreaMini[]>([]);
   const [areaRemitir, setAreaRemitir] = useState<number | ''>('');
@@ -264,6 +265,7 @@ export function BandejaPanel({ initialOpenId }: { initialOpenId?: number } = {})
     setMotivoSel('');
     setMsg('');
     setErr('');
+    setFirmaVistoBueno('');
     try {
       const r = await api.get<Detalle>(`/solicitudes/${id}`);
       setDetalle(r.data);
@@ -320,15 +322,23 @@ export function BandejaPanel({ initialOpenId }: { initialOpenId?: number } = {})
   }
 
   async function darVistoBueno(id: number) {
+    if (!firmaVistoBueno) {
+      setErr('Debes firmar antes de confirmar el visto bueno.');
+      return;
+    }
     setAccionando('visto_bueno');
     setErr('');
     setMsg('');
     try {
-      await api.post(`/solicitudes/${id}/autorizar-legalizacion`, { comentario: comentario.trim() || 'Visto bueno otorgado' });
+      await api.post(`/solicitudes/${id}/autorizar-legalizacion`, {
+        comentario: comentario.trim() || 'Visto bueno otorgado',
+        firma: firmaVistoBueno,
+      });
       setMsg('Visto bueno otorgado. La solicitud avanzó al siguiente paso.');
       setOpenId(null);
       setDetalle(null);
       setComentario('');
+      setFirmaVistoBueno('');
       cargar();
     } catch (e) {
       const r = (e as { response?: { data?: { message?: string } } })?.response?.data?.message;
@@ -980,15 +990,20 @@ export function BandejaPanel({ initialOpenId }: { initialOpenId?: number } = {})
                       <div className="bandeja-actions">
                         <div className="bandeja-visto-bueno-info">
                           <p>
-                            <strong>Se requiere tu visto bueno</strong> — El solicitante indica que tu autorizaste este gasto verbalmente.
+                            <strong>Se requiere tu visto bueno</strong> — El solicitante indica que tú autorizaste este gasto verbalmente.
                             Al confirmar, la solicitud avanza al siguiente paso del flujo.
                           </p>
                         </div>
                         <textarea
-                          placeholder="Observacion (opcional)"
+                          placeholder="Observación (opcional)"
                           value={comentario}
                           onChange={(e) => setComentario(e.target.value)}
                           rows={2}
+                        />
+                        <SignaturePad
+                          value={firmaVistoBueno}
+                          onChange={setFirmaVistoBueno}
+                          label="Tu firma (obligatoria para confirmar el visto bueno)"
                         />
                         <div className="bandeja-actions-row">
                           <button

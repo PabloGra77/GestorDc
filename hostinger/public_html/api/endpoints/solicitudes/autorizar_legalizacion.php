@@ -15,6 +15,14 @@ $jwt = Auth::requireUser();
 $id  = (int)($params['id'] ?? 0);
 $body = Request::body();
 $comentario = trim((string)($body['comentario'] ?? '')) ?: 'Visto bueno del autorizador';
+$firma = isset($body['firma']) ? (string)$body['firma'] : '';
+
+if ($firma === '' || strpos($firma, 'data:image') !== 0) {
+    Response::error('Se requiere la firma del autorizador para confirmar el visto bueno', 400);
+}
+if (strlen($firma) > 300_000) {
+    Response::error('La firma excede el tamaño máximo permitido (300 KB)', 413);
+}
 
 $pdo = Db::pdo();
 
@@ -54,14 +62,19 @@ if (($flujoEfectivo[0]['rol'] ?? '') !== 'autorizador_visto_bueno') {
 }
 $siguiente = FlujoHelpers::siguientePaso(json_encode($flujoEfectivo), 'autorizador_visto_bueno');
 
+// Guardar firma del autorizador junto a las demás firmas de la solicitud
+$firmasActuales = json_decode($sol['firmas'] ?? 'null', true) ?: [];
+$firmasActuales['autorizador_visto_bueno'] = $firma;
+$firmasJson = json_encode($firmasActuales, JSON_UNESCAPED_UNICODE);
+
 $pdo->beginTransaction();
 try {
     if ($siguiente) {
         $upd = $pdo->prepare(
-            "UPDATE solicitudes SET paso_actual = :pa, paso_orden = :po
+            "UPDATE solicitudes SET paso_actual = :pa, paso_orden = :po, firmas = :firmas
              WHERE id = :id AND paso_actual = 'autorizador_visto_bueno'"
         );
-        $upd->execute([':pa' => $siguiente['rol'], ':po' => (int)($siguiente['orden'] ?? 2), ':id' => $id]);
+        $upd->execute([':pa' => $siguiente['rol'], ':po' => (int)($siguiente['orden'] ?? 2), ':firmas' => $firmasJson, ':id' => $id]);
         if ($upd->rowCount() === 0) {
             $pdo->rollBack();
             Response::error('La solicitud ya fue actualizada por otro usuario', 409);
@@ -77,10 +90,10 @@ try {
     } else {
         // No hay más pasos → aprobar directamente
         $upd = $pdo->prepare(
-            "UPDATE solicitudes SET estado = 'aprobado', paso_actual = NULL, aprobado_en = UTC_TIMESTAMP()
+            "UPDATE solicitudes SET estado = 'aprobado', paso_actual = NULL, aprobado_en = UTC_TIMESTAMP(), firmas = :firmas
              WHERE id = :id AND paso_actual = 'autorizador_visto_bueno'"
         );
-        $upd->execute([':id' => $id]);
+        $upd->execute([':firmas' => $firmasJson, ':id' => $id]);
         FlujoHelpers::registrarMovimiento(
             $pdo, $id, 'aprobada', 'autorizador_visto_bueno', 'aprobado',
             ['id' => $user['id'], 'nombre_completo' => $user['nombre_completo'], 'nivel_aprobacion' => 'autorizador'],

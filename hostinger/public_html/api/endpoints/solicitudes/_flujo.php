@@ -57,6 +57,14 @@ final class FlujoHelpers
             if ((int)($user['area_id'] ?? 0) === (int)$sol['area_id']) {
                 $puede = true;
             }
+            // Si el usuario fue el autorizador designado puede validar el paso siguiente
+            // aunque sea de otra área (ya dio el visto bueno y sigue en la cadena)
+            if (!$puede) {
+                $datos = json_decode($sol['datos_formulario'] ?? '{}', true) ?: [];
+                if ((int)($datos['autorizadorId'] ?? 0) === $usuarioId) {
+                    $puede = true;
+                }
+            }
         } elseif ($nivelUsuario === $pasoActual) {
             if ($nivelUsuario === 'contabilidad') {
                 $puede = true;
