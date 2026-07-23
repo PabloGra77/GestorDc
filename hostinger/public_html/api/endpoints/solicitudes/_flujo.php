@@ -49,9 +49,17 @@ final class FlujoHelpers
             if ((int)($datos['autorizadorId'] ?? 0) === $usuarioId) {
                 $puede = true;
             }
+        } elseif (
+            in_array($pasoActual, ['analista', 'coordinador', 'director']) &&
+            in_array($nivelUsuario, ['analista', 'coordinador', 'director'])
+        ) {
+            // Cualquier nivel jerárquico del área puede validar pasos analista/coordinador/director
+            if ((int)($user['area_id'] ?? 0) === (int)$sol['area_id']) {
+                $puede = true;
+            }
         } elseif ($nivelUsuario === $pasoActual) {
             if ($nivelUsuario === 'contabilidad') {
-                $puede = true; // contabilidad ve todas las areas
+                $puede = true;
             } elseif ((int)($user['area_id'] ?? 0) === (int)$sol['area_id']) {
                 $puede = true;
             }

@@ -958,6 +958,7 @@ export function DashboardPage() {
 			esAdmin={esAdmin}
 			activeSection={activeSection}
 			onSelectSection={setActiveSection}
+			onNavigateRadicaciones={(vista) => { setRadicacionesVista(vista); setActiveSection('Radicaciones'); }}
 			onLogout={handleLogout}
 		>
 			{activeSection === 'Inicio' ? (

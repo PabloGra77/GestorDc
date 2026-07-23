@@ -4,12 +4,14 @@ import { isPushSupported, subscribeToPush } from '../utils/pushNotifications';
 
 export interface NotificacionPayops {
   id: number;
+  solicitudId: number;
   numeroRadicado: string;
   titulo: string;
   detalle: string;
   tipo: 'pendiente' | 'devuelta' | 'aprobada' | 'rechazada';
   areaNombre: string;
   creadoEn: string;
+  vista: 'bandeja' | 'misSolicitudes';
 }
 
 interface SolicitudResumen {
@@ -54,12 +56,14 @@ export function useNotificacionesPayops(refreshMs = 30000) {
       for (const b of bandeja.slice(0, 10)) {
         notifs.push({
           id: b.id,
+          solicitudId: b.id,
           numeroRadicado: b.numeroRadicado,
-          titulo: `Solicitud pendiente del área ${b.areaNombre}`,
+          titulo: `Solicitud pendiente · ${b.areaNombre}`,
           detalle: `${b.tipoNombre} · paso: ${b.pasoActual ?? '—'}${b.alertasCount > 0 ? ` · ${b.alertasCount} alerta(s)` : ''}`,
           tipo: 'pendiente',
           areaNombre: b.areaNombre,
           creadoEn: b.creadoEn,
+          vista: 'bandeja',
         });
       }
 
@@ -67,24 +71,27 @@ export function useNotificacionesPayops(refreshMs = 30000) {
         if (s.estado === 'devuelto') {
           notifs.push({
             id: s.id + 1000000,
+            solicitudId: s.id,
             numeroRadicado: s.numeroRadicado,
-            titulo: `Tu solicitud fue devuelta por el área ${s.areaNombre}`,
+            titulo: `Tu solicitud fue devuelta`,
             detalle: `${s.tipoNombre} · revisa los comentarios y reenvía.`,
             tipo: 'devuelta',
             areaNombre: s.areaNombre,
             creadoEn: s.creadoEn,
+            vista: 'misSolicitudes',
           });
         } else if (s.estado === 'aprobado') {
-          // Solo notificar las últimas 5 aprobadas
           if (notifs.filter((n) => n.tipo === 'aprobada').length < 5) {
             notifs.push({
               id: s.id + 2000000,
+              solicitudId: s.id,
               numeroRadicado: s.numeroRadicado,
-              titulo: `Solicitud aprobada por ${s.areaNombre}`,
+              titulo: `Solicitud aprobada`,
               detalle: s.tipoNombre,
               tipo: 'aprobada',
               areaNombre: s.areaNombre,
               creadoEn: s.creadoEn,
+              vista: 'misSolicitudes',
             });
           }
         }

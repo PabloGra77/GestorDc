@@ -6,6 +6,7 @@ interface SidebarProps {
 	esAdmin: boolean;
 	activeSection: string;
 	onSelectSection: (section: string) => void;
+	onNavigateRadicaciones?: (vista: 'nueva' | 'misSolicitudes' | 'bandeja' | 'tablero') => void;
 	currentUser: string;
 	rol?: string;
 	onLogout?: () => void;
@@ -51,13 +52,15 @@ function NavIcon({ item }: { item: string }) {
 	return <span style={{ fontSize: 18, lineHeight: 1 }}>●</span>;
 }
 
-export function Sidebar({ esAdmin, activeSection, onSelectSection, currentUser, rol, onLogout }: SidebarProps) {
+export function Sidebar({ esAdmin, activeSection, onSelectSection, onNavigateRadicaciones, currentUser, rol, onLogout }: SidebarProps) {
 	const [showNotifications, setShowNotifications] = useState(false);
 	const [movilAbierto, setMovilAbierto] = useState(false);
 	const notificationsRef = useRef<HTMLDivElement | null>(null);
 	const bellMovilRef = useRef<HTMLButtonElement | null>(null);
 	const { items } = useNotificacionesPayops();
 	const [seenIds, setSeenIdsState] = useState<Set<number>>(() => getSeenIds());
+	// IDs que eran nuevos justo al abrir el panel (para marcarlos visualmente en la lista)
+	const [newAtOpen, setNewAtOpen] = useState<Set<number>>(new Set());
 
 	const menuItems = esAdmin
 		? ['Inicio', 'Radicaciones', 'Panel administrador', 'Mi perfil']
@@ -67,6 +70,9 @@ export function Sidebar({ esAdmin, activeSection, onSelectSection, currentUser, 
 
 	useEffect(() => {
 		if (!showNotifications) return;
+		// Captura los IDs no vistos antes de marcarlos como vistos
+		const currentUnread = new Set(items.filter((n) => !seenIds.has(n.id)).map((n) => n.id));
+		setNewAtOpen(currentUnread);
 		const allIds = items.map((n) => n.id);
 		const merged = new Set([...seenIds, ...allIds]);
 		setSeenIdsState(merged);
@@ -93,11 +99,20 @@ export function Sidebar({ esAdmin, activeSection, onSelectSection, currentUser, 
 		setShowNotifications((v) => !v);
 	}
 
+	function irASolicitud(n: ReturnType<typeof useNotificacionesPayops>['items'][number]) {
+		setShowNotifications(false);
+		if (onNavigateRadicaciones) {
+			onNavigateRadicaciones(n.vista);
+		} else {
+			onSelectSection('Radicaciones');
+		}
+	}
+
 	const panelNotif = showNotifications ? createPortal(
 		<div
 			className="admin-notifications-panel"
-			role="status"
-			aria-live="polite"
+			role="dialog"
+			aria-label="Notificaciones"
 			ref={(el) => {
 				if (!el) return;
 				const btn = bellMovilRef.current ?? notificationsRef.current?.querySelector('.admin-bell-button') as HTMLElement | null;
@@ -125,13 +140,24 @@ export function Sidebar({ esAdmin, activeSection, onSelectSection, currentUser, 
 					</div>
 				) : (
 					<ul>
-						{items.map((n) => (
-							<li key={n.id} className={`notif-item notif-${n.tipo}`}>
-								<div className="notif-titulo">{n.titulo}</div>
-								<div className="notif-detalle">{n.detalle}</div>
-								<div className="notif-rad">{n.numeroRadicado}</div>
-							</li>
-						))}
+						{items.map((n) => {
+							const esNueva = newAtOpen.has(n.id);
+							return (
+								<li key={n.id}>
+									<button
+										type="button"
+										className={`notif-item notif-${n.tipo}${esNueva ? ' notif-nueva' : ' notif-vista'}`}
+										onClick={() => irASolicitud(n)}
+									>
+										{esNueva && <span className="notif-dot" aria-label="Nueva" />}
+										<div className="notif-titulo">{n.titulo}</div>
+										<div className="notif-detalle">{n.detalle}</div>
+										<div className="notif-rad">{n.numeroRadicado}</div>
+										<div className="notif-cta">Ver solicitud →</div>
+									</button>
+								</li>
+							);
+						})}
 					</ul>
 				)}
 			</div>

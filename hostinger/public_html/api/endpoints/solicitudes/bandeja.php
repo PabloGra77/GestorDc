@@ -23,8 +23,21 @@ if ($esAdmin || $esGerente) {
     $where = "(s.estado = 'en_validacion' OR s.estado IN ('por_legalizar','en_legalizacion'))";
 } elseif ($nivel === 'contabilidad') {
     $where = "((s.estado = 'en_validacion' AND s.paso_actual = 'contabilidad') OR s.estado IN ('por_legalizar','en_legalizacion'))";
+} elseif (in_array($nivel, ['analista', 'coordinador', 'director'])) {
+    // Los tres niveles jerárquicos del área pueden validar cualquier paso analista/coordinador/director
+    // de su misma área, además de los donde sean designados autorizadores.
+    $where = "(
+      (s.estado = 'en_validacion'
+       AND s.paso_actual IN ('analista','coordinador','director')
+       AND s.area_id = :aid)
+      OR
+      (s.estado = 'en_validacion' AND s.paso_actual = 'autorizador_visto_bueno'
+       AND JSON_UNQUOTE(JSON_EXTRACT(s.datos_formulario, '$.autorizadorId')) = :uid_str)
+    )";
+    $params[':aid']     = (int)($user['area_id'] ?? 0);
+    $params[':uid_str'] = (string)$usuarioId;
 } elseif ($nivel) {
-    // Tiene nivel de aprobación: ve solicitudes de su área en su paso + las donde es autorizador
+    // Otro nivel (ej. contabilidad ya se maneja arriba, pero por seguridad)
     $where = "(
       (s.estado = 'en_validacion' AND s.paso_actual = :nivel AND s.area_id = :aid)
       OR

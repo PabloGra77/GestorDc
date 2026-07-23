@@ -7,6 +7,7 @@ interface AppLayoutProps {
 	esAdmin: boolean;
 	activeSection: string;
 	onSelectSection: (section: string) => void;
+	onNavigateRadicaciones?: (vista: 'nueva' | 'misSolicitudes' | 'bandeja' | 'tablero') => void;
 	onLogout: () => void;
 	children: ReactNode;
 }
@@ -17,6 +18,7 @@ export function AppLayout({
 	esAdmin,
 	activeSection,
 	onSelectSection,
+	onNavigateRadicaciones,
 	onLogout,
 	children,
 }: AppLayoutProps) {
@@ -26,6 +28,7 @@ export function AppLayout({
 				esAdmin={esAdmin}
 				activeSection={activeSection}
 				onSelectSection={onSelectSection}
+				onNavigateRadicaciones={onNavigateRadicaciones}
 				currentUser={nombre}
 				rol={rol}
 				onLogout={onLogout}
