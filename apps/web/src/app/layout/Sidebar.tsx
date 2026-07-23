@@ -6,7 +6,7 @@ interface SidebarProps {
 	esAdmin: boolean;
 	activeSection: string;
 	onSelectSection: (section: string) => void;
-	onNavigateRadicaciones?: (vista: 'nueva' | 'misSolicitudes' | 'bandeja' | 'tablero') => void;
+	onNavigateRadicaciones?: (vista: 'nueva' | 'misSolicitudes' | 'bandeja' | 'tablero', solicitudId?: number) => void;
 	currentUser: string;
 	rol?: string;
 	onLogout?: () => void;
@@ -55,6 +55,7 @@ function NavIcon({ item }: { item: string }) {
 export function Sidebar({ esAdmin, activeSection, onSelectSection, onNavigateRadicaciones, currentUser, rol, onLogout }: SidebarProps) {
 	const [showNotifications, setShowNotifications] = useState(false);
 	const [movilAbierto, setMovilAbierto] = useState(false);
+	const [notifFiltro, setNotifFiltro] = useState<'todas' | 'sinLeer' | 'leidas'>('todas');
 	const notificationsRef = useRef<HTMLDivElement | null>(null);
 	const bellMovilRef = useRef<HTMLButtonElement | null>(null);
 	const { items } = useNotificacionesPayops();
@@ -102,11 +103,17 @@ export function Sidebar({ esAdmin, activeSection, onSelectSection, onNavigateRad
 	function irASolicitud(n: ReturnType<typeof useNotificacionesPayops>['items'][number]) {
 		setShowNotifications(false);
 		if (onNavigateRadicaciones) {
-			onNavigateRadicaciones(n.vista);
+			onNavigateRadicaciones(n.vista, n.solicitudId);
 		} else {
 			onSelectSection('Radicaciones');
 		}
 	}
+
+	const notifFiltradas = items.filter((n) => {
+		if (notifFiltro === 'sinLeer') return newAtOpen.has(n.id) || !seenIds.has(n.id);
+		if (notifFiltro === 'leidas') return !newAtOpen.has(n.id) && seenIds.has(n.id);
+		return true;
+	});
 
 	const panelNotif = showNotifications ? createPortal(
 		<div
@@ -132,15 +139,28 @@ export function Sidebar({ esAdmin, activeSection, onSelectSection, onNavigateRad
 				<h4>Notificaciones</h4>
 				<button type="button" className="admin-notif-panel-cerrar" onClick={() => setShowNotifications(false)}>✕</button>
 			</div>
+			<div className="admin-notif-tabs">
+				{(['todas', 'sinLeer', 'leidas'] as const).map((f) => (
+					<button
+						key={f}
+						type="button"
+						className={`admin-notif-tab${notifFiltro === f ? ' admin-notif-tab--active' : ''}`}
+						onClick={() => setNotifFiltro(f)}
+					>
+						{f === 'todas' ? 'Todas' : f === 'sinLeer' ? 'Sin leer' : 'Leídas'}
+						{f === 'sinLeer' && unread.length > 0 ? <span className="admin-notif-tab-count">{unread.length}</span> : null}
+					</button>
+				))}
+			</div>
 			<div className="admin-notif-panel-body">
-				{items.length === 0 ? (
+				{notifFiltradas.length === 0 ? (
 					<div className="admin-notif-vacio">
 						<span className="admin-notif-vacio-icon">📭</span>
-						<p>Sin notificaciones por el momento.</p>
+						<p>{notifFiltro === 'sinLeer' ? 'Sin notificaciones nuevas.' : notifFiltro === 'leidas' ? 'Sin notificaciones leídas.' : 'Sin notificaciones por el momento.'}</p>
 					</div>
 				) : (
 					<ul>
-						{items.map((n) => {
+						{notifFiltradas.map((n) => {
 							const esNueva = newAtOpen.has(n.id);
 							return (
 								<li key={n.id}>

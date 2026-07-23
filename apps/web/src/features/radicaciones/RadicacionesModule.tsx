@@ -9,6 +9,7 @@ type Vista = 'nueva' | 'misSolicitudes' | 'bandeja' | 'tablero';
 
 interface RadicacionesProps {
   vistaInicial?: Vista;
+  solicitudId?: number;
 }
 
 interface SolicitudResumen {
@@ -71,7 +72,7 @@ function EstadoBadge({ estado }: { estado: string }) {
   return <span className={`rad-badge ${cls}`}>{ETIQUETAS_ESTADO[estado] ?? estado}</span>;
 }
 
-export function RadicacionesModule({ vistaInicial }: RadicacionesProps = {}) {
+export function RadicacionesModule({ vistaInicial, solicitudId }: RadicacionesProps = {}) {
   const [vista, setVista]         = useState<Vista>(vistaInicial ?? 'misSolicitudes');
   const [items, setItems]         = useState<SolicitudResumen[]>([]);
   const [loading, setLoading]     = useState(false);
@@ -156,11 +157,11 @@ export function RadicacionesModule({ vistaInicial }: RadicacionesProps = {}) {
         )}
 
         {vista === 'misSolicitudes' && (
-          <MisSolicitudesPanel />
+          <MisSolicitudesPanel initialOpenId={solicitudId} />
         )}
 
         {vista === 'bandeja' && (
-          <BandejaPanel />
+          <BandejaPanel initialOpenId={solicitudId} />
         )}
 
         {vista === 'tablero' && (

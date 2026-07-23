@@ -7,7 +7,7 @@ interface AppLayoutProps {
 	esAdmin: boolean;
 	activeSection: string;
 	onSelectSection: (section: string) => void;
-	onNavigateRadicaciones?: (vista: 'nueva' | 'misSolicitudes' | 'bandeja' | 'tablero') => void;
+	onNavigateRadicaciones?: (vista: 'nueva' | 'misSolicitudes' | 'bandeja' | 'tablero', solicitudId?: number) => void;
 	onLogout: () => void;
 	children: ReactNode;
 }

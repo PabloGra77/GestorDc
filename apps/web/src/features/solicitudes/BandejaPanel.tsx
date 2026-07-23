@@ -188,7 +188,7 @@ function formatearDocumento(v: unknown): DocFormateado | null {
   return { texto: String(v) };
 }
 
-export function BandejaPanel() {
+export function BandejaPanel({ initialOpenId }: { initialOpenId?: number } = {}) {
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState('');
@@ -238,6 +238,15 @@ export function BandejaPanel() {
   useEffect(() => {
     api.get<AreaMini[]>('/areas').then((r) => setAreas(r.data.filter((a) => a.activo))).catch(() => setAreas([]));
   }, []);
+
+  // Auto-abrir solicitud cuando llega desde notificación
+  useEffect(() => {
+    if (!initialOpenId || openId === initialOpenId || loading || items.length === 0) return;
+    if (items.some((it) => it.id === initialOpenId)) {
+      abrir(initialOpenId);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialOpenId, items, loading]);
 
   async function abrir(id: number) {
     if (openId === id) {

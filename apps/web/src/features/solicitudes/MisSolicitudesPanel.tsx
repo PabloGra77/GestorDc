@@ -312,7 +312,7 @@ function DetalleDevueltoModal({ solicitud, onClose, onRenviada }: {
   );
 }
 
-export function MisSolicitudesPanel({ refresco }: { refresco?: number }) {
+export function MisSolicitudesPanel({ refresco, initialOpenId }: { refresco?: number; initialOpenId?: number }) {
   const [items, setItems] = useState<SolicitudResumen[]>([]);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState('');
@@ -349,6 +349,13 @@ export function MisSolicitudesPanel({ refresco }: { refresco?: number }) {
   useEffect(() => {
     cargar();
   }, [cargar, refresco]);
+
+  // Auto-abrir solicitud cuando llega desde notificación
+  useEffect(() => {
+    if (!initialOpenId || verDetalle?.id === initialOpenId || loading || items.length === 0) return;
+    const found = items.find((it) => it.id === initialOpenId);
+    if (found) setVerDetalle(found);
+  }, [initialOpenId, items, loading]);
 
   function formatFecha(s: string) {
     try {

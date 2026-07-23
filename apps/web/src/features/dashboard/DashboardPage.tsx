@@ -92,6 +92,7 @@ export function DashboardPage() {
 	const session = getAuthSession();
 	const [activeSection, setActiveSection] = useState('Inicio');
 	const [radicacionesVista, setRadicacionesVista] = useState<'nueva' | 'misSolicitudes' | 'bandeja' | 'tablero'>('misSolicitudes');
+	const [solicitudAbierta, setSolicitudAbierta] = useState<number | undefined>(undefined);
 	const [activeAdminModule, setActiveAdminModule] = useState<AdminModule>('Usuarios');
 	const [perfilBannerDismissed, setPerfilBannerDismissed] = useState(() => {
 		try { return localStorage.getItem('payops:perfil:banner:' + (session?.usuario.correo ?? '')) === '1'; } catch { return false; }
@@ -958,7 +959,7 @@ export function DashboardPage() {
 			esAdmin={esAdmin}
 			activeSection={activeSection}
 			onSelectSection={setActiveSection}
-			onNavigateRadicaciones={(vista) => { setRadicacionesVista(vista); setActiveSection('Radicaciones'); }}
+			onNavigateRadicaciones={(vista, solicitudId) => { setRadicacionesVista(vista); setSolicitudAbierta(solicitudId); setActiveSection('Radicaciones'); }}
 			onLogout={handleLogout}
 		>
 			{activeSection === 'Inicio' ? (
@@ -1759,7 +1760,7 @@ export function DashboardPage() {
 				</section>
 			) : null}
 
-			{activeSection === 'Radicaciones' ? <RadicacionesModule vistaInicial={radicacionesVista} /> : null}
+			{activeSection === 'Radicaciones' ? <RadicacionesModule vistaInicial={radicacionesVista} solicitudId={solicitudAbierta} /> : null}
 
 			{activeSection === 'Mi perfil' ? (
 				<>
