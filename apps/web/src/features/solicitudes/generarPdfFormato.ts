@@ -1020,8 +1020,8 @@ function _generarPdfEspecial(s: SolicitudParaPdf, opts?: { bloburl?: boolean }):
 
       // Tabla de tiquetes
       seccionViat('2. TIQUETES DE TRANSPORTE');
-      const tCols = ['Trayecto', 'Tipo', 'Empresa', 'N° vuelo/tiquete', 'Salida', 'Llegada', 'Valor'];
-      const tW = [0.10, 0.09, 0.16, 0.19, 0.10, 0.10, 0.14].map((r) => (pageWidth - margin * 2) * r);
+      const tCols = ['Trayecto', 'Tipo', 'Ruta', 'Valor'];
+      const tW = [0.12, 0.13, 0.55, 0.20].map((r) => (pageWidth - margin * 2) * r);
       if (y > 265) { doc.addPage(); y = margin; }
       doc.setFillColor(212, 175, 55);
       doc.rect(margin, y, pageWidth - margin * 2, 5.5, 'F');
@@ -1034,16 +1034,15 @@ function _generarPdfEspecial(s: SolicitudParaPdf, opts?: { bloburl?: boolean }):
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(8);
       doc.setTextColor(15, 23, 42);
+      const rutaIda = ciudadOrigen && ciudadDestino ? `${ciudadOrigen} → ${ciudadDestino}` : '';
+      const rutaVuelta = ciudadOrigen && ciudadDestino ? `${ciudadDestino} → ${ciudadOrigen}` : '';
       const tRows = [['Ida', tIda], ...(tVuelta ? [['Vuelta', tVuelta]] : [])] as [string, Record<string, string>][];
       tRows.forEach(([label, t], idx) => {
         if (y > 275) { doc.addPage(); y = margin; }
         const vals = [
           label,
           t.tipo === 'aereo' ? 'Aéreo' : 'Terrestre',
-          t.empresa || '',
-          t.numDoc || '',
-          t.horaSalida || '',
-          t.horaLlegada || '',
+          label === 'Ida' ? rutaIda : rutaVuelta,
           fmt(t.valor),
         ];
         const bg = idx % 2 === 0 ? [245, 245, 248] as [number,number,number] : [255, 255, 255] as [number,number,number];

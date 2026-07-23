@@ -18,18 +18,13 @@ $rol = strtolower(trim($user['rol'] ?? ''));
 $esAdmin = $rol === 'administrador';
 $esGerente = $rol === 'gerente';
 
-if (!$nivel && !$esAdmin && !$esGerente) {
-    Response::json([]); // sin nivel, no admin y no gerente: sin bandeja
-}
-
 $params = [];
 if ($esAdmin || $esGerente) {
     $where = "(s.estado = 'en_validacion' OR s.estado IN ('por_legalizar','en_legalizacion'))";
 } elseif ($nivel === 'contabilidad') {
     $where = "((s.estado = 'en_validacion' AND s.paso_actual = 'contabilidad') OR s.estado IN ('por_legalizar','en_legalizacion'))";
-} else {
-    // Solicitudes normales según nivel + área
-    // PLUS: legalizaciones donde este usuario es el autorizador designado
+} elseif ($nivel) {
+    // Tiene nivel de aprobación: ve solicitudes de su área en su paso + las donde es autorizador
     $where = "(
       (s.estado = 'en_validacion' AND s.paso_actual = :nivel AND s.area_id = :aid)
       OR
@@ -38,6 +33,13 @@ if ($esAdmin || $esGerente) {
     )";
     $params[':nivel']   = $nivel;
     $params[':aid']     = (int)($user['area_id'] ?? 0);
+    $params[':uid_str'] = (string)$usuarioId;
+} else {
+    // Sin nivel formal: solo ve solicitudes donde fue designado autorizador
+    $where = "(
+      s.estado = 'en_validacion' AND s.paso_actual = 'autorizador_visto_bueno'
+      AND JSON_UNQUOTE(JSON_EXTRACT(s.datos_formulario, '$.autorizadorId')) = :uid_str
+    )";
     $params[':uid_str'] = (string)$usuarioId;
 }
 
