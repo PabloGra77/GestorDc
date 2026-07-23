@@ -71,6 +71,8 @@ export function ConfigViaticosPanel() {
 
   /* ── Rutas específicas ── */
   const [viajes, setViajes] = useState<ViajeEspecifico[]>([]);
+  const [editIdx, setEditIdx] = useState<number | null>(null);
+  const [editViaje, setEditViaje] = useState<ViajeEspecifico | null>(null);
 
   /* form nueva ruta */
   const [nDeptOrigen,   setNDeptOrigen]   = useState('');
@@ -308,7 +310,7 @@ export function ConfigViaticosPanel() {
         {/* Tabla de rutas existentes */}
         {viajes.length > 0 && (
           <div style={{ overflowX: 'auto', marginBottom: 16 }}>
-            <table className="tarifa-rutas-tabla" style={{ minWidth: 720 }}>
+            <table className="tarifa-rutas-tabla" style={{ minWidth: 760 }}>
               <thead>
                 <tr>
                   <th>Origen</th>
@@ -323,24 +325,70 @@ export function ConfigViaticosPanel() {
                 </tr>
               </thead>
               <tbody>
-                {viajes.map((v, i) => (
-                  <tr key={i}>
-                    <td>{v.origen}</td>
-                    <td>{v.destino}</td>
-                    <td>{v.tipo === 'aereo' ? '✈ Aéreo' : '🚌 Terrestre'}</td>
-                    <td>{fmtCOP(v.precioTransporte)}</td>
-                    <td>{fmtCOP(v.precioDesayuno)}</td>
-                    <td>{fmtCOP(v.precioAlmuerzo)}</td>
-                    <td>{fmtCOP(v.precioCena)}</td>
-                    <td>{fmtCOP(v.precioHospedaje)}</td>
-                    <td>
-                      <button type="button" className="tipos-eliminar-btn"
-                        onClick={() => setViajes((p) => p.filter((_, j) => j !== i))}>
-                        Eliminar
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                {viajes.map((v, i) => {
+                  const editando = editIdx === i && editViaje !== null;
+                  if (editando && editViaje) {
+                    /* ── Fila en modo edición ── */
+                    const setE = (campo: keyof ViajeEspecifico) => (val: string) =>
+                      setEditViaje((p) => p ? { ...p, [campo]: parseNum(val) } : p);
+                    return (
+                      <tr key={i} className="ruta-row-edit">
+                        <td>{v.origen}</td>
+                        <td>{v.destino}</td>
+                        <td>
+                          <select value={editViaje.tipo}
+                            onChange={(e) => setEditViaje((p) => p ? { ...p, tipo: e.target.value as 'aereo' | 'terrestre' } : p)}
+                            style={{ fontSize: 12 }}>
+                            <option value="aereo">✈ Aéreo</option>
+                            <option value="terrestre">🚌 Terrestre</option>
+                          </select>
+                        </td>
+                        {(['precioTransporte','precioDesayuno','precioAlmuerzo','precioCena','precioHospedaje'] as (keyof ViajeEspecifico)[]).map((k) => (
+                          <td key={k}>
+                            <div className="leg-monto-row" style={{ margin: 0 }}>
+                              <span className="leg-monto-prefix" style={{ fontSize: 11 }}>$</span>
+                              <input type="text" inputMode="numeric" style={{ width: 80, margin: 0, fontSize: 12 }}
+                                value={fmtNum(Number(editViaje[k]))}
+                                onChange={(e) => setE(k)(e.target.value.replace(/[^0-9.,]/g, ''))} />
+                            </div>
+                          </td>
+                        ))}
+                        <td style={{ whiteSpace: 'nowrap', display: 'flex', gap: 4 }}>
+                          <button type="button" className="admin-primary-button" style={{ fontSize: 12, padding: '4px 10px' }}
+                            onClick={() => {
+                              setViajes((p) => p.map((x, j) => j === i ? editViaje! : x));
+                              setEditIdx(null); setEditViaje(null);
+                            }}>Guardar</button>
+                          <button type="button" className="admin-ghost-button" style={{ fontSize: 12, padding: '4px 8px' }}
+                            onClick={() => { setEditIdx(null); setEditViaje(null); }}>✕</button>
+                        </td>
+                      </tr>
+                    );
+                  }
+                  /* ── Fila normal ── */
+                  return (
+                    <tr key={i}>
+                      <td>{v.origen}</td>
+                      <td>{v.destino}</td>
+                      <td>{v.tipo === 'aereo' ? '✈ Aéreo' : '🚌 Terrestre'}</td>
+                      <td>{fmtCOP(v.precioTransporte)}</td>
+                      <td>{fmtCOP(v.precioDesayuno)}</td>
+                      <td>{fmtCOP(v.precioAlmuerzo)}</td>
+                      <td>{fmtCOP(v.precioCena)}</td>
+                      <td>{fmtCOP(v.precioHospedaje)}</td>
+                      <td style={{ whiteSpace: 'nowrap', display: 'flex', gap: 4 }}>
+                        <button type="button" className="admin-ghost-button" style={{ fontSize: 12, padding: '4px 10px' }}
+                          onClick={() => { setEditIdx(i); setEditViaje({ ...v }); }}>
+                          Editar
+                        </button>
+                        <button type="button" className="tipos-eliminar-btn"
+                          onClick={() => { setViajes((p) => p.filter((_, j) => j !== i)); if (editIdx === i) { setEditIdx(null); setEditViaje(null); } }}>
+                          Eliminar
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
