@@ -27,30 +27,41 @@ $uStmt = $pdo->prepare(
 );
 $uStmt->execute([':id' => $usuarioId]);
 $user = $uStmt->fetch();
-$esAdmin = strtolower(trim($user['rol'] ?? '')) === 'administrador';
+$rolNorm    = strtolower(trim($user['rol'] ?? ''));
+$esAdmin    = $rolNorm === 'administrador';
+$esGerente  = $rolNorm === 'gerente';
 
-$esSolicitante = (int)$r['solicitante_usuario_id'] === $usuarioId;
-$nivelUser     = (string)($user['nivel_aprobacion'] ?? '');
-$mismaArea     = (int)($user['area_id'] ?? 0) === (int)$r['area_id'];
+$esSolicitante  = (int)$r['solicitante_usuario_id'] === $usuarioId;
+$nivelUser      = strtolower(trim($user['nivel_aprobacion'] ?? ''));
+$mismaArea      = (int)($user['area_id'] ?? 0) === (int)$r['area_id'];
 $esContabilidad = $nivelUser === 'contabilidad';
-$pasoActual    = (string)($r['paso_actual'] ?? '');
-$estadoCerrado = in_array((string)$r['estado'], ['aprobado', 'rechazado'], true);
-$nivelHabilitado = $nivelUser !== '' && ($nivelUser === $pasoActual || $estadoCerrado);
+$pasoActual     = strtolower(trim((string)($r['paso_actual'] ?? '')));
+$estadoCerrado  = in_array((string)$r['estado'], ['aprobado', 'rechazado', 'devuelto', 'legalizado'], true);
+
+// Multi-nivel: analista/coordinador/director pueden validar cualquier paso de ese grupo en su área
+$nivelHabilitado = $nivelUser !== '' && (
+    $nivelUser === $pasoActual ||
+    $estadoCerrado ||
+    (in_array($nivelUser, ['analista', 'coordinador', 'director']) &&
+     in_array($pasoActual, ['analista', 'coordinador', 'director']))
+);
 $esValidadorEnTurno = $nivelHabilitado && ($esContabilidad || $mismaArea);
 
-// Autorizador de visto bueno: puede ver si paso_actual = 'autorizador_visto_bueno' y su ID coincide
-$esAutorizador = false;
-if ($pasoActual === 'autorizador_visto_bueno') {
-    $datos = json_decode($r['datos_formulario'] ?? '{}', true) ?: [];
-    $esAutorizador = (int)($datos['autorizadorId'] ?? 0) === $usuarioId;
-}
+// Autorizador designado: puede ver cuando es su turno o cuando ya dio visto bueno y tiene nivel siguiente
+$datos = json_decode($r['datos_formulario'] ?? '{}', true) ?: [];
+$esAutorizadorDesignado = (int)($datos['autorizadorId'] ?? 0) === $usuarioId;
+$esAutorizador = $esAutorizadorDesignado && $pasoActual === 'autorizador_visto_bueno';
+// Si ya dio visto bueno y tiene nivel para el siguiente paso, también puede ver y actuar
+$esAutorizadorConNivel = $esAutorizadorDesignado &&
+    in_array($nivelUser, ['analista', 'coordinador', 'director']) &&
+    in_array($pasoActual, ['analista', 'coordinador', 'director']);
 
-if (!$esAdmin && !$esSolicitante && !$esValidadorEnTurno && !$esAutorizador) {
+if (!$esAdmin && !$esGerente && !$esSolicitante && !$esValidadorEnTurno && !$esAutorizador && !$esAutorizadorConNivel) {
     Response::error('No tienes permiso para ver esta solicitud', 403);
 }
 
-// Solo admin y solicitante ven firmas completas; validadores en turno ven todo menos firmas de otros pasos
-$puedeVerFirmas = $esAdmin || $esSolicitante;
+// Firmas: visibles a todos quienes pueden ver la solicitud (necesario para PDF y trazabilidad)
+$puedeVerFirmas = true;
 
 // Movimientos
 $movStmt = $pdo->prepare(

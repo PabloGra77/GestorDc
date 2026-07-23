@@ -30,11 +30,11 @@ final class FlujoHelpers
         $user = $uStmt->fetch();
         if (!$user) Response::error('Usuario no encontrado', 404);
 
-        $rolNorm     = strtolower(trim($user['rol'] ?? ''));
-        $esAdmin     = $rolNorm === 'administrador';
-        $esGerente   = $rolNorm === 'gerente';
-        $pasoActual  = $sol['paso_actual'] ?? '';
-        $nivelUsuario = $user['nivel_aprobacion'] ?? '';
+        $rolNorm      = strtolower(trim($user['rol'] ?? ''));
+        $esAdmin      = $rolNorm === 'administrador';
+        $esGerente    = $rolNorm === 'gerente';
+        $pasoActual   = strtolower(trim($sol['paso_actual'] ?? ''));
+        $nivelUsuario = strtolower(trim($user['nivel_aprobacion'] ?? ''));
 
         // Admin y gerente pueden actuar en cualquier solicitud.
         // Contabilidad ve todas las areas en su paso.

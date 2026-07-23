@@ -13,7 +13,7 @@ $uStmt->execute([':id' => $usuarioId]);
 $user = $uStmt->fetch();
 if (!$user) Response::error('Usuario no encontrado', 404);
 
-$nivel = $user['nivel_aprobacion'] ?? '';
+$nivel = strtolower(trim($user['nivel_aprobacion'] ?? ''));
 $rol = strtolower(trim($user['rol'] ?? ''));
 $esAdmin = $rol === 'administrador';
 $esGerente = $rol === 'gerente';
