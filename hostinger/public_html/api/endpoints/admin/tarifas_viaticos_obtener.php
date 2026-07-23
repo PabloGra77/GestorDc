@@ -7,26 +7,24 @@ Auth::requireAdmin();
 
 $pdo = Db::pdo();
 $row = $pdo->query(
-    "SELECT precio_aereo, precio_terrestre, precio_desayuno, precio_almuerzo, precio_cena, precio_hospedaje
+    "SELECT precio_aereo, precio_terrestre, precio_desayuno, precio_almuerzo, precio_cena, precio_hospedaje, viajes_especificos
      FROM tarifas_viaticos WHERE id = 1 LIMIT 1"
 )->fetch();
 
 if (!$row) {
     Response::json([
-        'precioAereo'     => 0,
-        'precioTerrestre' => 0,
-        'precioDesayuno'  => 0,
-        'precioAlmuerzo'  => 0,
-        'precioCena'      => 0,
-        'precioHospedaje' => 0,
+        'precioAereo' => 0, 'precioTerrestre' => 0,
+        'precioDesayuno' => 0, 'precioAlmuerzo' => 0, 'precioCena' => 0,
+        'precioHospedaje' => 0, 'viajesEspecificos' => [],
     ]);
 }
 
 Response::json([
-    'precioAereo'     => (float)$row['precio_aereo'],
-    'precioTerrestre' => (float)$row['precio_terrestre'],
-    'precioDesayuno'  => (float)$row['precio_desayuno'],
-    'precioAlmuerzo'  => (float)$row['precio_almuerzo'],
-    'precioCena'      => (float)$row['precio_cena'],
-    'precioHospedaje' => (float)$row['precio_hospedaje'],
+    'precioAereo'       => (float)$row['precio_aereo'],
+    'precioTerrestre'   => (float)$row['precio_terrestre'],
+    'precioDesayuno'    => (float)$row['precio_desayuno'],
+    'precioAlmuerzo'    => (float)$row['precio_almuerzo'],
+    'precioCena'        => (float)$row['precio_cena'],
+    'precioHospedaje'   => (float)$row['precio_hospedaje'],
+    'viajesEspecificos' => $row['viajes_especificos'] ? (json_decode($row['viajes_especificos'], true) ?: []) : [],
 ]);

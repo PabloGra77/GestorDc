@@ -1,12 +1,18 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { api } from '../../services/http/api';
 import { formatearMiles } from '../../utils/numeroALetras';
 import { SignaturePad } from '../../components/SignaturePad';
-import { useOcrDocument, validarOcrContraDato } from '../../hooks/useOcrDocument';
 import { DEPTOS } from './colombiaData';
 import { MapaRuta } from './MapaRuta';
 
 /* ─── Tipos ─────────────────────────────────────────────────── */
+interface ViajeEspecifico {
+  origen: string;
+  destino: string;
+  tipo: 'aereo' | 'terrestre';
+  precio: number;
+}
+
 interface TarifasViaticos {
   precioAereo: number;
   precioTerrestre: number;
@@ -14,51 +20,39 @@ interface TarifasViaticos {
   precioAlmuerzo: number;
   precioCena: number;
   precioHospedaje: number;
+  viajesEspecificos: ViajeEspecifico[];
 }
 
 interface UsuarioSugerido { id: number; nombreCompleto: string; rol: string; area: string | null; }
-interface FacturaAdj { archivoId: string; nombre: string; alertas: string[]; }
 
-/* ─── Helpers ───────────────────────────────────────────────── */
-async function prepararImagen(file: File): Promise<File> {
-  if (file.type === 'application/pdf') return file;
-  return new Promise((resolve) => {
-    const img = new Image();
-    const url = URL.createObjectURL(file);
-    img.onload = () => {
-      URL.revokeObjectURL(url);
-      const MAX = 1600;
-      let w = img.naturalWidth, h = img.naturalHeight;
-      if (w > MAX || h > MAX) {
-        if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
-        else { w = Math.round(w * MAX / h); h = MAX; }
-      }
-      const canvas = document.createElement('canvas');
-      canvas.width = w; canvas.height = h;
-      canvas.getContext('2d')?.drawImage(img, 0, 0, w, h);
-      canvas.toBlob(
-        (blob) => resolve(blob ? new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' }) : file),
-        'image/jpeg', 0.82,
-      );
-    };
-    img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
-    img.src = url;
-  });
-}
-
-async function subirArchivo(file: File): Promise<string> {
-  const prepared = await prepararImagen(file);
-  const fd = new FormData();
-  fd.append('archivo', prepared);
-  const r = await api.post<{ id: string }>('/archivos', fd, { headers: { 'Content-Type': undefined } });
-  return r.data.id;
+/* ─── Helper: precio de transporte ─────────────────────────── */
+function getPrecioTransporte(
+  tarifas: TarifasViaticos | null,
+  tipo: 'aereo' | 'terrestre',
+  origen: string,
+  destino: string,
+): { precio: number; especifico: boolean } {
+  if (!tarifas) return { precio: 0, especifico: false };
+  const norm = (s: string) => s.trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  const match = (tarifas.viajesEspecificos ?? []).find(
+    (v) => v.tipo === tipo && norm(v.origen) === norm(origen) && norm(v.destino) === norm(destino),
+  );
+  if (match) return { precio: match.precio, especifico: true };
+  return { precio: tipo === 'aereo' ? tarifas.precioAereo : tarifas.precioTerrestre, especifico: false };
 }
 
 /* ─── Bloque de tipo de transporte ─────────────────────────── */
 function TipoTransporteBloque({
-  titulo, tipo, onTipo, tarifas,
-}: { titulo: string; tipo: 'aereo' | 'terrestre'; onTipo: (v: 'aereo' | 'terrestre') => void; tarifas: TarifasViaticos | null }) {
-  const precio = tarifas ? (tipo === 'aereo' ? tarifas.precioAereo : tarifas.precioTerrestre) : 0;
+  titulo, tipo, onTipo, tarifas, origen, destino,
+}: {
+  titulo: string;
+  tipo: 'aereo' | 'terrestre';
+  onTipo: (v: 'aereo' | 'terrestre') => void;
+  tarifas: TarifasViaticos | null;
+  origen: string;
+  destino: string;
+}) {
+  const { precio, especifico } = getPrecioTransporte(tarifas, tipo, origen, destino);
   return (
     <div className="viatico-tiquete-bloque">
       <div className="viatico-tiquete-titulo">{titulo}</div>
@@ -74,8 +68,9 @@ function TipoTransporteBloque({
         </div>
       </div>
       <div className="viatico-tarifa-fija-display">
-        <span>Tarifa {tipo === 'aereo' ? 'aéreo' : 'terrestre'}:</span>
+        <span>{especifico ? 'Precio por ruta específica:' : `Tarifa ${tipo === 'aereo' ? 'aéreo' : 'terrestre'}:`}</span>
         <strong>{tarifas ? `$${formatearMiles(precio)} COP` : 'Cargando…'}</strong>
+        {especifico && <span className="viatico-ruta-badge">Ruta configurada</span>}
       </div>
     </div>
   );
@@ -85,11 +80,9 @@ function TipoTransporteBloque({
 export function ViaticosPanel({ onCreada, areaId }: { onCreada?: (info: { id: number; numeroRadicado: string }) => void; areaId?: number }) {
   const [paso, setPaso] = useState<1 | 2 | 3 | 4 | 5>(1);
 
-  /* Tarifas fijas del admin */
   const [tarifas, setTarifas] = useState<TarifasViaticos | null>(null);
 
   /* Paso 1 */
-  const [tipoViatico, setTipoViatico] = useState<'anticipo' | 'legalizar' | ''>('anticipo');
   const [autorizadorInput, setAutorizadorInput] = useState('');
   const [autorizadorId, setAutorizadorId] = useState(0);
   const [autorizadorNombre, setAutorizadorNombre] = useState('');
@@ -109,38 +102,17 @@ export function ViaticosPanel({ onCreada, areaId }: { onCreada?: (info: { id: nu
   /* Paso 3 — tipo de transporte */
   const [tipoTrIda, setTipoTrIda] = useState<'aereo' | 'terrestre'>('aereo');
   const [tipoTrVuelta, setTipoTrVuelta] = useState<'aereo' | 'terrestre'>('aereo');
-  /* Solo para legalización */
-  const [empresaIda, setEmpresaIda] = useState('');
-  const [numDocIda, setNumDocIda] = useState('');
-  const [codResIda, setCodResIda] = useState('');
-  const [tramoIda, setTramoIda] = useState('');
-  const [puestoIda, setPuestoIda] = useState('');
-  const [hrSalidaIda, setHrSalidaIda] = useState('');
-  const [hrLlegadaIda, setHrLlegadaIda] = useState('');
-  const [empresaVuelta, setEmpresaVuelta] = useState('');
-  const [numDocVuelta, setNumDocVuelta] = useState('');
-  const [codResVuelta, setCodResVuelta] = useState('');
-  const [tramoVuelta, setTramoVuelta] = useState('');
-  const [puestoVuelta, setPuestoVuelta] = useState('');
-  const [hrSalidaVuelta, setHrSalidaVuelta] = useState('');
-  const [hrLlegadaVuelta, setHrLlegadaVuelta] = useState('');
-  const [facturaTransporte, setFacturaTransporte] = useState<FacturaAdj | null>(null);
-  const [subiendoTransporte, setSubiendoTransporte] = useState(false);
 
   /* Paso 4 — hospedaje */
   const [tieneHospedaje, setTieneHospedaje] = useState(false);
   const [hotelNombre, setHotelNombre] = useState('');
   const [hotelEntrada, setHotelEntrada] = useState('');
   const [hotelSalida, setHotelSalida] = useState('');
-  const [facturaHotel, setFacturaHotel] = useState<FacturaAdj | null>(null);
-  const [subiendoHotel, setSubiendoHotel] = useState(false);
 
-  /* Paso 4 — alimentación (solo días; precio viene de tarifas) */
+  /* Paso 4 — alimentación */
   const [diasDesayuno, setDiasDesayuno] = useState('');
   const [diasAlmuerzo, setDiasAlmuerzo] = useState('');
   const [diasCena, setDiasCena] = useState('');
-  const [facturaComidas, setFacturaComidas] = useState<FacturaAdj | null>(null);
-  const [subiendoComidas, setSubiendoComidas] = useState(false);
 
   /* Paso 5 */
   const [firma, setFirma] = useState('');
@@ -149,13 +121,6 @@ export function ViaticosPanel({ onCreada, areaId }: { onCreada?: (info: { id: nu
   const [msg, setMsg] = useState('');
   const [enviando, setEnviando] = useState(false);
 
-  const fileTransporteRef = useRef<HTMLInputElement>(null);
-  const fileHotelRef = useRef<HTMLInputElement>(null);
-  const fileComidasRef = useRef<HTMLInputElement>(null);
-
-  const { procesarArchivo } = useOcrDocument();
-
-  /* Cargar tarifas y usuarios */
   useEffect(() => {
     api.get<TarifasViaticos>('/tarifas-viaticos').then((r) => setTarifas(r.data)).catch(() => {});
     api.get<UsuarioSugerido[]>('/usuarios/nombres').then((r) => setUsuarios(r.data)).catch(() => {});
@@ -174,11 +139,10 @@ export function ViaticosPanel({ onCreada, areaId }: { onCreada?: (info: { id: nu
     setShowSugeridos(false);
   }
 
-  /* Precio unitario de transporte según tipo seleccionado */
-  const precioIda    = tarifas ? (tipoTrIda    === 'aereo' ? tarifas.precioAereo : tarifas.precioTerrestre) : 0;
-  const precioVuelta = tarifas ? (tipoTrVuelta === 'aereo' ? tarifas.precioAereo : tarifas.precioTerrestre) : 0;
+  /* Precios calculados con rutas específicas */
+  const { precio: precioIda }    = getPrecioTransporte(tarifas, tipoTrIda,    ciudadOrigen, ciudadDestino);
+  const { precio: precioVuelta } = getPrecioTransporte(tarifas, tipoTrVuelta, ciudadDestino, ciudadOrigen);
 
-  /* Cálculos */
   const totalTransporte = useMemo(() => precioIda + (esIdaVuelta ? precioVuelta : 0), [precioIda, precioVuelta, esIdaVuelta]);
 
   const noches = useMemo(() => {
@@ -190,62 +154,12 @@ export function ViaticosPanel({ onCreada, areaId }: { onCreada?: (info: { id: nu
   const totalHospedaje  = useMemo(() => tieneHospedaje ? precioHospedaje * noches : 0, [tieneHospedaje, precioHospedaje, noches]);
 
   const totalComidas = useMemo(() => {
-    const pd = tarifas?.precioDesayuno ?? 0;
-    const pa = tarifas?.precioAlmuerzo ?? 0;
-    const pc = tarifas?.precioCena     ?? 0;
-    return (parseInt(diasDesayuno) || 0) * pd
-         + (parseInt(diasAlmuerzo) || 0) * pa
-         + (parseInt(diasCena)     || 0) * pc;
+    return (parseInt(diasDesayuno) || 0) * (tarifas?.precioDesayuno ?? 0)
+         + (parseInt(diasAlmuerzo) || 0) * (tarifas?.precioAlmuerzo ?? 0)
+         + (parseInt(diasCena)     || 0) * (tarifas?.precioCena     ?? 0);
   }, [diasDesayuno, diasAlmuerzo, diasCena, tarifas]);
 
   const totalGeneral = useMemo(() => totalTransporte + totalHospedaje + totalComidas, [totalTransporte, totalHospedaje, totalComidas]);
-
-  const subirFactura = useCallback(async (
-    file: File,
-    tipo: 'transporte' | 'hotel' | 'comidas',
-    contexto: { valor?: number; ciudad?: string; fecha?: string },
-  ) => {
-    const setSubiendo = tipo === 'transporte' ? setSubiendoTransporte : tipo === 'hotel' ? setSubiendoHotel : setSubiendoComidas;
-    const setFactura  = tipo === 'transporte' ? setFacturaTransporte  : tipo === 'hotel' ? setFacturaHotel  : setFacturaComidas;
-    setSubiendo(true);
-    try {
-      const archivoId = await subirArchivo(file);
-      const alertas: string[] = [];
-      const ocr = await procesarArchivo(file).catch(() => null);
-      if (ocr) {
-        const texto = ocr.text;
-        const t = texto.toLowerCase();
-        if (ocr.confidence < 45) alertas.push(`Imagen de baja calidad (${Math.round(ocr.confidence)}%). Verifica que sea legible.`);
-        if (contexto.valor && contexto.valor > 0) {
-          const limpio = String(contexto.valor).replace(/\D/g, '');
-          if (limpio.length >= 4) {
-            const ocrFlat = texto.replace(/[.,\s]/g, '');
-            if (!ocrFlat.includes(limpio)) alertas.push(`El valor $${formatearMiles(contexto.valor)} no se identificó claramente en el soporte.`);
-          }
-        }
-        if (contexto.ciudad) {
-          const v = validarOcrContraDato(texto, contexto.ciudad, 'texto');
-          if (!v.coincide) alertas.push(`No se identificó "${contexto.ciudad}" en el soporte.`);
-        }
-        const marcadores = ['total', 'nit', 'valor', 'fecha', 'factura', 'tiquete', 'vuelo'].filter((k) => t.includes(k)).length;
-        if (marcadores < 2) alertas.push('El archivo no parece ser un tiquete válido. Verifica el documento.');
-      }
-      setFactura({ archivoId, nombre: file.name, alertas });
-    } catch (ex: unknown) {
-      const serverMsg = (ex as { response?: { data?: { message?: string } } })?.response?.data?.message;
-      const isServerError = (ex as { response?: unknown })?.response !== undefined;
-      const errMsg = isServerError
-        ? (serverMsg?.toLowerCase().includes('tamaño') || serverMsg?.toLowerCase().includes('excede')
-            ? 'El archivo es demasiado grande. Usa JPG, PNG o PDF de menos de 10 MB.'
-            : serverMsg?.toLowerCase().includes('tipo') || serverMsg?.toLowerCase().includes('formato')
-              ? 'Formato no permitido. Solo JPG, PNG, WEBP o PDF.'
-              : `Error en el servidor${serverMsg ? ': ' + serverMsg : '. Intenta de nuevo.'}`)
-        : 'No se pudo subir el archivo. Verifica tu conexión e inténtalo de nuevo.';
-      setFactura({ archivoId: '', nombre: '', alertas: [errMsg] });
-    } finally {
-      setSubiendo(false);
-    }
-  }, [procesarArchivo]);
 
   function validarPaso(): string {
     if (paso === 1) {
@@ -260,15 +174,6 @@ export function ViaticosPanel({ onCreada, areaId }: { onCreada?: (info: { id: nu
       if (!fechaIda) return 'Indica la fecha de ida';
       if (esIdaVuelta && !fechaRegreso) return 'Indica la fecha de regreso';
       if (esIdaVuelta && fechaRegreso && fechaRegreso < fechaIda) return 'La fecha de regreso debe ser posterior a la de ida';
-    }
-    if (paso === 3) {
-      if (tipoViatico === 'legalizar') {
-        if (!empresaIda.trim()) return 'Ingresa la empresa transportadora de ida';
-        if (!numDocIda.trim()) return `Ingresa el ${tipoTrIda === 'aereo' ? 'número de vuelo' : 'número de tiquete'} de ida`;
-        if (esIdaVuelta && !empresaVuelta.trim()) return 'Ingresa la empresa transportadora de regreso';
-        if (esIdaVuelta && !numDocVuelta.trim()) return `Ingresa el ${tipoTrVuelta === 'aereo' ? 'número de vuelo' : 'número de tiquete'} de regreso`;
-        if (!facturaTransporte?.archivoId) return 'Adjunta el tiquete o comprobante de transporte';
-      }
     }
     if (paso === 4) {
       if (tieneHospedaje) {
@@ -286,13 +191,13 @@ export function ViaticosPanel({ onCreada, areaId }: { onCreada?: (info: { id: nu
   function anterior() { setErr(''); setPaso((p) => Math.max(1, p - 1) as 1|2|3|4|5); }
 
   function resetear() {
-    setPaso(1); setTipoViatico('anticipo'); setAutorizadorInput(''); setAutorizadorId(0); setAutorizadorNombre(''); setMotivoViaje('');
-    setCiudadOrigen(''); setCiudadDestino(''); setFechaIda(''); setFechaRegreso(''); setEsIdaVuelta(true);
+    setPaso(1);
+    setAutorizadorInput(''); setAutorizadorId(0); setAutorizadorNombre(''); setMotivoViaje('');
+    setCiudadOrigen(''); setCiudadDestino(''); setDeptoOrigen(''); setDeptoDestino('');
+    setFechaIda(''); setFechaRegreso(''); setEsIdaVuelta(true);
     setTipoTrIda('aereo'); setTipoTrVuelta('aereo');
-    setEmpresaIda(''); setNumDocIda(''); setCodResIda(''); setTramoIda(''); setPuestoIda(''); setHrSalidaIda(''); setHrLlegadaIda('');
-    setEmpresaVuelta(''); setNumDocVuelta(''); setCodResVuelta(''); setTramoVuelta(''); setPuestoVuelta(''); setHrSalidaVuelta(''); setHrLlegadaVuelta('');
-    setFacturaTransporte(null); setTieneHospedaje(false); setHotelNombre(''); setHotelEntrada(''); setHotelSalida(''); setFacturaHotel(null);
-    setDiasDesayuno(''); setDiasAlmuerzo(''); setDiasCena(''); setFacturaComidas(null);
+    setTieneHospedaje(false); setHotelNombre(''); setHotelEntrada(''); setHotelSalida('');
+    setDiasDesayuno(''); setDiasAlmuerzo(''); setDiasCena('');
     setFirma(''); setMsg('');
   }
 
@@ -304,24 +209,19 @@ export function ViaticosPanel({ onCreada, areaId }: { onCreada?: (info: { id: nu
     try {
       const norm = (s: string) => (s ?? '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]/g, '');
       const tipos = await api.get<Array<{ id: number; slug: string; nombre: string }>>('/tipos');
-      const tipo = tipos.data.find((t) => norm(t.slug) === 'viaticos' || norm(t.nombre) === 'viaticos');
+      const tipo = tipos.data.find((t) => norm(t.slug) === 'viaticos' || norm(t.nombre).includes('viatico'));
       if (!tipo) {
-        setErr('No se encontró el tipo "Viáticos". El administrador debe crearlo con slug "viaticos".');
+        setErr('No se encontró el tipo "Solicitud de Viático". El administrador debe verificar que exista.');
         return;
       }
-      const docs: Record<string, unknown> = {};
-      if (facturaTransporte?.archivoId) docs['tiquete'] = { archivoId: facturaTransporte.archivoId, nombre: facturaTransporte.nombre, ocrAlertas: facturaTransporte.alertas };
-      if (facturaHotel?.archivoId)      docs['hotel']   = { archivoId: facturaHotel.archivoId,      nombre: facturaHotel.nombre,      ocrAlertas: facturaHotel.alertas };
-      if (facturaComidas?.archivoId)    docs['comidas'] = { archivoId: facturaComidas.archivoId,    nombre: facturaComidas.nombre,    ocrAlertas: facturaComidas.alertas };
 
-      const tiqueteIda = { tipo: tipoTrIda, empresa: empresaIda, numDoc: numDocIda, codReserva: codResIda, tramo: tramoIda, puesto: puestoIda, horaSalida: hrSalidaIda, horaLlegada: hrLlegadaIda, valor: String(precioIda) };
-      const tiqueteVuelta = esIdaVuelta ? { tipo: tipoTrVuelta, empresa: empresaVuelta, numDoc: numDocVuelta, codReserva: codResVuelta, tramo: tramoVuelta, puesto: puestoVuelta, horaSalida: hrSalidaVuelta, horaLlegada: hrLlegadaVuelta, valor: String(precioVuelta) } : null;
+      const tiqueteIda = { tipo: tipoTrIda, valor: String(precioIda) };
+      const tiqueteVuelta = esIdaVuelta ? { tipo: tipoTrVuelta, valor: String(precioVuelta) } : null;
 
       const r = await api.post<{ id: number; numeroRadicado: string }>('/solicitudes', {
         tipoSolicitudId: tipo.id,
         ...(areaId ? { areaSeleccionadaId: areaId } : {}),
         datos: {
-          tipoViatico,
           motivoViaje,
           autorizadorId: String(autorizadorId),
           autorizadorNombre,
@@ -346,7 +246,7 @@ export function ViaticosPanel({ onCreada, areaId }: { onCreada?: (info: { id: nu
           totalComidas:    String(totalComidas),
           totalGeneral:    String(totalGeneral),
         },
-        documentos: docs,
+        documentos: {},
         firmas: { profesional: firma },
       });
       setMsg(`¡Viático radicado exitosamente! Radicado: ${r.data.numeroRadicado}`);
@@ -359,7 +259,7 @@ export function ViaticosPanel({ onCreada, areaId }: { onCreada?: (info: { id: nu
     }
   }
 
-  const PASOS = ['Tipo y autorización', 'Detalles del viaje', 'Transporte', 'Hospedaje y comidas', 'Resumen y firma'];
+  const PASOS = ['Autorización', 'Detalles del viaje', 'Transporte', 'Hospedaje y comidas', 'Resumen y firma'];
 
   if (msg) {
     return (
@@ -368,12 +268,10 @@ export function ViaticosPanel({ onCreada, areaId }: { onCreada?: (info: { id: nu
         <h3>Viático radicado</h3>
         <p>{msg}</p>
         <p className="leg-success-note">Puedes hacer seguimiento en <strong>Mis solicitudes</strong>.</p>
-        <button type="button" className="admin-primary-button" onClick={resetear}>Nuevo viático</button>
+        <button type="button" className="admin-primary-button" onClick={resetear}>Nueva solicitud</button>
       </div>
     );
   }
-
-
 
   return (
     <div className="leg-panel">
@@ -389,32 +287,12 @@ export function ViaticosPanel({ onCreada, areaId }: { onCreada?: (info: { id: nu
 
       {err && <div className="admin-error" role="alert">{err}</div>}
 
-      {/* ── PASO 1: Tipo y autorización ── */}
+      {/* ── PASO 1: Autorización ── */}
       {paso === 1 && (
         <div className="leg-form card-surface">
-          <h3>Tipo de viático y autorización</h3>
+          <h3>Autorización del viaje</h3>
 
           <div className="leg-field">
-            <label>¿Qué tipo de viático necesitas? *</label>
-            <div className="leg-radio-group">
-              <label className="leg-radio-item">
-                <input type="radio" name="tipoViatico" checked={tipoViatico === 'anticipo'} onChange={() => setTipoViatico('anticipo')} />
-                <div>
-                  <strong>Solicitud de anticipo</strong>
-                  <span className="leg-radio-desc">Pide el dinero antes del viaje. Luego debes legalizarlo con tiquetes y facturas.</span>
-                </div>
-              </label>
-              <label className="leg-radio-item">
-                <input type="radio" name="tipoViatico" checked={tipoViatico === 'legalizar'} onChange={() => setTipoViatico('legalizar')} />
-                <div>
-                  <strong>Legalización de viático</strong>
-                  <span className="leg-radio-desc">Ya realizaste el viaje y quieres reembolso o legalizar un anticipo previo.</span>
-                </div>
-              </label>
-            </div>
-          </div>
-
-          <div className="leg-field" style={{ marginTop: 16 }}>
             <label>Motivo / propósito del viaje *</label>
             <textarea value={motivoViaje} onChange={(e) => setMotivoViaje(e.target.value)}
               rows={2} placeholder="Ej: Visita a cliente, capacitación, reunión con proveedor…" />
@@ -542,11 +420,7 @@ export function ViaticosPanel({ onCreada, areaId }: { onCreada?: (info: { id: nu
       {paso === 3 && (
         <div className="leg-form card-surface">
           <h3>Transporte</h3>
-          <p className="leg-nota">
-            {tipoViatico === 'anticipo'
-              ? 'Selecciona el tipo de transporte. Las tarifas están configuradas por el administrador.'
-              : 'Selecciona el tipo de transporte e ingresa los datos del tiquete.'}
-          </p>
+          <p className="leg-nota">Selecciona el tipo de transporte. Las tarifas están configuradas por el administrador.</p>
 
           {!tarifas && <p className="admin-help-text">Cargando tarifas…</p>}
           {tarifas && (tarifas.precioAereo === 0 && tarifas.precioTerrestre === 0) && (
@@ -560,99 +434,19 @@ export function ViaticosPanel({ onCreada, areaId }: { onCreada?: (info: { id: nu
             tipo={tipoTrIda}
             onTipo={setTipoTrIda}
             tarifas={tarifas}
+            origen={ciudadOrigen}
+            destino={ciudadDestino}
           />
 
-          {/* Detalles solo para legalización */}
-          {tipoViatico === 'legalizar' && (
-            <div className="leg-gasto-fields" style={{ marginTop: 8 }}>
-              <div className="leg-field">
-                <label>Empresa transportadora *</label>
-                <input type="text" value={empresaIda} onChange={(e) => setEmpresaIda(e.target.value)}
-                  placeholder={tipoTrIda === 'aereo' ? 'Ej: Avianca, LATAM' : 'Ej: COOFLOTAX, Flota Magdalena'} />
-              </div>
-              <div className="leg-field">
-                <label>{tipoTrIda === 'aereo' ? 'Número de vuelo *' : 'Número de tiquete *'}</label>
-                <input type="text" value={numDocIda} onChange={(e) => setNumDocIda(e.target.value.toUpperCase())}
-                  placeholder={tipoTrIda === 'aereo' ? 'Ej: AV 8001' : 'Ej: DEST4-83964'} />
-              </div>
-              {tipoTrIda === 'aereo' && (
-                <div className="leg-field">
-                  <label>Código de reserva</label>
-                  <input type="text" value={codResIda} onChange={(e) => setCodResIda(e.target.value.toUpperCase())} placeholder="Ej: J48SQO" maxLength={10} />
-                </div>
-              )}
-              {tipoTrIda === 'terrestre' && (
-                <>
-                  <div className="leg-field">
-                    <label>Tramo / Ruta</label>
-                    <input type="text" value={tramoIda} onChange={(e) => setTramoIda(e.target.value)} placeholder="Ej: SANTA ROSA - DUITAMA" />
-                  </div>
-                  <div className="leg-field">
-                    <label>Puesto / Silla</label>
-                    <input type="text" value={puestoIda} onChange={(e) => setPuestoIda(e.target.value)} placeholder="Ej: 3, 12A" maxLength={6} />
-                  </div>
-                </>
-              )}
-              <div className="leg-field">
-                <label>Hora de salida</label>
-                <input type="time" value={hrSalidaIda} onChange={(e) => setHrSalidaIda(e.target.value)} />
-              </div>
-              <div className="leg-field">
-                <label>Hora de llegada</label>
-                <input type="time" value={hrLlegadaIda} onChange={(e) => setHrLlegadaIda(e.target.value)} />
-              </div>
-            </div>
-          )}
-
           {esIdaVuelta && (
-            <>
-              <TipoTransporteBloque
-                titulo="🛬 Regreso"
-                tipo={tipoTrVuelta}
-                onTipo={setTipoTrVuelta}
-                tarifas={tarifas}
-              />
-              {tipoViatico === 'legalizar' && (
-                <div className="leg-gasto-fields" style={{ marginTop: 8 }}>
-                  <div className="leg-field">
-                    <label>Empresa transportadora *</label>
-                    <input type="text" value={empresaVuelta} onChange={(e) => setEmpresaVuelta(e.target.value)}
-                      placeholder={tipoTrVuelta === 'aereo' ? 'Ej: Avianca, LATAM' : 'Ej: COOFLOTAX, Flota Magdalena'} />
-                  </div>
-                  <div className="leg-field">
-                    <label>{tipoTrVuelta === 'aereo' ? 'Número de vuelo *' : 'Número de tiquete *'}</label>
-                    <input type="text" value={numDocVuelta} onChange={(e) => setNumDocVuelta(e.target.value.toUpperCase())}
-                      placeholder={tipoTrVuelta === 'aereo' ? 'Ej: AV 8001' : 'Ej: DEST4-83964'} />
-                  </div>
-                  {tipoTrVuelta === 'aereo' && (
-                    <div className="leg-field">
-                      <label>Código de reserva</label>
-                      <input type="text" value={codResVuelta} onChange={(e) => setCodResVuelta(e.target.value.toUpperCase())} placeholder="Ej: J48SQO" maxLength={10} />
-                    </div>
-                  )}
-                  {tipoTrVuelta === 'terrestre' && (
-                    <>
-                      <div className="leg-field">
-                        <label>Tramo / Ruta</label>
-                        <input type="text" value={tramoVuelta} onChange={(e) => setTramoVuelta(e.target.value)} placeholder="Ej: DUITAMA - SANTA ROSA" />
-                      </div>
-                      <div className="leg-field">
-                        <label>Puesto / Silla</label>
-                        <input type="text" value={puestoVuelta} onChange={(e) => setPuestoVuelta(e.target.value)} placeholder="Ej: 3, 12A" maxLength={6} />
-                      </div>
-                    </>
-                  )}
-                  <div className="leg-field">
-                    <label>Hora de salida</label>
-                    <input type="time" value={hrSalidaVuelta} onChange={(e) => setHrSalidaVuelta(e.target.value)} />
-                  </div>
-                  <div className="leg-field">
-                    <label>Hora de llegada</label>
-                    <input type="time" value={hrLlegadaVuelta} onChange={(e) => setHrLlegadaVuelta(e.target.value)} />
-                  </div>
-                </div>
-              )}
-            </>
+            <TipoTransporteBloque
+              titulo="🛬 Regreso"
+              tipo={tipoTrVuelta}
+              onTipo={setTipoTrVuelta}
+              tarifas={tarifas}
+              origen={ciudadDestino}
+              destino={ciudadOrigen}
+            />
           )}
 
           {totalTransporte > 0 && (
@@ -661,72 +455,27 @@ export function ViaticosPanel({ onCreada, areaId }: { onCreada?: (info: { id: nu
             </div>
           )}
 
-          {/* Adjuntar tiquete — solo para legalización */}
-          {tipoViatico === 'anticipo' ? (
-            <div className="viatico-anticipo-aviso" style={{ marginTop: 20 }}>
-              <strong>No necesitas adjuntar tiquete ahora.</strong> Al recibir el anticipo, la plataforma te pedirá que lo legalices con los tiquetes y facturas reales.
-            </div>
-          ) : (
-            <div className="leg-factura-section" style={{ marginTop: 20 }}>
-              <div className="leg-factura-label">
-                <strong>Adjuntar tiquete o comprobante *</strong>
-                {!facturaTransporte?.archivoId && <span className="leg-factura-falta">⚠ Obligatorio</span>}
-                {facturaTransporte?.archivoId && (
-                  <span className={facturaTransporte.alertas.length ? 'leg-factura-warn' : 'leg-factura-ok'}>
-                    ✓ {facturaTransporte.nombre}
-                    {facturaTransporte.alertas.length > 0 && ` — ${facturaTransporte.alertas.length} alerta(s)`}
-                  </span>
-                )}
-              </div>
-              <div className="leg-factura-actions">
-                {subiendoTransporte
-                  ? <span className="leg-validando">Subiendo y analizando…</span>
-                  : (
-                    <>
-                      <button type="button" className="leg-btn-camara admin-ghost-button"
-                        onClick={() => { if (fileTransporteRef.current) { fileTransporteRef.current.setAttribute('capture', 'environment'); fileTransporteRef.current.click(); } }}>
-                        📷 Cámara
-                      </button>
-                      <button type="button" className="admin-ghost-button"
-                        onClick={() => { if (fileTransporteRef.current) { fileTransporteRef.current.removeAttribute('capture'); fileTransporteRef.current.click(); } }}>
-                        {facturaTransporte?.archivoId ? 'Cambiar archivo' : 'Adjuntar tiquete'}
-                      </button>
-                    </>
-                  )
-                }
-                <input ref={fileTransporteRef} type="file" accept="image/*,application/pdf" style={{ display: 'none' }}
-                  onChange={(e) => { const f = e.target.files?.[0]; if (f) subirFactura(f, 'transporte', { valor: totalTransporte, ciudad: ciudadDestino, fecha: fechaIda }); e.target.value = ''; }} />
-              </div>
-              {facturaTransporte?.alertas.length
-                ? <ul className="leg-alertas-list">{facturaTransporte.alertas.map((a, i) => <li key={i}>{a}</li>)}</ul>
-                : null
-              }
-            </div>
-          )}
-
           <div className="leg-actions">
             <button type="button" className="admin-ghost-button" onClick={anterior}>← Atrás</button>
             <button type="button" className="admin-primary-button" onClick={siguiente}>
-              Continuar → Alojamiento y comidas
+              Continuar → Hospedaje y comidas
             </button>
           </div>
         </div>
       )}
 
-      {/* ── PASO 4: Alojamiento y alimentación ── */}
+      {/* ── PASO 4: Hospedaje y alimentación ── */}
       {paso === 4 && (
         <div className="leg-form card-surface">
-          <h3>{tipoViatico === 'anticipo' ? 'Estimación de hospedaje y alimentación' : 'Alojamiento y alimentación'}</h3>
-          {tipoViatico === 'anticipo' && (
-            <p className="leg-nota">Indica los días / noches que necesitas. Los valores son las tarifas fijas configuradas.</p>
-          )}
+          <h3>Hospedaje y alimentación</h3>
+          <p className="leg-nota">Indica los días y noches estimados. Los valores son las tarifas fijas configuradas.</p>
 
           {/* HOSPEDAJE */}
           <div className="viaticos-seccion-titulo">🏨 Hospedaje</div>
           <div className="leg-field">
             <label className="viaticos-check-label">
               <input type="checkbox" checked={tieneHospedaje} onChange={(e) => setTieneHospedaje(e.target.checked)} />
-              {tipoViatico === 'anticipo' ? 'El viaje requerirá hospedaje' : 'El viaje requirió / requerirá hospedaje'}
+              El viaje requerirá hospedaje
             </label>
           </div>
 
@@ -756,42 +505,6 @@ export function ViaticosPanel({ onCreada, areaId }: { onCreada?: (info: { id: nu
               )}
               {noches === 0 && hotelEntrada && hotelSalida && (
                 <p className="leg-nota" style={{ color: 'var(--error, #c0392b)' }}>La fecha de salida debe ser posterior a la de entrada.</p>
-              )}
-              {tipoViatico === 'legalizar' && (
-                <div className="leg-factura-section">
-                  <div className="leg-factura-label">
-                    <strong>Factura del hotel *</strong>
-                    {!facturaHotel?.archivoId && <span className="leg-factura-falta">⚠ Obligatoria</span>}
-                    {facturaHotel?.archivoId && (
-                      <span className={facturaHotel.alertas.length ? 'leg-factura-warn' : 'leg-factura-ok'}>
-                        ✓ {facturaHotel.nombre}
-                      </span>
-                    )}
-                  </div>
-                  <div className="leg-factura-actions">
-                    {subiendoHotel
-                      ? <span className="leg-validando">Subiendo y analizando…</span>
-                      : (
-                        <>
-                          <button type="button" className="leg-btn-camara admin-ghost-button"
-                            onClick={() => { if (fileHotelRef.current) { fileHotelRef.current.setAttribute('capture', 'environment'); fileHotelRef.current.click(); } }}>
-                            📷 Cámara
-                          </button>
-                          <button type="button" className="admin-ghost-button"
-                            onClick={() => { if (fileHotelRef.current) { fileHotelRef.current.removeAttribute('capture'); fileHotelRef.current.click(); } }}>
-                            {facturaHotel?.archivoId ? 'Cambiar' : 'Adjuntar factura'}
-                          </button>
-                        </>
-                      )
-                    }
-                    <input ref={fileHotelRef} type="file" accept="image/*,application/pdf" style={{ display: 'none' }}
-                      onChange={(e) => { const f = e.target.files?.[0]; if (f) subirFactura(f, 'hotel', { valor: totalHospedaje, ciudad: ciudadDestino, fecha: hotelEntrada }); e.target.value = ''; }} />
-                  </div>
-                  {facturaHotel?.alertas.length
-                    ? <ul className="leg-alertas-list">{facturaHotel.alertas.map((a, i) => <li key={i}>{a}</li>)}</ul>
-                    : null
-                  }
-                </div>
               )}
             </>
           )}
@@ -830,43 +543,6 @@ export function ViaticosPanel({ onCreada, areaId }: { onCreada?: (info: { id: nu
             </div>
           )}
 
-          {totalComidas > 0 && tipoViatico === 'legalizar' && (
-            <div className="leg-factura-section">
-              <div className="leg-factura-label">
-                <strong>Soportes de alimentación *</strong>
-                {!facturaComidas?.archivoId && <span className="leg-factura-falta">⚠ Obligatorio</span>}
-                {facturaComidas?.archivoId && (
-                  <span className={facturaComidas.alertas.length ? 'leg-factura-warn' : 'leg-factura-ok'}>
-                    ✓ {facturaComidas.nombre}
-                  </span>
-                )}
-              </div>
-              <div className="leg-factura-actions">
-                {subiendoComidas
-                  ? <span className="leg-validando">Subiendo y analizando…</span>
-                  : (
-                    <>
-                      <button type="button" className="leg-btn-camara admin-ghost-button"
-                        onClick={() => { if (fileComidasRef.current) { fileComidasRef.current.setAttribute('capture', 'environment'); fileComidasRef.current.click(); } }}>
-                        📷 Cámara
-                      </button>
-                      <button type="button" className="admin-ghost-button"
-                        onClick={() => { if (fileComidasRef.current) { fileComidasRef.current.removeAttribute('capture'); fileComidasRef.current.click(); } }}>
-                        {facturaComidas?.archivoId ? 'Cambiar' : 'Adjuntar soporte'}
-                      </button>
-                    </>
-                  )
-                }
-                <input ref={fileComidasRef} type="file" accept="image/*,application/pdf" style={{ display: 'none' }}
-                  onChange={(e) => { const f = e.target.files?.[0]; if (f) subirFactura(f, 'comidas', { valor: totalComidas, fecha: fechaIda }); e.target.value = ''; }} />
-              </div>
-              {facturaComidas?.alertas.length
-                ? <ul className="leg-alertas-list">{facturaComidas.alertas.map((a, i) => <li key={i}>{a}</li>)}</ul>
-                : null
-              }
-            </div>
-          )}
-
           <div className="leg-actions">
             <button type="button" className="admin-ghost-button" onClick={anterior}>← Atrás</button>
             <button type="button" className="admin-primary-button" onClick={siguiente}>
@@ -882,11 +558,7 @@ export function ViaticosPanel({ onCreada, areaId }: { onCreada?: (info: { id: nu
           <h3>Resumen y firma</h3>
 
           <div className="leg-resumen-final">
-            <h4>Tipo de solicitud</h4>
-            <div className="leg-resumen-row">
-              <span>Tipo:</span>
-              <strong>{tipoViatico === 'anticipo' ? 'Solicitud de anticipo de viáticos' : 'Legalización de viáticos'}</strong>
-            </div>
+            <h4>Autorización</h4>
             <div className="leg-resumen-row"><span>Autorizado por:</span> <strong>{autorizadorNombre}</strong></div>
             <div className="leg-resumen-row"><span>Motivo:</span> <strong>{motivoViaje}</strong></div>
 
@@ -926,34 +598,26 @@ export function ViaticosPanel({ onCreada, areaId }: { onCreada?: (info: { id: nu
                 <h4>Alimentación</h4>
                 {(parseInt(diasDesayuno) || 0) > 0 && <div className="leg-resumen-row"><span>Desayunos:</span> <strong>{diasDesayuno} × ${formatearMiles(tarifas?.precioDesayuno ?? 0)} = ${formatearMiles((parseInt(diasDesayuno)||0)*(tarifas?.precioDesayuno??0))}</strong></div>}
                 {(parseInt(diasAlmuerzo) || 0) > 0 && <div className="leg-resumen-row"><span>Almuerzos:</span> <strong>{diasAlmuerzo} × ${formatearMiles(tarifas?.precioAlmuerzo ?? 0)} = ${formatearMiles((parseInt(diasAlmuerzo)||0)*(tarifas?.precioAlmuerzo??0))}</strong></div>}
-                {(parseInt(diasCena) || 0) > 0    && <div className="leg-resumen-row"><span>Cenas:</span>     <strong>{diasCena}     × ${formatearMiles(tarifas?.precioCena     ?? 0)} = ${formatearMiles((parseInt(diasCena)    ||0)*(tarifas?.precioCena    ??0))}</strong></div>}
+                {(parseInt(diasCena)     || 0) > 0 && <div className="leg-resumen-row"><span>Cenas:</span>     <strong>{diasCena}     × ${formatearMiles(tarifas?.precioCena     ?? 0)} = ${formatearMiles((parseInt(diasCena)    ||0)*(tarifas?.precioCena    ??0))}</strong></div>}
               </>
             )}
 
             <div className="leg-resumen-total-line">
-              <span>{tipoViatico === 'anticipo' ? 'ANTICIPO SOLICITADO:' : 'TOTAL A REEMBOLSAR:'}</span>
+              <span>TOTAL SOLICITADO:</span>
               <strong>${formatearMiles(totalGeneral)} COP</strong>
             </div>
-            {tipoViatico === 'anticipo' && (
-              <div className="viatico-anticipo-aviso" style={{ marginTop: 12 }}>
-                Al recibir este anticipo, deberás <strong>legalizarlo en la plataforma</strong> adjuntando los tiquetes y facturas reales.
-              </div>
-            )}
           </div>
 
           <div className="leg-field">
             <label>Firma del solicitante *</label>
-            <p className="leg-nota">{tipoViatico === 'anticipo'
-              ? 'Al firmar, declaras que el viaje está autorizado y te comprometes a legalizar el anticipo con facturas reales.'
-              : 'Al firmar, declaras que la información es veraz y los soportes adjuntos son auténticos.'
-            }</p>
+            <p className="leg-nota">Al firmar, declaras que el viaje está autorizado y la información es correcta.</p>
             <SignaturePad value={firma} onChange={setFirma} />
           </div>
 
           <div className="leg-actions">
             <button type="button" className="admin-ghost-button" onClick={anterior}>← Atrás</button>
             <button type="button" className="admin-primary-button" onClick={enviar} disabled={enviando}>
-              {enviando ? 'Enviando…' : tipoViatico === 'anticipo' ? 'Solicitar viático' : 'Enviar legalización de viático'}
+              {enviando ? 'Enviando…' : 'Solicitar viático'}
             </button>
           </div>
         </div>
