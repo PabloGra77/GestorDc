@@ -923,7 +923,7 @@ export function DashboardPage() {
 							try { localStorage.setItem('payops:bienvenida:v1:' + (session?.usuario.correo ?? ''), '1'); } catch { /* */ }
 							api.patch('/usuarios/perfil', { datosAutorizados: true }).catch(() => {});
 							setBienvenidaVista(true);
-							setActiveSection('Perfil');
+							setActiveSection('Mi perfil');
 						}}
 						style={{
 							display: 'block', width: '100%',
