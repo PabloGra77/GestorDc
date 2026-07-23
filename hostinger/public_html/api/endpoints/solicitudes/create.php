@@ -403,6 +403,10 @@ if (($primerPaso['rol'] ?? '') === 'autorizador_visto_bueno') {
             }
         }
     }
+    // Push notification to autorizador
+    if ($autorizadorIdDatos > 0) {
+        try { WebPushSender::notificar($pdo, [$autorizadorIdDatos]); } catch (Throwable $e) { error_log('[push create] ' . $e->getMessage()); }
+    }
 } else {
     FlujoHelpers::notificarValidadores($pdo, $solNotif, $primerPaso['rol'] ?? null, $areaSolicitud);
 }

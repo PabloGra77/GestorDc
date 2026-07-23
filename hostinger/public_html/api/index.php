@@ -130,6 +130,11 @@ $routes = [
     ['POST',   '#^/admin/tarifas-viaticos$#',                       'admin/tarifas_viaticos_guardar'],
     ['GET',    '#^/tarifas-viaticos$#',                             'tarifas_viaticos_pub'],
 
+    // Push notifications (Web Push API / VAPID)
+    ['GET',    '#^/push/vapid-key$#',                              'push/vapid_key'],
+    ['POST',   '#^/push/subscribe$#',                              'push/subscribe'],
+    ['DELETE', '#^/push/unsubscribe$#',                            'push/unsubscribe'],
+
     // Radicados
     ['POST',   '#^/radicados$#',                                 'radicados/create'],
     ['POST',   '#^/radicados/cuentas-cobro-ops/solicitud$#',     'radicados/ops_solicitud'],

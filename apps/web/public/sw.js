@@ -1,5 +1,5 @@
-// Payops Service Worker v13 — network-first para HTML, cache-first para assets
-const CACHE_NAME = 'payops-v25';
+// Payops Service Worker v14 — network-first para HTML, cache-first para assets + Web Push
+const CACHE_NAME = 'payops-v26';
 
 // Pre-cachear solo assets estáticos inmutables (imágenes, manifest)
 const STATIC_ASSETS = [
@@ -24,6 +24,41 @@ self.addEventListener('activate', (event) => {
   );
   self.clients.claim();
 });
+
+// ── Web Push ─────────────────────────────────────────────────────────────────
+
+self.addEventListener('push', (event) => {
+  const options = {
+    body: 'Tienes notificaciones pendientes en PayOPS. Toca para revisar.',
+    icon: '/icon-app.png',
+    badge: '/logo-pestana.png',
+    tag: 'payops-notif',
+    renotify: true,
+    requireInteraction: false,
+    data: { url: '/' },
+    vibrate: [200, 100, 200],
+  };
+  event.waitUntil(
+    self.registration.showNotification('PayOPS · Goleman IPS', options)
+  );
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const targetUrl = (event.notification.data && event.notification.data.url) || '/';
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
+      for (const client of list) {
+        if (client.url.startsWith(self.location.origin) && 'focus' in client) {
+          return client.focus();
+        }
+      }
+      if (clients.openWindow) return clients.openWindow(targetUrl);
+    })
+  );
+});
+
+// ── Fetch cache strategy ──────────────────────────────────────────────────────
 
 self.addEventListener('fetch', (event) => {
   const { request } = event;

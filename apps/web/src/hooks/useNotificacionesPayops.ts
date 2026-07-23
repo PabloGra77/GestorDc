@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../services/http/api';
+import { isPushSupported, subscribeToPush } from '../utils/pushNotifications';
 
 export interface NotificacionPayops {
   id: number;
@@ -36,6 +37,8 @@ interface BandejaItem {
 export function useNotificacionesPayops(refreshMs = 30000) {
   const [items, setItems] = useState<NotificacionPayops[]>([]);
   const [pendientesBandeja, setPendientesBandeja] = useState(0);
+  const prevCountRef = useRef(0);
+  const pushInitRef = useRef(false);
 
   const cargar = useCallback(async () => {
     try {
@@ -88,6 +91,18 @@ export function useNotificacionesPayops(refreshMs = 30000) {
       }
 
       setItems(notifs);
+
+      // Show browser notification when bandeja count increases while app is open
+      const newCount = notifs.filter((n) => n.tipo === 'pendiente').length;
+      if (newCount > prevCountRef.current && prevCountRef.current > 0 && 'Notification' in window && Notification.permission === 'granted') {
+        new Notification('PayOPS · Goleman IPS', {
+          body: `Tienes ${newCount} solicitud${newCount !== 1 ? 'es' : ''} pendiente${newCount !== 1 ? 's' : ''} de validación.`,
+          icon: '/icon-app.png',
+          tag: 'payops-in-app',
+          silent: true,
+        });
+      }
+      prevCountRef.current = newCount;
     } catch {
       // ignorar
     }
@@ -98,6 +113,18 @@ export function useNotificacionesPayops(refreshMs = 30000) {
     const t = setInterval(cargar, refreshMs);
     return () => clearInterval(t);
   }, [cargar, refreshMs]);
+
+  // Auto-subscribe to Web Push after a short delay (once per session)
+  useEffect(() => {
+    if (pushInitRef.current) return;
+    pushInitRef.current = true;
+    if (!isPushSupported()) return;
+    // Wait 8 seconds before prompting so the user has settled into the app
+    const timer = setTimeout(() => {
+      subscribeToPush().catch(() => {});
+    }, 8000);
+    return () => clearTimeout(timer);
+  }, []);
 
   return { items, pendientesBandeja, recargar: cargar };
 }

@@ -813,6 +813,18 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
   animation: bellRing 1.4s ease-in-out infinite;
 }
 
+/* Desktop bell rings and turns gold when there are unread notifications */
+.admin-bell-button.has-notif {
+  border-color: var(--gold) !important;
+  box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.2);
+}
+.admin-bell-ringing {
+  transform-origin: top center;
+  animation: bellShake 2.5s ease-in-out infinite;
+  color: var(--gold) !important;
+  filter: drop-shadow(0 0 5px rgba(212, 175, 55, 0.55));
+}
+
 .admin-bell-count {
   position: absolute;
   top: -6px;

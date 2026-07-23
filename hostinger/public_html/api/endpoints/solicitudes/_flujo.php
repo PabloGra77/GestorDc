@@ -109,6 +109,8 @@ final class FlujoHelpers
         } catch (Throwable $e) {
             error_log('[flujo notif] ' . $e->getMessage());
         }
+        // Push notification
+        try { WebPushSender::notificarPorCorreo(Db::pdo(), $correo); } catch (Throwable $e) { error_log('[push notif sol] ' . $e->getMessage()); }
     }
 
     /**
@@ -158,6 +160,8 @@ final class FlujoHelpers
                 error_log('[notif validador] ' . $e->getMessage());
             }
         }
+        // Push notification to validators
+        try { WebPushSender::notificarPorNivel($pdo, $paso, $areaId); } catch (Throwable $e) { error_log('[push notif val] ' . $e->getMessage()); }
     }
 
     /**

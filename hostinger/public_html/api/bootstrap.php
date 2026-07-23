@@ -36,6 +36,7 @@ require_once __DIR__ . '/lib/shapes.php';
 require_once __DIR__ . '/lib/domain.php';
 require_once __DIR__ . '/lib/forense.php';
 require_once __DIR__ . '/lib/auditoria.php';
+require_once __DIR__ . '/lib/webpush.php';
 
 try {
     Config::load(__DIR__ . '/.env');
