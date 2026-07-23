@@ -14,6 +14,7 @@ import { PersonalAutorizadoPanel } from '../admin/PersonalAutorizadoPanel';
 import { ConfiguracionSmtpPanel } from '../admin/ConfiguracionSmtpPanel';
 import { LegalizacionConfigPanel } from '../admin/LegalizacionConfigPanel';
 import { TiposSolicitudPanel } from '../admin/TiposSolicitudPanel';
+import { TarifasViaticosPanel } from '../admin/TarifasViaticosPanel';
 import { ProfilePanel } from '../admin/ProfilePanel';
 import { HistorialPanel } from '../admin/HistorialPanel';
 import { InformesOpsPanel } from '../admin/InformesOpsPanel';
@@ -23,7 +24,7 @@ import type { Role } from '../../types/role';
 import type { Radicado, VerificarRadicadoResponse } from '../../types/radicado';
 import type { Usuario } from '../../types/usuario';
 
-type AdminModule = 'Usuarios' | 'Personal autorizado' | 'Roles' | 'Areas' | 'Usuarios en linea' | 'Configuracion' | 'Configuracion Legalizaciones' | 'Tipos de solicitud' | 'Historial' | 'Informes OPS';
+type AdminModule = 'Usuarios' | 'Personal autorizado' | 'Roles' | 'Areas' | 'Usuarios en linea' | 'Configuracion' | 'Configuracion Legalizaciones' | 'Tipos de solicitud' | 'Tarifas Viáticos' | 'Historial' | 'Informes OPS';
 
 const ROLE_PERMISSIONS_CATALOG = {
 	inicio: {
@@ -1308,7 +1309,7 @@ export function DashboardPage() {
 					</div>
 
 					<div className="admin-module-nav" role="tablist" aria-label="Módulos administrativos">
-						{(['Usuarios', 'Personal autorizado', 'Roles', 'Areas', 'Usuarios en linea', 'Configuracion', 'Configuracion Legalizaciones', 'Tipos de solicitud', 'Historial', 'Informes OPS'] as AdminModule[]).map((module) => (
+						{(['Usuarios', 'Personal autorizado', 'Roles', 'Areas', 'Usuarios en linea', 'Configuracion', 'Configuracion Legalizaciones', 'Tipos de solicitud', 'Tarifas Viáticos', 'Historial', 'Informes OPS'] as AdminModule[]).map((module) => (
 							<button
 								key={module}
 								type="button"
@@ -1692,6 +1693,10 @@ export function DashboardPage() {
 
 						{activeAdminModule === 'Tipos de solicitud' ? (
 							<TiposSolicitudPanel />
+						) : null}
+
+						{activeAdminModule === 'Tarifas Viáticos' ? (
+							<TarifasViaticosPanel />
 						) : null}
 
 						{activeAdminModule === 'Historial' ? (

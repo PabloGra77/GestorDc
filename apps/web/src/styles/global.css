@@ -13089,3 +13089,14 @@ body[data-weather="tormenta"]::after {
   border-color: rgba(239, 68, 68, 0.55);
   color: #f87171;
 }
+
+/* ============================================================
+   TARIFAS VIÁTICOS — Panel admin
+   ============================================================ */
+.tarifa-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+}
+.tarifa-campo { display: flex; flex-direction: column; }
+.tarifa-label { font-size: 14px; font-weight: 600; margin-bottom: 2px; }
