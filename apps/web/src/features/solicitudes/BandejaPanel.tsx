@@ -188,9 +188,12 @@ function formatearDocumento(v: unknown): DocFormateado | null {
   return { texto: String(v) };
 }
 
+const ESTADOS_ACTIVOS = new Set(['en_validacion', 'por_legalizar', 'en_legalizacion']);
+
 export function BandejaPanel({ initialOpenId }: { initialOpenId?: number } = {}) {
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(false);
+  const [showHistorial, setShowHistorial] = useState(false);
   const [err, setErr] = useState('');
   const [msg, setMsg] = useState('');
   const [motivoSel, setMotivoSel] = useState('');
@@ -377,29 +380,11 @@ export function BandejaPanel({ initialOpenId }: { initialOpenId?: number } = {})
     }
   }
 
-  return (
-    <section className="bandeja-panel">
-      <header className="admin-panel-head">
-        <div>
-          <h3>Bandeja de validación</h3>
-          <p className="admin-help-text">
-            {loading ? 'Cargando…' : `${items.length} solicitud(es) pendiente(s) de tu validación.`}
-          </p>
-        </div>
-        <button type="button" className="admin-refresh-button" onClick={cargar}>
-          Refrescar
-        </button>
-      </header>
+  const activos   = items.filter((it) => ESTADOS_ACTIVOS.has(it.estado));
+  const historial = items.filter((it) => !ESTADOS_ACTIVOS.has(it.estado));
 
-      {err ? <div className="admin-error">{err}</div> : null}
-      {msg ? <div className="admin-success">{msg}</div> : null}
-
-      <div className="bandeja-list">
-        {!loading && items.length === 0 ? (
-          <p className="admin-help-text">No tienes solicitudes pendientes en este momento.</p>
-        ) : null}
-
-        {items.map((it) => (
+  function renderItem(it: Item) {
+    return (
           <div key={it.id} className="bandeja-item card-surface">
             <div className="bandeja-item-head" onClick={() => abrir(it.id)} role="button" tabIndex={0}>
               <div>
@@ -1123,8 +1108,51 @@ export function BandejaPanel({ initialOpenId }: { initialOpenId?: number } = {})
               </div>
             ) : null}
           </div>
-        ))}
+    );
+  }
+
+  return (
+    <section className="bandeja-panel">
+      <header className="admin-panel-head">
+        <div>
+          <h3>Bandeja de validación</h3>
+          <p className="admin-help-text">
+            {loading ? 'Cargando…' : `${activos.length} solicitud(es) pendiente(s) de tu validación.`}
+          </p>
+        </div>
+        <button type="button" className="admin-refresh-button" onClick={cargar}>
+          Refrescar
+        </button>
+      </header>
+
+      {err ? <div className="admin-error">{err}</div> : null}
+      {msg ? <div className="admin-success">{msg}</div> : null}
+
+      <div className="bandeja-list">
+        {!loading && activos.length === 0 ? (
+          <p className="admin-help-text">No tienes solicitudes pendientes en este momento.</p>
+        ) : null}
+        {activos.map((it) => renderItem(it))}
       </div>
+
+      {historial.length > 0 && (
+        <div className="bandeja-historial-section">
+          <button
+            type="button"
+            className="bandeja-historial-toggle"
+            onClick={() => setShowHistorial((v) => !v)}
+          >
+            <span>Historial del área — últimos 90 días</span>
+            <span className="bandeja-historial-count">{historial.length}</span>
+            <span className="bandeja-historial-chevron">{showHistorial ? '▲' : '▼'}</span>
+          </button>
+          {showHistorial && (
+            <div className="bandeja-list">
+              {historial.map((it) => renderItem(it))}
+            </div>
+          )}
+        </div>
+      )}
     </section>
   );
 }

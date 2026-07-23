@@ -26,6 +26,8 @@ if ($esAdmin || $esGerente) {
 } elseif (in_array($nivel, ['analista', 'coordinador', 'director'])) {
     // Los tres niveles jerárquicos del área pueden validar cualquier paso analista/coordinador/director
     // de su misma área, además de los donde sean designados autorizadores.
+    // También ven el historial del área (completadas últimos 90 días) para que el cambio de rol
+    // no pierda visibilidad de lo ya procesado.
     $where = "(
       (s.estado = 'en_validacion'
        AND s.paso_actual IN ('analista','coordinador','director')
@@ -33,8 +35,13 @@ if ($esAdmin || $esGerente) {
       OR
       (s.estado = 'en_validacion' AND s.paso_actual = 'autorizador_visto_bueno'
        AND JSON_UNQUOTE(JSON_EXTRACT(s.datos_formulario, '$.autorizadorId')) = :uid_str)
+      OR
+      (s.estado IN ('aprobado','rechazado','devuelto','legalizado')
+       AND s.area_id = :aid2
+       AND s.creado_en >= DATE_SUB(NOW(), INTERVAL 90 DAY))
     )";
     $params[':aid']     = (int)($user['area_id'] ?? 0);
+    $params[':aid2']    = (int)($user['area_id'] ?? 0);
     $params[':uid_str'] = (string)$usuarioId;
 } elseif ($nivel) {
     // Otro nivel (ej. contabilidad ya se maneja arriba, pero por seguridad)

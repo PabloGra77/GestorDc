@@ -5763,6 +5763,34 @@ button.mail-tracking-search-button,
    ============================================================ */
 .bandeja-panel { display: flex; flex-direction: column; gap: 20px; }
 .bandeja-list { display: flex; flex-direction: column; gap: 14px; }
+.bandeja-historial-section {
+  border-top: 1px solid rgba(255,255,255,0.07);
+  padding-top: 8px;
+}
+.bandeja-historial-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  background: none;
+  border: none;
+  color: var(--text-secondary, #8b99b0);
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 10px 4px;
+  cursor: pointer;
+  text-align: left;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+.bandeja-historial-toggle:hover { color: var(--text-primary, #e2e8f0); }
+.bandeja-historial-count {
+  background: rgba(255,255,255,0.08);
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 0.75rem;
+}
+.bandeja-historial-chevron { margin-left: auto; }
 .bandeja-item {
   padding: 0 !important;
   overflow: hidden;
