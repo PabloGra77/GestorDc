@@ -13111,3 +13111,13 @@ body[data-weather="tormenta"]::after {
 .tarifa-ruta-form .leg-monto-row { flex: 0 0 auto; }
 .tarifa-ruta-form .leg-monto-row input { max-width: 120px; }
 .viatico-ruta-badge { font-size: 11px; background: rgba(99,102,241,0.12); color: #818cf8; border-radius: 4px; padding: 2px 6px; margin-left: 8px; }
+
+/* ── Config rutas específicas viáticos ─────────────────────── */
+.tarifa-subtitulo { font-size: 13px; font-weight: 600; color: var(--text-secondary); margin: 0 0 8px; text-transform: uppercase; letter-spacing: .04em; }
+.ruta-especifica-form { background: var(--surface-raised, rgba(0,0,0,.03)); border: 1px solid var(--border-soft); border-radius: 8px; padding: 16px; margin-top: 12px; }
+@media (prefers-color-scheme: dark) { .ruta-especifica-form { background: rgba(255,255,255,.04); } }
+.ruta-ciudades-grid { display: grid; grid-template-columns: 1fr auto 1fr; gap: 8px 12px; align-items: end; }
+.ruta-ciudad-col { display: flex; flex-direction: column; gap: 4px; }
+.ruta-ciudad-col select { width: 100%; }
+.ruta-flecha { font-size: 22px; font-weight: 700; color: var(--text-secondary); padding-bottom: 8px; align-self: end; text-align: center; }
+@media (max-width: 600px) { .ruta-ciudades-grid { grid-template-columns: 1fr; } .ruta-flecha { display: none; } }

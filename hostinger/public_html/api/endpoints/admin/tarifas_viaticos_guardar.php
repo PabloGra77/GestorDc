@@ -18,12 +18,25 @@ $hospedaje = max(0, (float)($body['precioHospedaje'] ?? 0));
 $viajesRaw = is_array($body['viajesEspecificos'] ?? null) ? $body['viajesEspecificos'] : [];
 $viajes = [];
 foreach ($viajesRaw as $v) {
-    $origen  = trim((string)($v['origen']  ?? ''));
-    $destino = trim((string)($v['destino'] ?? ''));
-    $tipo    = in_array($v['tipo'] ?? '', ['aereo', 'terrestre'], true) ? $v['tipo'] : 'aereo';
-    $precio  = max(0, (float)($v['precio'] ?? 0));
+    $origen           = trim((string)($v['origen']  ?? ''));
+    $destino          = trim((string)($v['destino'] ?? ''));
+    $tipo             = in_array($v['tipo'] ?? '', ['aereo', 'terrestre'], true) ? $v['tipo'] : 'aereo';
+    $precioTransporte = max(0, (float)($v['precioTransporte'] ?? $v['precio'] ?? 0));
+    $precioDesayuno   = max(0, (float)($v['precioDesayuno']  ?? 0));
+    $precioAlmuerzo   = max(0, (float)($v['precioAlmuerzo']  ?? 0));
+    $precioCena       = max(0, (float)($v['precioCena']       ?? 0));
+    $precioHospedaje  = max(0, (float)($v['precioHospedaje']  ?? 0));
     if ($origen && $destino) {
-        $viajes[] = ['origen' => $origen, 'destino' => $destino, 'tipo' => $tipo, 'precio' => $precio];
+        $viajes[] = [
+            'origen'           => $origen,
+            'destino'          => $destino,
+            'tipo'             => $tipo,
+            'precioTransporte' => $precioTransporte,
+            'precioDesayuno'   => $precioDesayuno,
+            'precioAlmuerzo'   => $precioAlmuerzo,
+            'precioCena'       => $precioCena,
+            'precioHospedaje'  => $precioHospedaje,
+        ];
     }
 }
 $viajesJson = json_encode($viajes, JSON_UNESCAPED_UNICODE);

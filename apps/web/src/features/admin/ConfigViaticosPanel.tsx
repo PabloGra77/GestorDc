@@ -1,8 +1,20 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../services/http/api';
+import { DEPTOS } from '../solicitudes/colombiaData';
 
 interface FlujoStep { rol: string; label: string; orden: number; }
-interface ViajeEspecifico { origen: string; destino: string; tipo: 'aereo' | 'terrestre'; precio: number; }
+
+interface ViajeEspecifico {
+  origen: string;
+  destino: string;
+  tipo: 'aereo' | 'terrestre';
+  precioTransporte: number;
+  precioDesayuno: number;
+  precioAlmuerzo: number;
+  precioCena: number;
+  precioHospedaje: number;
+}
+
 interface Area { id: number; nombre: string; }
 
 const ROLES = [
@@ -16,7 +28,22 @@ const ROLES = [
 ];
 
 function fmtNum(v: number) { return v > 0 ? String(v) : ''; }
-function parseNum(s: string) { return parseFloat(s.replace(/\D/g, '')) || 0; }
+function parseNum(s: string) { return parseFloat(s.replace(/[^0-9.]/g, '')) || 0; }
+function fmtCOP(v: number) { return v > 0 ? `$${v.toLocaleString('es-CO')}` : '$0'; }
+
+/* cuando carga una ruta vieja que solo tiene "precio", la normaliza */
+function normalizarViaje(v: Record<string, unknown>): ViajeEspecifico {
+  return {
+    origen:            String(v.origen ?? ''),
+    destino:           String(v.destino ?? ''),
+    tipo:              (v.tipo === 'terrestre' ? 'terrestre' : 'aereo') as 'aereo' | 'terrestre',
+    precioTransporte:  Number(v.precioTransporte ?? v.precio ?? 0),
+    precioDesayuno:    Number(v.precioDesayuno  ?? 0),
+    precioAlmuerzo:    Number(v.precioAlmuerzo  ?? 0),
+    precioCena:        Number(v.precioCena       ?? 0),
+    precioHospedaje:   Number(v.precioHospedaje  ?? 0),
+  };
+}
 
 export function ConfigViaticosPanel() {
   const [tipoId, setTipoId] = useState<number | null>(null);
@@ -31,23 +58,31 @@ export function ConfigViaticosPanel() {
   const [descripcion, setDescripcion] = useState('');
   const [activo, setActivo] = useState(true);
 
-  /* ── Flujo de aprobación ── */
+  /* ── Flujo ── */
   const [flujo, setFlujo] = useState<FlujoStep[]>([]);
 
-  /* ── Tarifas fijas ── */
-  const [precioAereo, setPrecioAereo] = useState('');
-  const [precioTerrestre, setPrecioTerrestre] = useState('');
-  const [precioDesayuno, setPrecioDesayuno] = useState('');
-  const [precioAlmuerzo, setPrecioAlmuerzo] = useState('');
-  const [precioCena, setPrecioCena] = useState('');
-  const [precioHospedaje, setPrecioHospedaje] = useState('');
+  /* ── Tarifas generales ── */
+  const [precioAereo,      setPrecioAereo]      = useState('');
+  const [precioTerrestre,  setPrecioTerrestre]  = useState('');
+  const [precioDesayuno,   setPrecioDesayuno]   = useState('');
+  const [precioAlmuerzo,   setPrecioAlmuerzo]   = useState('');
+  const [precioCena,       setPrecioCena]       = useState('');
+  const [precioHospedaje,  setPrecioHospedaje]  = useState('');
 
-  /* ── Viajes específicos ── */
+  /* ── Rutas específicas ── */
   const [viajes, setViajes] = useState<ViajeEspecifico[]>([]);
-  const [nOrigen, setNOrigen] = useState('');
-  const [nDestino, setNDestino] = useState('');
-  const [nTipo, setNTipo] = useState<'aereo' | 'terrestre'>('aereo');
-  const [nPrecio, setNPrecio] = useState('');
+
+  /* form nueva ruta */
+  const [nDeptOrigen,   setNDeptOrigen]   = useState('');
+  const [nCiudadOrigen, setNCiudadOrigen] = useState('');
+  const [nDeptDestino,  setNDeptDestino]  = useState('');
+  const [nCiudadDestino, setNCiudadDestino] = useState('');
+  const [nTipo,         setNTipo]         = useState<'aereo' | 'terrestre'>('aereo');
+  const [nTransporte,   setNTransporte]   = useState('');
+  const [nDesayuno,     setNDesayuno]     = useState('');
+  const [nAlmuerzo,     setNAlmuerzo]     = useState('');
+  const [nCena,         setNCena]         = useState('');
+  const [nHospedaje,    setNHospedaje]    = useState('');
 
   /* ── Visibilidad ── */
   const [areasVisibles, setAreasVisibles] = useState<'todas' | number[]>('todas');
@@ -57,8 +92,8 @@ export function ConfigViaticosPanel() {
     Promise.all([
       api.get<Array<{ id: number; slug: string; nombre: string; descripcion: string | null; activo: boolean; flujoAprobacion: FlujoStep[]; configuracionTipo: { areasVisibles?: 'todas' | number[] } | null }>>('/tipos'),
       api.get<Area[]>('/areas'),
-      api.get<{ precioAereo: number; precioTerrestre: number; precioDesayuno: number; precioAlmuerzo: number; precioCena: number; precioHospedaje: number; viajesEspecificos?: ViajeEspecifico[] }>('/admin/tarifas-viaticos'),
-    ]).then(([rTipos, rAreas, rTarifas]) => {
+      api.get<Record<string, unknown>>('/admin/tarifas-viaticos'),
+    ]).then(([rTipos, rAreas, rTar]) => {
       const tipo = rTipos.data.find((t) => t.slug === 'viaticos');
       if (!tipo) { setErr('No se encontró el tipo "viaticos" en la base de datos.'); return; }
       setTipoId(tipo.id);
@@ -72,27 +107,63 @@ export function ConfigViaticosPanel() {
       const av = tipo.configuracionTipo?.areasVisibles;
       setAreasVisibles(Array.isArray(av) ? av : 'todas');
       setAreas(rAreas.data);
-      const t = rTarifas.data;
-      setPrecioAereo(fmtNum(t.precioAereo));
-      setPrecioTerrestre(fmtNum(t.precioTerrestre));
-      setPrecioDesayuno(fmtNum(t.precioDesayuno));
-      setPrecioAlmuerzo(fmtNum(t.precioAlmuerzo));
-      setPrecioCena(fmtNum(t.precioCena));
-      setPrecioHospedaje(fmtNum(t.precioHospedaje));
-      setViajes(t.viajesEspecificos ?? []);
+      const t = rTar.data;
+      setPrecioAereo(fmtNum(Number(t.precioAereo)));
+      setPrecioTerrestre(fmtNum(Number(t.precioTerrestre)));
+      setPrecioDesayuno(fmtNum(Number(t.precioDesayuno)));
+      setPrecioAlmuerzo(fmtNum(Number(t.precioAlmuerzo)));
+      setPrecioCena(fmtNum(Number(t.precioCena)));
+      setPrecioHospedaje(fmtNum(Number(t.precioHospedaje)));
+      const raw = Array.isArray(t.viajesEspecificos) ? (t.viajesEspecificos as Record<string, unknown>[]) : [];
+      setViajes(raw.map(normalizarViaje));
+      /* pre-fill form defaults con tarifa aéreo general */
+      setNTransporte(fmtNum(Number(t.precioAereo)));
+      setNDesayuno(fmtNum(Number(t.precioDesayuno)));
+      setNAlmuerzo(fmtNum(Number(t.precioAlmuerzo)));
+      setNCena(fmtNum(Number(t.precioCena)));
+      setNHospedaje(fmtNum(Number(t.precioHospedaje)));
     }).catch(() => setErr('Error al cargar la configuración.')).finally(() => setCargando(false));
   }, []);
 
-  function agregarViaje() {
-    const o = nOrigen.trim(); const d = nDestino.trim();
-    if (!o || !d) { setErr('Ingresa origen y destino.'); return; }
-    setViajes((p) => [...p, { origen: o, destino: d, tipo: nTipo, precio: parseNum(nPrecio) }]);
-    setNOrigen(''); setNDestino(''); setNTipo('aereo'); setNPrecio(''); setErr('');
-  }
+  /* al cambiar tipo de transporte en el form, actualizar precio de transporte por defecto */
+  useEffect(() => {
+    setNTransporte(nTipo === 'aereo' ? precioAereo : precioTerrestre);
+  }, [nTipo, precioAereo, precioTerrestre]);
 
   function cambiarPaso(i: number, rol: string) {
     const info = ROLES.find((r) => r.value === rol);
     setFlujo((f) => f.map((s, idx) => idx === i ? { ...s, rol, label: info?.label ?? rol } : s));
+  }
+
+  function resetFormRuta() {
+    setNDeptOrigen(''); setNCiudadOrigen('');
+    setNDeptDestino(''); setNCiudadDestino('');
+    setNTipo('aereo');
+    setNTransporte(precioAereo);
+    setNDesayuno(precioDesayuno);
+    setNAlmuerzo(precioAlmuerzo);
+    setNCena(precioCena);
+    setNHospedaje(precioHospedaje);
+    setErr('');
+  }
+
+  function agregarViaje() {
+    const o = nCiudadOrigen.trim();
+    const d = nCiudadDestino.trim();
+    if (!o || !d) { setErr('Selecciona la ciudad de origen y destino.'); return; }
+    if (o === d)  { setErr('Origen y destino deben ser diferentes.'); return; }
+    const dup = viajes.find((v) => v.tipo === nTipo &&
+      v.origen.toLowerCase() === o.toLowerCase() && v.destino.toLowerCase() === d.toLowerCase());
+    if (dup) { setErr(`Ya existe una ruta ${nTipo} ${o} → ${d}.`); return; }
+    setViajes((p) => [...p, {
+      origen: o, destino: d, tipo: nTipo,
+      precioTransporte: parseNum(nTransporte),
+      precioDesayuno:   parseNum(nDesayuno),
+      precioAlmuerzo:   parseNum(nAlmuerzo),
+      precioCena:       parseNum(nCena),
+      precioHospedaje:  parseNum(nHospedaje),
+    }]);
+    resetFormRuta();
   }
 
   async function guardar() {
@@ -102,9 +173,12 @@ export function ConfigViaticosPanel() {
     setErr(''); setOk(''); setGuardando(true);
     try {
       await api.post('/admin/tarifas-viaticos', {
-        precioAereo: parseNum(precioAereo), precioTerrestre: parseNum(precioTerrestre),
-        precioDesayuno: parseNum(precioDesayuno), precioAlmuerzo: parseNum(precioAlmuerzo),
-        precioCena: parseNum(precioCena), precioHospedaje: parseNum(precioHospedaje),
+        precioAereo:     parseNum(precioAereo),
+        precioTerrestre: parseNum(precioTerrestre),
+        precioDesayuno:  parseNum(precioDesayuno),
+        precioAlmuerzo:  parseNum(precioAlmuerzo),
+        precioCena:      parseNum(precioCena),
+        precioHospedaje: parseNum(precioHospedaje),
         viajesEspecificos: viajes,
       });
       await api.patch(`/tipos/${tipoId}`, {
@@ -131,9 +205,9 @@ export function ConfigViaticosPanel() {
       <p className="leg-config-desc">Ajusta el flujo de aprobación, las tarifas y la visibilidad de este tipo de solicitud.</p>
 
       {err && <div className="admin-error">{err}</div>}
-      {ok && <div className="admin-success">{ok}</div>}
+      {ok  && <div className="admin-success">{ok}</div>}
 
-      {/* Información básica */}
+      {/* ── Información básica ── */}
       <section className="leg-config-section">
         <h3>Información básica</h3>
         <div className="tipos-editor-fields">
@@ -153,7 +227,7 @@ export function ConfigViaticosPanel() {
         </div>
       </section>
 
-      {/* Flujo de aprobación */}
+      {/* ── Flujo ── */}
       <section className="leg-config-section">
         <h3>Flujo de aprobación</h3>
         <p className="leg-config-hint">Define quién aprueba este tipo de solicitud, en orden. Mínimo 1 paso.</p>
@@ -178,14 +252,37 @@ export function ConfigViaticosPanel() {
         </div>
       </section>
 
-      {/* Tarifas fijas */}
+      {/* ── Tarifas por defecto ── */}
       <section className="leg-config-section">
-        <h3>Tarifas de transporte</h3>
-        <p className="leg-config-hint">Valores fijos por trayecto. Se aplican cuando no hay precio específico de ruta.</p>
+        <h3>Tarifas por defecto</h3>
+        <p className="leg-config-hint">
+          Se aplican cuando <strong>no hay una ruta específica configurada</strong> para el viaje seleccionado.
+        </p>
+
+        <h4 className="tarifa-subtitulo">Transporte</h4>
         <div className="tarifa-grid">
           {([
-            ['Viaje aéreo', precioAereo, setPrecioAereo],
-            ['Viaje terrestre', precioTerrestre, setPrecioTerrestre],
+            ['✈ Viaje aéreo (por tiquete)', precioAereo, setPrecioAereo],
+            ['🚌 Viaje terrestre (por tiquete)', precioTerrestre, setPrecioTerrestre],
+          ] as [string, string, (v: string) => void][]).map(([label, val, set]) => (
+            <div key={label} className="tarifa-campo">
+              <label className="tarifa-label">{label}</label>
+              <div className="leg-monto-row">
+                <span className="leg-monto-prefix">$</span>
+                <input type="text" inputMode="numeric" value={val} placeholder="0"
+                  onChange={(e) => set(e.target.value.replace(/[^0-9.,]/g, ''))} />
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <h4 className="tarifa-subtitulo" style={{ marginTop: 16 }}>Alimentación y hospedaje</h4>
+        <div className="tarifa-grid">
+          {([
+            ['☀️ Desayuno (por día)',        precioDesayuno,  setPrecioDesayuno],
+            ['🌤 Almuerzo (por día)',         precioAlmuerzo,  setPrecioAlmuerzo],
+            ['🌙 Cena (por día)',             precioCena,      setPrecioCena],
+            ['🏨 Hospedaje (por noche)',      precioHospedaje, setPrecioHospedaje],
           ] as [string, string, (v: string) => void][]).map(([label, val, set]) => (
             <div key={label} className="tarifa-campo">
               <label className="tarifa-label">{label}</label>
@@ -199,64 +296,133 @@ export function ConfigViaticosPanel() {
         </div>
       </section>
 
-      {/* Rutas específicas */}
+      {/* ── Rutas específicas ── */}
       <section className="leg-config-section">
         <h3>Precios por ruta específica</h3>
-        <p className="leg-config-hint">Si una ruta tiene un precio fijo diferente al general, agrégala aquí. El sistema la detecta automáticamente al seleccionar las ciudades.</p>
+        <p className="leg-config-hint">
+          Cuando el profesional selecciona estas ciudades, se usan <strong>todos</strong> los precios de la ruta
+          (transporte, comidas, hospedaje) en lugar de las tarifas por defecto.
+          Las comidas y hospedaje indicados aquí reemplazan los valores generales para ese viaje.
+        </p>
+
+        {/* Tabla de rutas existentes */}
         {viajes.length > 0 && (
-          <table className="tarifa-rutas-tabla">
-            <thead><tr><th>Origen</th><th>Destino</th><th>Tipo</th><th>Precio</th><th></th></tr></thead>
-            <tbody>
-              {viajes.map((v, i) => (
-                <tr key={i}>
-                  <td>{v.origen}</td><td>{v.destino}</td>
-                  <td>{v.tipo === 'aereo' ? '✈ Aéreo' : '🚌 Terrestre'}</td>
-                  <td>${v.precio.toLocaleString('es-CO')}</td>
-                  <td><button type="button" className="tipos-eliminar-btn" onClick={() => setViajes((p) => p.filter((_, j) => j !== i))}>Eliminar</button></td>
+          <div style={{ overflowX: 'auto', marginBottom: 16 }}>
+            <table className="tarifa-rutas-tabla" style={{ minWidth: 720 }}>
+              <thead>
+                <tr>
+                  <th>Origen</th>
+                  <th>Destino</th>
+                  <th>Tipo</th>
+                  <th>Transp.</th>
+                  <th>Desay.</th>
+                  <th>Almuerz.</th>
+                  <th>Cena</th>
+                  <th>Hosped./noche</th>
+                  <th></th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-        <div className="tarifa-ruta-form">
-          <input type="text" placeholder="Ciudad origen" value={nOrigen} onChange={(e) => setNOrigen(e.target.value)} />
-          <input type="text" placeholder="Ciudad destino" value={nDestino} onChange={(e) => setNDestino(e.target.value)} />
-          <select value={nTipo} onChange={(e) => setNTipo(e.target.value as 'aereo' | 'terrestre')}>
-            <option value="aereo">✈ Aéreo</option>
-            <option value="terrestre">🚌 Terrestre</option>
-          </select>
-          <div className="leg-monto-row">
-            <span className="leg-monto-prefix">$</span>
-            <input type="text" inputMode="numeric" placeholder="Precio" value={nPrecio}
-              onChange={(e) => setNPrecio(e.target.value.replace(/[^0-9.,]/g, ''))} />
+              </thead>
+              <tbody>
+                {viajes.map((v, i) => (
+                  <tr key={i}>
+                    <td>{v.origen}</td>
+                    <td>{v.destino}</td>
+                    <td>{v.tipo === 'aereo' ? '✈ Aéreo' : '🚌 Terrestre'}</td>
+                    <td>{fmtCOP(v.precioTransporte)}</td>
+                    <td>{fmtCOP(v.precioDesayuno)}</td>
+                    <td>{fmtCOP(v.precioAlmuerzo)}</td>
+                    <td>{fmtCOP(v.precioCena)}</td>
+                    <td>{fmtCOP(v.precioHospedaje)}</td>
+                    <td>
+                      <button type="button" className="tipos-eliminar-btn"
+                        onClick={() => setViajes((p) => p.filter((_, j) => j !== i))}>
+                        Eliminar
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-          <button type="button" className="admin-ghost-button" onClick={agregarViaje}>+ Agregar ruta</button>
-        </div>
-      </section>
+        )}
 
-      {/* Tarifas alimentación y hospedaje */}
-      <section className="leg-config-section">
-        <h3>Alimentación y hospedaje</h3>
-        <div className="tarifa-grid">
-          {([
-            ['☀️ Desayuno (por día)', precioDesayuno, setPrecioDesayuno],
-            ['🌤 Almuerzo (por día)', precioAlmuerzo, setPrecioAlmuerzo],
-            ['🌙 Cena (por día)', precioCena, setPrecioCena],
-            ['🏨 Hospedaje (por noche)', precioHospedaje, setPrecioHospedaje],
-          ] as [string, string, (v: string) => void][]).map(([label, val, set]) => (
-            <div key={label} className="tarifa-campo">
-              <label className="tarifa-label">{label}</label>
-              <div className="leg-monto-row">
-                <span className="leg-monto-prefix">$</span>
-                <input type="text" inputMode="numeric" value={val} placeholder="0"
-                  onChange={(e) => set(e.target.value.replace(/[^0-9.,]/g, ''))} />
-              </div>
+        {/* Formulario nueva ruta */}
+        <div className="ruta-especifica-form">
+          <p className="leg-config-hint" style={{ marginBottom: 10 }}>
+            <strong>Nueva ruta:</strong> los precios se pre-rellenan con los valores generales; modifica solo los que difieran.
+          </p>
+
+          {/* Ciudades */}
+          <div className="ruta-ciudades-grid">
+            <div className="ruta-ciudad-col">
+              <label className="tarifa-label">Departamento origen</label>
+              <select value={nDeptOrigen} onChange={(e) => { setNDeptOrigen(e.target.value); setNCiudadOrigen(''); }}>
+                <option value="">— Departamento —</option>
+                {DEPTOS.map((d) => <option key={d.id} value={d.id}>{d.nombre}</option>)}
+              </select>
+              <label className="tarifa-label" style={{ marginTop: 8 }}>Ciudad origen *</label>
+              <select value={nCiudadOrigen} onChange={(e) => setNCiudadOrigen(e.target.value)} disabled={!nDeptOrigen}>
+                <option value="">— Ciudad —</option>
+                {(DEPTOS.find((d) => d.id === nDeptOrigen)?.ciudades ?? []).map((c) => (
+                  <option key={c.nombre} value={c.nombre}>{c.nombre}</option>
+                ))}
+              </select>
             </div>
-          ))}
+
+            <div className="ruta-flecha">→</div>
+
+            <div className="ruta-ciudad-col">
+              <label className="tarifa-label">Departamento destino</label>
+              <select value={nDeptDestino} onChange={(e) => { setNDeptDestino(e.target.value); setNCiudadDestino(''); }}>
+                <option value="">— Departamento —</option>
+                {DEPTOS.map((d) => <option key={d.id} value={d.id}>{d.nombre}</option>)}
+              </select>
+              <label className="tarifa-label" style={{ marginTop: 8 }}>Ciudad destino *</label>
+              <select value={nCiudadDestino} onChange={(e) => setNCiudadDestino(e.target.value)} disabled={!nDeptDestino}>
+                <option value="">— Ciudad —</option>
+                {(DEPTOS.find((d) => d.id === nDeptDestino)?.ciudades ?? []).map((c) => (
+                  <option key={c.nombre} value={c.nombre}>{c.nombre}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Tipo transporte */}
+          <div style={{ marginTop: 12 }}>
+            <label className="tarifa-label">Tipo de transporte</label>
+            <div className="viaticos-tipo-transport-row" style={{ marginTop: 6 }}>
+              <button type="button" className={`viatico-tr-btn${nTipo === 'aereo' ? ' selected' : ''}`} onClick={() => setNTipo('aereo')}>✈ Aéreo</button>
+              <button type="button" className={`viatico-tr-btn${nTipo === 'terrestre' ? ' selected' : ''}`} onClick={() => setNTipo('terrestre')}>🚌 Terrestre</button>
+            </div>
+          </div>
+
+          {/* Precios de la ruta */}
+          <div className="tarifa-grid" style={{ marginTop: 14 }}>
+            {([
+              [`${nTipo === 'aereo' ? '✈' : '🚌'} Precio transporte`, nTransporte, setNTransporte],
+              ['☀️ Desayuno por día',                                  nDesayuno,   setNDesayuno],
+              ['🌤 Almuerzo por día',                                  nAlmuerzo,   setNAlmuerzo],
+              ['🌙 Cena por día',                                      nCena,       setNCena],
+              ['🏨 Hospedaje por noche',                               nHospedaje,  setNHospedaje],
+            ] as [string, string, (v: string) => void][]).map(([label, val, set]) => (
+              <div key={label} className="tarifa-campo">
+                <label className="tarifa-label">{label}</label>
+                <div className="leg-monto-row">
+                  <span className="leg-monto-prefix">$</span>
+                  <input type="text" inputMode="numeric" value={val} placeholder="0"
+                    onChange={(e) => set(e.target.value.replace(/[^0-9.,]/g, ''))} />
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <button type="button" className="admin-ghost-button" style={{ marginTop: 14 }} onClick={agregarViaje}>
+            + Agregar ruta
+          </button>
         </div>
       </section>
 
-      {/* Visibilidad */}
+      {/* ── Visibilidad ── */}
       <section className="leg-config-section">
         <h3>Visibilidad por área</h3>
         <p className="leg-config-hint">Controla qué áreas pueden ver y usar esta solicitud.</p>

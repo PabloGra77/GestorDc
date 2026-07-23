@@ -10,7 +10,12 @@ interface ViajeEspecifico {
   origen: string;
   destino: string;
   tipo: 'aereo' | 'terrestre';
-  precio: number;
+  precio?: number;              /* campo legado */
+  precioTransporte?: number;
+  precioDesayuno?: number;
+  precioAlmuerzo?: number;
+  precioCena?: number;
+  precioHospedaje?: number;
 }
 
 interface TarifasViaticos {
@@ -23,36 +28,58 @@ interface TarifasViaticos {
   viajesEspecificos: ViajeEspecifico[];
 }
 
+interface TarifasRuta {
+  especifico: boolean;
+  precioTransporte: number;
+  precioDesayuno: number;
+  precioAlmuerzo: number;
+  precioCena: number;
+  precioHospedaje: number;
+}
+
 interface UsuarioSugerido { id: number; nombreCompleto: string; rol: string; area: string | null; }
 
-/* ─── Helper: precio de transporte ─────────────────────────── */
-function getPrecioTransporte(
+/* ─── Helper: todas las tarifas para una ruta ─────────────── */
+function getTarifasRuta(
   tarifas: TarifasViaticos | null,
   tipo: 'aereo' | 'terrestre',
   origen: string,
   destino: string,
-): { precio: number; especifico: boolean } {
-  if (!tarifas) return { precio: 0, especifico: false };
+): TarifasRuta {
+  const gen: TarifasRuta = {
+    especifico: false,
+    precioTransporte: tipo === 'aereo' ? (tarifas?.precioAereo ?? 0) : (tarifas?.precioTerrestre ?? 0),
+    precioDesayuno:  tarifas?.precioDesayuno  ?? 0,
+    precioAlmuerzo:  tarifas?.precioAlmuerzo  ?? 0,
+    precioCena:      tarifas?.precioCena       ?? 0,
+    precioHospedaje: tarifas?.precioHospedaje  ?? 0,
+  };
+  if (!tarifas || !origen || !destino) return gen;
   const norm = (s: string) => s.trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
   const match = (tarifas.viajesEspecificos ?? []).find(
     (v) => v.tipo === tipo && norm(v.origen) === norm(origen) && norm(v.destino) === norm(destino),
   );
-  if (match) return { precio: match.precio, especifico: true };
-  return { precio: tipo === 'aereo' ? tarifas.precioAereo : tarifas.precioTerrestre, especifico: false };
+  if (!match) return gen;
+  return {
+    especifico: true,
+    precioTransporte: match.precioTransporte ?? match.precio ?? gen.precioTransporte,
+    precioDesayuno:   match.precioDesayuno  ?? gen.precioDesayuno,
+    precioAlmuerzo:   match.precioAlmuerzo  ?? gen.precioAlmuerzo,
+    precioCena:       match.precioCena       ?? gen.precioCena,
+    precioHospedaje:  match.precioHospedaje  ?? gen.precioHospedaje,
+  };
 }
 
 /* ─── Bloque de tipo de transporte ─────────────────────────── */
 function TipoTransporteBloque({
-  titulo, tipo, onTipo, tarifas, origen, destino,
+  titulo, tipo, onTipo, tarifasRuta, tarifasCargadas,
 }: {
   titulo: string;
   tipo: 'aereo' | 'terrestre';
   onTipo: (v: 'aereo' | 'terrestre') => void;
-  tarifas: TarifasViaticos | null;
-  origen: string;
-  destino: string;
+  tarifasRuta: TarifasRuta;
+  tarifasCargadas: boolean;
 }) {
-  const { precio, especifico } = getPrecioTransporte(tarifas, tipo, origen, destino);
   return (
     <div className="viatico-tiquete-bloque">
       <div className="viatico-tiquete-titulo">{titulo}</div>
@@ -68,9 +95,9 @@ function TipoTransporteBloque({
         </div>
       </div>
       <div className="viatico-tarifa-fija-display">
-        <span>{especifico ? 'Precio por ruta específica:' : `Tarifa ${tipo === 'aereo' ? 'aéreo' : 'terrestre'}:`}</span>
-        <strong>{tarifas ? `$${formatearMiles(precio)} COP` : 'Cargando…'}</strong>
-        {especifico && <span className="viatico-ruta-badge">Ruta configurada</span>}
+        <span>{tarifasRuta.especifico ? 'Precio de ruta específica:' : `Tarifa ${tipo === 'aereo' ? 'aéreo' : 'terrestre'}:`}</span>
+        <strong>{tarifasCargadas ? `$${formatearMiles(tarifasRuta.precioTransporte)} COP` : 'Cargando…'}</strong>
+        {tarifasRuta.especifico && <span className="viatico-ruta-badge">Ruta configurada</span>}
       </div>
     </div>
   );
@@ -139,27 +166,37 @@ export function ViaticosPanel({ onCreada, areaId }: { onCreada?: (info: { id: nu
     setShowSugeridos(false);
   }
 
-  /* Precios calculados con rutas específicas */
-  const { precio: precioIda }    = getPrecioTransporte(tarifas, tipoTrIda,    ciudadOrigen, ciudadDestino);
-  const { precio: precioVuelta } = getPrecioTransporte(tarifas, tipoTrVuelta, ciudadDestino, ciudadOrigen);
+  /* Tarifas según ruta (específica si existe, si no general) */
+  const tarifasIda    = getTarifasRuta(tarifas, tipoTrIda,    ciudadOrigen, ciudadDestino);
+  const tarifasVuelta = getTarifasRuta(tarifas, tipoTrVuelta, ciudadDestino, ciudadOrigen);
 
-  const totalTransporte = useMemo(() => precioIda + (esIdaVuelta ? precioVuelta : 0), [precioIda, precioVuelta, esIdaVuelta]);
+  const precioTrIda    = tarifasIda.precioTransporte;
+  const precioTrVuelta = tarifasVuelta.precioTransporte;
+
+  const totalTransporte = useMemo(() => precioTrIda + (esIdaVuelta ? precioTrVuelta : 0),
+    [precioTrIda, precioTrVuelta, esIdaVuelta]);
 
   const noches = useMemo(() => {
     if (!tieneHospedaje || !hotelEntrada || !hotelSalida) return 0;
     return Math.max(0, Math.round((new Date(hotelSalida).getTime() - new Date(hotelEntrada).getTime()) / 86400000));
   }, [tieneHospedaje, hotelEntrada, hotelSalida]);
 
-  const precioHospedaje = tarifas?.precioHospedaje ?? 0;
-  const totalHospedaje  = useMemo(() => tieneHospedaje ? precioHospedaje * noches : 0, [tieneHospedaje, precioHospedaje, noches]);
+  const precioHospedaje = tarifasIda.precioHospedaje;
+  const totalHospedaje  = useMemo(() => tieneHospedaje ? precioHospedaje * noches : 0,
+    [tieneHospedaje, precioHospedaje, noches]);
 
-  const totalComidas = useMemo(() => {
-    return (parseInt(diasDesayuno) || 0) * (tarifas?.precioDesayuno ?? 0)
-         + (parseInt(diasAlmuerzo) || 0) * (tarifas?.precioAlmuerzo ?? 0)
-         + (parseInt(diasCena)     || 0) * (tarifas?.precioCena     ?? 0);
-  }, [diasDesayuno, diasAlmuerzo, diasCena, tarifas]);
+  const precioDesayuno = tarifasIda.precioDesayuno;
+  const precioAlmuerzo = tarifasIda.precioAlmuerzo;
+  const precioCena     = tarifasIda.precioCena;
 
-  const totalGeneral = useMemo(() => totalTransporte + totalHospedaje + totalComidas, [totalTransporte, totalHospedaje, totalComidas]);
+  const totalComidas = useMemo(() =>
+    (parseInt(diasDesayuno) || 0) * precioDesayuno
+  + (parseInt(diasAlmuerzo) || 0) * precioAlmuerzo
+  + (parseInt(diasCena)     || 0) * precioCena,
+    [diasDesayuno, diasAlmuerzo, diasCena, precioDesayuno, precioAlmuerzo, precioCena]);
+
+  const totalGeneral = useMemo(() => totalTransporte + totalHospedaje + totalComidas,
+    [totalTransporte, totalHospedaje, totalComidas]);
 
   function validarPaso(): string {
     if (paso === 1) {
@@ -215,8 +252,8 @@ export function ViaticosPanel({ onCreada, areaId }: { onCreada?: (info: { id: nu
         return;
       }
 
-      const tiqueteIda = { tipo: tipoTrIda, valor: String(precioIda) };
-      const tiqueteVuelta = esIdaVuelta ? { tipo: tipoTrVuelta, valor: String(precioVuelta) } : null;
+      const tiqueteIda = { tipo: tipoTrIda, valor: String(precioTrIda) };
+      const tiqueteVuelta = esIdaVuelta ? { tipo: tipoTrVuelta, valor: String(precioTrVuelta) } : null;
 
       const r = await api.post<{ id: number; numeroRadicado: string }>('/solicitudes', {
         tipoSolicitudId: tipo.id,
@@ -238,9 +275,9 @@ export function ViaticosPanel({ onCreada, areaId }: { onCreada?: (info: { id: nu
           hotelSalida:  tieneHospedaje ? hotelSalida  : '',
           hotelNoches:  tieneHospedaje ? String(noches) : '0',
           hotelValorNoche: tieneHospedaje ? String(precioHospedaje) : '0',
-          diasDesayuno, valorDesayuno: String(tarifas?.precioDesayuno ?? 0),
-          diasAlmuerzo, valorAlmuerzo: String(tarifas?.precioAlmuerzo ?? 0),
-          diasCena,     valorCena:     String(tarifas?.precioCena     ?? 0),
+          diasDesayuno, valorDesayuno: String(precioDesayuno),
+          diasAlmuerzo, valorAlmuerzo: String(precioAlmuerzo),
+          diasCena,     valorCena:     String(precioCena),
           totalTransporte: String(totalTransporte),
           totalHospedaje:  String(totalHospedaje),
           totalComidas:    String(totalComidas),
@@ -433,9 +470,8 @@ export function ViaticosPanel({ onCreada, areaId }: { onCreada?: (info: { id: nu
             titulo={esIdaVuelta ? '🛫 Ida' : '🛫 Tiquete'}
             tipo={tipoTrIda}
             onTipo={setTipoTrIda}
-            tarifas={tarifas}
-            origen={ciudadOrigen}
-            destino={ciudadDestino}
+            tarifasRuta={tarifasIda}
+            tarifasCargadas={tarifas !== null}
           />
 
           {esIdaVuelta && (
@@ -443,9 +479,8 @@ export function ViaticosPanel({ onCreada, areaId }: { onCreada?: (info: { id: nu
               titulo="🛬 Regreso"
               tipo={tipoTrVuelta}
               onTipo={setTipoTrVuelta}
-              tarifas={tarifas}
-              origen={ciudadDestino}
-              destino={ciudadOrigen}
+              tarifasRuta={tarifasVuelta}
+              tarifasCargadas={tarifas !== null}
             />
           )}
 
@@ -573,12 +608,12 @@ export function ViaticosPanel({ onCreada, areaId }: { onCreada?: (info: { id: nu
             <h4>Transporte</h4>
             <div className="leg-resumen-row">
               <span>Ida:</span>
-              <strong>{tipoTrIda === 'aereo' ? '✈ Aéreo' : '🚌 Terrestre'} — ${formatearMiles(precioIda)}</strong>
+              <strong>{tipoTrIda === 'aereo' ? '✈ Aéreo' : '🚌 Terrestre'} — ${formatearMiles(precioTrIda)}</strong>
             </div>
             {esIdaVuelta && (
               <div className="leg-resumen-row">
                 <span>Regreso:</span>
-                <strong>{tipoTrVuelta === 'aereo' ? '✈ Aéreo' : '🚌 Terrestre'} — ${formatearMiles(precioVuelta)}</strong>
+                <strong>{tipoTrVuelta === 'aereo' ? '✈ Aéreo' : '🚌 Terrestre'} — ${formatearMiles(precioTrVuelta)}</strong>
               </div>
             )}
 
