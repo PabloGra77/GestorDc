@@ -56,17 +56,24 @@ function getTarifasRuta(
   };
   if (!tarifas || !origen || !destino) return gen;
   const norm = (s: string) => s.trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
-  const match = (tarifas.viajesEspecificos ?? []).find(
+  const viajes = tarifas.viajesEspecificos ?? [];
+  /* busca coincidencia directa (origen→destino con el tipo seleccionado) */
+  const match = viajes.find(
     (v) => v.tipo === tipo && norm(v.origen) === norm(origen) && norm(v.destino) === norm(destino),
   );
-  if (!match) return gen;
+  /* si no hay directa, busca la ruta inversa del mismo tipo (trayecto de regreso) */
+  const fallback = !match ? viajes.find(
+    (v) => v.tipo === tipo && norm(v.origen) === norm(destino) && norm(v.destino) === norm(origen),
+  ) : undefined;
+  const found = match ?? fallback;
+  if (!found) return gen;
   return {
     especifico: true,
-    precioTransporte: match.precioTransporte ?? match.precio ?? gen.precioTransporte,
-    precioDesayuno:   match.precioDesayuno  ?? gen.precioDesayuno,
-    precioAlmuerzo:   match.precioAlmuerzo  ?? gen.precioAlmuerzo,
-    precioCena:       match.precioCena       ?? gen.precioCena,
-    precioHospedaje:  match.precioHospedaje  ?? gen.precioHospedaje,
+    precioTransporte: found.precioTransporte ?? found.precio ?? gen.precioTransporte,
+    precioDesayuno:   found.precioDesayuno  ?? gen.precioDesayuno,
+    precioAlmuerzo:   found.precioAlmuerzo  ?? gen.precioAlmuerzo,
+    precioCena:       found.precioCena       ?? gen.precioCena,
+    precioHospedaje:  found.precioHospedaje  ?? gen.precioHospedaje,
   };
 }
 
@@ -224,7 +231,25 @@ export function ViaticosPanel({ onCreada, areaId }: { onCreada?: (info: { id: nu
     return '';
   }
 
-  function siguiente() { const e = validarPaso(); if (e) { setErr(e); return; } setErr(''); setPaso((p) => Math.min(5, p + 1) as 1|2|3|4|5); }
+  function siguiente() {
+    const e = validarPaso();
+    if (e) { setErr(e); return; }
+    setErr('');
+    /* al pasar de paso 2 → 3, auto-seleccionar el tipo de transporte configurado para la ruta */
+    if (paso === 2 && tarifas) {
+      const norm = (s: string) => s.trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+      const viajes = tarifas.viajesEspecificos ?? [];
+      const rutaIda = viajes.find(
+        (v) => (norm(v.origen) === norm(ciudadOrigen) && norm(v.destino) === norm(ciudadDestino))
+             || (norm(v.origen) === norm(ciudadDestino) && norm(v.destino) === norm(ciudadOrigen)),
+      );
+      if (rutaIda) {
+        setTipoTrIda(rutaIda.tipo);
+        if (esIdaVuelta) setTipoTrVuelta(rutaIda.tipo);
+      }
+    }
+    setPaso((p) => Math.min(5, p + 1) as 1|2|3|4|5);
+  }
   function anterior() { setErr(''); setPaso((p) => Math.max(1, p - 1) as 1|2|3|4|5); }
 
   function resetear() {
