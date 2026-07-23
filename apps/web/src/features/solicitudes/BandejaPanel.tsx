@@ -739,55 +739,37 @@ export function BandejaPanel() {
                           {motivoViaje && <p className="bandeja-leg-concepto"><strong>Motivo:</strong> {motivoViaje}</p>}
                           {/* Tiquetes */}
                           <table className="bandeja-items-table bandeja-leg-table">
-                            <thead><tr><th>Trayecto</th><th>Tipo</th><th>Empresa</th><th>N° vuelo/tiquete</th><th>Salida</th><th>Llegada</th><th>Valor</th><th>Soporte</th></tr></thead>
+                            <thead><tr><th>Trayecto</th><th>Tipo</th><th>Ruta</th><th>Valor</th></tr></thead>
                             <tbody>
                               {tIda && (
                                 <tr>
                                   <td>Ida</td>
                                   <td>{tIda.tipo === 'aereo' ? '✈ Aéreo' : '🚌 Terrestre'}</td>
-                                  <td>{tIda.empresa || '—'}</td>
-                                  <td>{tIda.numDoc || '—'}{tIda.codReserva ? <span className="leg-ocr-badge" style={{ marginLeft: 4 }}>Res: {tIda.codReserva}</span> : null}</td>
-                                  <td>{tIda.horaSalida || '—'}</td>
-                                  <td>{tIda.horaLlegada || '—'}</td>
+                                  <td>{ciudadOrigen && ciudadDestino ? `${ciudadOrigen} → ${ciudadDestino}` : '—'}</td>
                                   <td>{fmt(tIda.valor)}</td>
-                                  <td rowSpan={tVuelta ? 2 : 1}>
-                                    {docTiquete?.archivoId ? (
-                                      <button type="button" className="bandeja-abrir-adjunto" onClick={() => abrirArchivo(docTiquete.archivoId!)}>📎 {docTiquete.nombre || 'Ver tiquete'}</button>
-                                    ) : <span className="factura-falta">⚠ sin soporte</span>}
-                                    {docTiquete?.ocrAlertas && docTiquete.ocrAlertas.length > 0 && (
-                                      <ul className="bandeja-factura-alertas">{docTiquete.ocrAlertas.map((a, ai) => <li key={ai}>⚠ {a}</li>)}</ul>
-                                    )}
-                                  </td>
                                 </tr>
                               )}
                               {tVuelta && (
                                 <tr>
                                   <td>Vuelta</td>
                                   <td>{tVuelta.tipo === 'aereo' ? '✈ Aéreo' : '🚌 Terrestre'}</td>
-                                  <td>{tVuelta.empresa || '—'}</td>
-                                  <td>{tVuelta.numDoc || '—'}{tVuelta.codReserva ? <span className="leg-ocr-badge" style={{ marginLeft: 4 }}>Res: {tVuelta.codReserva}</span> : null}</td>
-                                  <td>{tVuelta.horaSalida || '—'}</td>
-                                  <td>{tVuelta.horaLlegada || '—'}</td>
+                                  <td>{ciudadOrigen && ciudadDestino ? `${ciudadDestino} → ${ciudadOrigen}` : '—'}</td>
                                   <td>{fmt(tVuelta.valor)}</td>
                                 </tr>
                               )}
                             </tbody>
-                            {Number(totalTransporte) > 0 && <tfoot><tr><td colSpan={6}><strong>Total transporte</strong></td><td colSpan={2}><strong>{fmt(totalTransporte)}</strong></td></tr></tfoot>}
+                            {Number(totalTransporte) > 0 && <tfoot><tr><td colSpan={3}><strong>Total transporte</strong></td><td><strong>{fmt(totalTransporte)}</strong></td></tr></tfoot>}
                           </table>
                           {/* Hospedaje */}
                           {tieneHospedaje && (
                             <div style={{ marginTop: 12 }}>
                               <h5 style={{ color: 'var(--gold)', marginBottom: 6 }}>Alojamiento</h5>
                               <table className="bandeja-items-table bandeja-leg-table">
-                                <thead><tr><th>Hotel</th><th>Entrada</th><th>Salida</th><th>Noches</th><th>Valor/noche</th><th>Total</th><th>Soporte</th></tr></thead>
+                                <thead><tr><th>Hotel</th><th>Entrada</th><th>Salida</th><th>Noches</th><th>Valor/noche</th><th>Total</th></tr></thead>
                                 <tbody>
                                   <tr>
                                     <td>{hotelNombre || '—'}</td><td>{hotelEntrada || '—'}</td><td>{hotelSalida || '—'}</td>
                                     <td>{hotelNoches}</td><td>{fmt(hotelValorNoche)}</td><td>{fmt(totalHospedaje)}</td>
-                                    <td>
-                                      {docHotel?.archivoId ? <button type="button" className="bandeja-abrir-adjunto" onClick={() => abrirArchivo(docHotel.archivoId!)}>📎 {docHotel.nombre || 'Ver factura'}</button> : <span className="factura-falta">⚠ sin soporte</span>}
-                                      {docHotel?.ocrAlertas && docHotel.ocrAlertas.length > 0 && <ul className="bandeja-factura-alertas">{docHotel.ocrAlertas.map((a, ai) => <li key={ai}>⚠ {a}</li>)}</ul>}
-                                    </td>
                                   </tr>
                                 </tbody>
                               </table>
