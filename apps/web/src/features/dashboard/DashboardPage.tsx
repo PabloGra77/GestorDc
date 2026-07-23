@@ -861,51 +861,58 @@ export function DashboardPage() {
 		{!bienvenidaVista && (
 			<div style={{
 				position: 'fixed', inset: 0, zIndex: 9999,
-				background: 'rgba(0,0,0,0.65)', display: 'flex',
-				alignItems: 'center', justifyContent: 'center', padding: 16,
+				background: 'rgba(0,0,0,0.72)', display: 'flex',
+				alignItems: 'center', justifyContent: 'center', padding: '16px 12px',
 			}}>
+				{/* card con colores explícitos para que no herede dark-mode global */}
 				<div style={{
-					background: 'var(--color-bg, #fff)', borderRadius: 14, maxWidth: 540, width: '100%',
-					padding: '32px 28px', boxShadow: '0 8px 40px rgba(0,0,0,0.25)',
+					background: '#ffffff', borderRadius: 16, maxWidth: 520, width: '100%',
+					maxHeight: 'calc(100dvh - 32px)', overflowY: 'auto',
+					padding: 'clamp(20px, 5vw, 32px) clamp(16px, 5vw, 28px)',
+					boxShadow: '0 12px 48px rgba(0,0,0,0.35)',
+					color: '#1a2742',
 				}}>
-					<div style={{ textAlign: 'center', marginBottom: 20 }}>
-						<div style={{ fontSize: 40, marginBottom: 8 }}>📋</div>
-						<h2 style={{ margin: 0, fontSize: 20, fontWeight: 700 }}>Bienvenido(a) a PayOPS</h2>
-						<p style={{ margin: '6px 0 0', color: 'var(--color-text-muted)', fontSize: 13 }}>
-							Plataforma de legalización y gestión documental de pagos · Goleman IPS
+					<div style={{ textAlign: 'center', marginBottom: 18 }}>
+						<div style={{ fontSize: 44, marginBottom: 6, lineHeight: 1 }}>📋</div>
+						<h2 style={{ margin: 0, fontSize: 'clamp(17px, 4.5vw, 21px)', fontWeight: 700, color: '#1a2742' }}>
+							Bienvenido(a) a PayOPS
+						</h2>
+						<p style={{ margin: '6px 0 0', color: '#64748b', fontSize: 12.5 }}>
+							Plataforma de gestión documental de pagos · Goleman IPS
 						</p>
 					</div>
 
-					<p style={{ fontSize: 13.5, lineHeight: 1.6, margin: '0 0 12px' }}>
-						PayOPS es la plataforma oficial de Goleman IPS para el registro, aprobación y trazabilidad
-						de solicitudes de anticipo de gastos, viáticos, cuentas de cobro y legalizaciones.
+					<p style={{ fontSize: 13.5, lineHeight: 1.65, margin: '0 0 10px', color: '#334155' }}>
+						PayOPS es la plataforma oficial de Goleman IPS para el registro, aprobación y
+						trazabilidad de solicitudes de anticipo, viáticos, cuentas de cobro y legalizaciones.
 					</p>
-					<p style={{ fontSize: 13.5, lineHeight: 1.6, margin: '0 0 12px' }}>
-						<strong>Primer paso:</strong> configura tu información personal en <em>Mi Perfil</em>.
-						Recuerda que estos datos serán utilizados en todos los tipos de solicitud que radiques,
-						y quedarán bajo tu responsabilidad.
+					<p style={{ fontSize: 13.5, lineHeight: 1.65, margin: '0 0 14px', color: '#334155' }}>
+						<strong style={{ color: '#1a2742' }}>Primer paso:</strong> completa tu información en{' '}
+						<em>Mi Perfil</em>. Esos datos se usarán en todas tus solicitudes.
 					</p>
+
 					<div style={{
-						background: 'var(--color-bg-alt, #f8f6ed)', borderRadius: 8,
+						background: '#fefce8', borderRadius: 8,
 						padding: '10px 14px', fontSize: 12.5, lineHeight: 1.6,
-						borderLeft: '3px solid #d4a017', marginBottom: 16,
+						borderLeft: '3px solid #d4a017', marginBottom: 16, color: '#78350f',
 					}}>
-						<strong>Aviso legal:</strong> La falsificación, alteración o manipulación de documentos
-						constituye delito conforme al <strong>Art. 286 del Código Penal colombiano</strong> (Ley 599 de 2000).
-						Todos los documentos subidos a esta plataforma son objeto de análisis forense digital.
+						<strong style={{ color: '#92400e' }}>Aviso legal:</strong>{' '}
+						La falsificación, alteración o manipulación de documentos constituye delito conforme al{' '}
+						<strong style={{ color: '#92400e' }}>Art. 286 del Código Penal colombiano</strong> (Ley 599 de 2000).
+						Todos los documentos subidos son objeto de análisis forense digital.
 					</div>
 
-					<label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', cursor: 'pointer', marginBottom: 20 }}>
+					<label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', cursor: 'pointer', marginBottom: 18 }}>
 						<input
 							type="checkbox"
 							checked={datosAutorizados}
 							onChange={(e) => setDatosAutorizados(e.target.checked)}
-							style={{ marginTop: 3, flexShrink: 0 }}
+							style={{ marginTop: 3, flexShrink: 0, accentColor: '#1a2742', width: 16, height: 16 }}
 						/>
-						<span style={{ fontSize: 12.5, lineHeight: 1.5 }}>
+						<span style={{ fontSize: 12.5, lineHeight: 1.55, color: '#334155' }}>
 							Autorizo el tratamiento de mis datos personales conforme a la{' '}
-							<strong>Ley 1581 de 2012</strong> (Protección de Datos Personales) y declaro
-							que la información que registre en esta plataforma es veraz y verificable.
+							<strong style={{ color: '#1a2742' }}>Ley 1581 de 2012</strong> (Protección de Datos Personales)
+							y declaro que la información que registre en esta plataforma es veraz y verificable.
 						</span>
 					</label>
 
@@ -919,13 +926,17 @@ export function DashboardPage() {
 							setActiveSection('Perfil');
 						}}
 						style={{
-							width: '100%', padding: '11px 0', borderRadius: 8, border: 'none',
-							background: datosAutorizados ? '#1a2742' : '#ccc',
-							color: '#fff', fontWeight: 600, fontSize: 14, cursor: datosAutorizados ? 'pointer' : 'not-allowed',
-							transition: 'background 0.2s',
+							display: 'block', width: '100%',
+							padding: '13px 16px', borderRadius: 10, border: 'none',
+							background: datosAutorizados ? '#1a2742' : '#94a3b8',
+							color: '#ffffff', fontWeight: 700, fontSize: 15,
+							cursor: datosAutorizados ? 'pointer' : 'not-allowed',
+							transition: 'background 0.2s, opacity 0.2s',
+							opacity: datosAutorizados ? 1 : 0.7,
+							letterSpacing: '0.01em',
 						}}
 					>
-						Comenzar — ir a Mi Perfil
+						Comenzar → ir a Mi Perfil
 					</button>
 				</div>
 			</div>
