@@ -19,9 +19,9 @@ if (!filter_var($correo, FILTER_VALIDATE_EMAIL)) {
 }
 
 $pdo = Db::pdo();
-$sql = "SELECT u.id, u.nombre_completo, u.correo, u.activo, u.password_hash, 
-               u.must_change_password, u.permisos, u.rol_id,
-               r.id AS r_id, r.nombre AS r_nombre, r.descripcion AS r_desc, 
+$sql = "SELECT u.id, u.nombre_completo, u.correo, u.activo, u.password_hash,
+               u.must_change_password, u.permisos, u.rol_id, u.area_id,
+               r.id AS r_id, r.nombre AS r_nombre, r.descripcion AS r_desc,
                r.activo AS r_activo, r.permisos AS r_permisos
         FROM usuarios u
         INNER JOIN roles r ON r.id = u.rol_id
@@ -89,6 +89,7 @@ Response::json([
         'activo' => (bool)$row['activo'],
         'debeCambiarPassword' => (bool)$row['must_change_password'],
         'permisos' => json_decode($row['permisos'] ?: '{}', true) ?: new stdClass(),
+        'areaId' => $row['area_id'] !== null ? (int)$row['area_id'] : null,
         'rol' => [
             'id' => (int)$row['r_id'],
             'nombre' => $row['r_nombre'],

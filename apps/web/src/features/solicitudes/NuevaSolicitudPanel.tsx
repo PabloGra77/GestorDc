@@ -358,10 +358,13 @@ export function NuevaSolicitudPanel({ onCreada }: NuevaSolicitudPanelProps) {
     if (!areaSel) return [];
     return tipos.filter((t) => {
       if ((t.slug ?? '').toLowerCase() === 'anticipo') return false;
-      if (t.areaId === areaSel.id) return true;
       const av = t.configuracionTipo?.areasVisibles;
+      // areasVisibles con lista explícita: solo esas áreas pueden ver el tipo
+      if (Array.isArray(av) && av.length > 0) return av.includes(areaSel.id);
+      // 'todas': visible en cualquier área
       if (av === 'todas') return true;
-      if (Array.isArray(av) && av.includes(areaSel.id)) return true;
+      // Sin restricción: el área propietaria y las que participan en el flujo
+      if (t.areaId === areaSel.id) return true;
       const participantes = (t as unknown as { flujoAreas?: { areasParticipantes?: number[] } })?.flujoAreas?.areasParticipantes;
       return Array.isArray(participantes) && participantes.includes(areaSel.id);
     });
