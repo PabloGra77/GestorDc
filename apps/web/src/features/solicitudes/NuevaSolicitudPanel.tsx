@@ -43,7 +43,8 @@ interface CampoPlantilla {
     | 'direccion'
     | 'persona'
     | 'calculado'
-    | 'tabla-items';
+    | 'tabla-items'
+    | 'autorizacion-descuento';
   required: boolean;
   group?: string;
   ocr_target?: string;
@@ -880,7 +881,7 @@ export function NuevaSolicitudPanel({ onCreada }: NuevaSolicitudPanelProps) {
                 <h4 className="nueva-sol-grupo-titulo">{grupo}</h4>
                 <div className="nueva-sol-grupo-grid">
                   {campos.filter((c) => esVisible(c)).map((c) => (
-                    <div key={c.key} className={`form-group${(c.type === 'direccion' || c.type === 'textarea' || c.type === 'tabla-items' || c.type === 'file' || c.type === 'texto-fijo') ? ' form-group--wide' : ''}`}>
+                    <div key={c.key} className={`form-group${(c.type === 'direccion' || c.type === 'textarea' || c.type === 'tabla-items' || c.type === 'file' || c.type === 'texto-fijo' || c.type === 'autorizacion-descuento') ? ' form-group--wide' : ''}`}>
                       <label htmlFor={`f-${c.key}`}>
                         {c.label} {c.required ? <span className="req">*</span> : null}
                       </label>
@@ -1103,6 +1104,22 @@ export function NuevaSolicitudPanel({ onCreada }: NuevaSolicitudPanelProps) {
                             </>
                           );
                         })()
+                      ) : c.type === 'autorizacion-descuento' ? (
+                        <div style={{ background: 'rgba(239,68,68,0.07)', border: '1.5px solid rgba(239,68,68,0.35)', borderRadius: 8, padding: '14px 16px' }}>
+                          <p style={{ fontSize: 13, lineHeight: 1.55, margin: '0 0 10px' }}>
+                            Autorizo de manera expresa a <strong>IPS GOLEMAN SERVICIOS INTEGRALES SAS</strong>, para que en el evento que no se realice la acción, las atenciones o la prestación de los servicios solicitados por la empresa, sea descontado <strong>el valor total</strong> de la presente solicitud. Este descuento será aplicable a conceptos de pago de salarios, primas extralegales, primas legales. Igualmente, en caso de retiro o desvinculación de la empresa, autorizo a que el saldo que en cualquier momento se encuentre en mi contra, sea descontado de mi liquidación de salarios y prestaciones sociales finales, vacaciones, auxilios y en general cualquier concepto que deba cancelarme la Empresa.
+                          </p>
+                          <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer', fontSize: 13 }}>
+                            <input
+                              type="checkbox"
+                              checked={datos[c.key] === 'aceptado'}
+                              onChange={(e) => setDatos((p) => ({ ...p, [c.key]: e.target.checked ? 'aceptado' : '' }))}
+                              required={c.required}
+                              style={{ marginTop: 2, flexShrink: 0 }}
+                            />
+                            <span>He leído y acepto la autorización de descuento descrita anteriormente.</span>
+                          </label>
+                        </div>
                       ) : (
                         <input
                           id={`f-${c.key}`}

@@ -431,6 +431,17 @@ export function MisSolicitudesPanel({ refresco, initialOpenId }: { refresco?: nu
                     {s.estado === 'en_legalizacion' ? '↻ Re-enviar legalización' : '💸 Legalizar'}
                   </button>
                 ) : null}
+                {s.estado === 'en_validacion' ? (
+                  <button
+                    type="button"
+                    className="admin-ghost-button"
+                    onClick={() => descargarPdf(s.id)}
+                    disabled={descargando === s.id}
+                    style={{ opacity: 0.8 }}
+                  >
+                    {descargando === s.id ? 'Generando…' : '⬇ PDF en trámite'}
+                  </button>
+                ) : null}
                 {(s.estado === 'aprobado' || s.estado === 'legalizado' || s.estado === 'por_legalizar' || s.estado === 'en_legalizacion') ? (
                   <button
                     type="button"

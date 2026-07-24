@@ -42,6 +42,7 @@ type PdfBloque = BloqueBase & (
   | { tipo: 'lista'; items: string[]; conVinetas: boolean }
   | { tipo: 'separador-doble' }
   | { tipo: 'qr-radicado'; tamano: number }
+  | { tipo: 'autorizacion-descuento' }
 );
 
 async function cargarImagenDataUrl(url: string): Promise<string | null> {
@@ -510,7 +511,40 @@ async function generarPdfPlantilla(s: SolicitudParaPdf, pl: PlantillaPdf, filena
       doc.setFontSize(6);
       doc.setFont('helvetica', 'normal');
       doc.text(s.numeroRadicado, b.x + t / 2, baseY + t / 2 + 2, { align: 'center' });
+    } else if (b.tipo === 'autorizacion-descuento') {
+      const textoAuth = 'Autorizo de manera expresa a IPS GOLEMAN SERVICIOS INTEGRALES SAS, para que en el evento que no se realice la accion, las atenciones o la prestacion de los servicios solicitados por la empresa, sea descontado el valor total de la presente solicitud. Este descuento sera aplicable a conceptos de pago de salarios, primas extralegales, primas legales. Igualmente, en caso de retiro o desvinculacion de la empresa, autorizo a que el saldo que en cualquier momento se encuentre en mi contra, sea descontado de mi liquidacion de salarios y prestaciones sociales finales, vacaciones, auxilios y en general cualquier concepto que deba cancelarme la Empresa.';
+      const aceptado = (s.datosFormulario || {})[b.id] === 'aceptado';
+      doc.setFillColor(255, 245, 245);
+      doc.setDrawColor(200, 60, 60);
+      doc.setLineWidth(0.4);
+      const authLines = doc.splitTextToSize(textoAuth, b.w - 8);
+      const authH = authLines.length * 4.5 + 16;
+      doc.rect(b.x, baseY, b.w, authH, 'FD');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      doc.setTextColor(180, 30, 30);
+      doc.text('AUTORIZACION DE DESCUENTO', b.x + 4, baseY + 6);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.setTextColor(30, 30, 30);
+      doc.text(authLines, b.x + 4, baseY + 11);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8.5);
+      doc.setTextColor(aceptado ? 0 : 120, aceptado ? 130 : 0, 0);
+      doc.text((aceptado ? '[X] ' : '[ ] ') + 'El solicitante acepta la autorizacion de descuento.', b.x + 4, baseY + authH - 4);
     }
+    }
+  }
+
+  // Marca de agua para solicitudes en tramite
+  if (s.estado === 'en_validacion') {
+    const wPages = doc.getNumberOfPages();
+    for (let wi = 1; wi <= wPages; wi++) {
+      doc.setPage(wi);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(70);
+      doc.setTextColor(220, 60, 60);
+      doc.text('EN PROCESO', pageWidth / 2, pageHeight / 2, { align: 'center', angle: 45 });
     }
   }
 
@@ -1752,6 +1786,36 @@ function _generarPdfEspecial(s: SolicitudParaPdf, opts?: { bloburl?: boolean }):
     });
   }
 
+  // Bloque de autorización de descuento (viáticos y anticipos)
+  if (esViaticos || esAnticipo) {
+    const campoAuth = (s.camposPlantilla || []).find((c) => c.type === 'autorizacion-descuento');
+    const aceptado = campoAuth ? (s.datosFormulario || {})[campoAuth.key] === 'aceptado' : false;
+    if (y > 220) { doc.addPage(); y = margin; }
+    y += 4;
+    const textoAuth = 'Autorizo de manera expresa a IPS GOLEMAN SERVICIOS INTEGRALES SAS, para que en el evento que no se realice la accion, las atenciones o la prestacion de los servicios solicitados por la empresa, sea descontado el valor total de la presente solicitud. Este descuento sera aplicable a conceptos de pago de salarios, primas extralegales, primas legales. Igualmente, en caso de retiro o desvinculacion de la empresa, autorizo a que el saldo que en cualquier momento se encuentre en mi contra, sea descontado de mi liquidacion de salarios y prestaciones sociales finales, vacaciones, auxilios y en general cualquier concepto que deba cancelarme la Empresa.';
+    const authW = pageWidth - margin * 2;
+    doc.setFontSize(8);
+    const authLines = doc.splitTextToSize(textoAuth, authW - 8);
+    const authH = authLines.length * 4.2 + 16;
+    doc.setFillColor(255, 245, 245);
+    doc.setDrawColor(200, 60, 60);
+    doc.setLineWidth(0.4);
+    doc.rect(margin, y, authW, authH, 'FD');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(180, 30, 30);
+    doc.text('AUTORIZACION DE DESCUENTO', margin + 4, y + 6);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(30, 30, 30);
+    doc.text(authLines, margin + 4, y + 11);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8.5);
+    doc.setTextColor(aceptado ? 0 : 120, aceptado ? 130 : 0, 0);
+    doc.text((aceptado ? '[X] ' : '[ ] ') + 'El solicitante acepta la autorizacion de descuento.', margin + 4, y + authH - 4);
+    y += authH + 4;
+  }
+
   // Firmas
   const firmas = s.firmas || {};
   if (y > 230) { doc.addPage(); y = margin; }
@@ -1820,6 +1884,18 @@ function _generarPdfEspecial(s: SolicitudParaPdf, opts?: { bloburl?: boolean }):
       290,
       { align: 'center' }
     );
+  }
+
+  // Marca de agua para solicitudes en tramite
+  if (s.estado === 'en_validacion') {
+    const wH = doc.internal.pageSize.getHeight();
+    for (let wi = 1; wi <= totalPages; wi++) {
+      doc.setPage(wi);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(70);
+      doc.setTextColor(220, 60, 60);
+      doc.text('EN PROCESO', pageWidth / 2, wH / 2, { align: 'center', angle: 45 });
+    }
   }
 
   if (opts?.bloburl) {
