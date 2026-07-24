@@ -128,4 +128,10 @@ $out = Shapes::usuario($sel->fetch());
 $out['correoEnviado'] = $correoEnviado;
 // Si el correo no salio, devolver la contrasena temporal para que el admin la entregue.
 $out['passwordTemporal'] = $correoEnviado ? null : $tempPassword;
+
+Auditoria::registrar(
+    'crear_usuario',
+    "Usuario creado: {$nombreCompleto} ({$correo}) · Rol: {$rol['nombre']}"
+);
+
 Response::json($out, 201);

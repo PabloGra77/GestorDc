@@ -22,23 +22,30 @@ interface LogsResponse {
 }
 
 const ACCION_LABEL: Record<string, string> = {
-  login_exitoso:  'Inicio de sesión',
-  login_fallido:  'Intento fallido',
-  logout:         'Cierre de sesión',
-  crear_usuario:  'Crear usuario',
-  editar_usuario: 'Editar usuario',
+  login_exitoso:    'Inicio de sesión',
+  login_fallido:    'Intento fallido',
+  logout:           'Cierre de sesión',
+  crear_usuario:    'Crear usuario',
+  editar_usuario:   'Editar usuario',
   eliminar_usuario: 'Eliminar usuario',
-  crear_solicitud:'Nueva solicitud',
-  aprobar:        'Aprobar',
-  rechazar:       'Rechazar',
-  devolver:       'Devolver',
+  crear_solicitud:  'Nueva solicitud',
+  visto_bueno:      'Visto bueno',
+  validar:          'Validar paso',
+  aprobar:          'Aprobar',
+  rechazar:         'Rechazar',
+  devolver:         'Devolver',
 };
 
 const ACCION_COLOR: Record<string, string> = {
   login_exitoso:    '#22c55e',
   login_fallido:    '#ef4444',
   logout:           '#94a3b8',
+  crear_usuario:    '#8b5cf6',
+  editar_usuario:   '#6366f1',
+  eliminar_usuario: '#ef4444',
   crear_solicitud:  '#3b82f6',
+  visto_bueno:      '#0ea5e9',
+  validar:          '#10b981',
   aprobar:          '#22c55e',
   rechazar:         '#ef4444',
   devolver:         '#f59e0b',
@@ -169,6 +176,8 @@ export function HistorialPanel() {
           <option value="editar_usuario">Editar usuario</option>
           <option value="eliminar_usuario">Eliminar usuario</option>
           <option value="crear_solicitud">Nueva solicitud</option>
+          <option value="visto_bueno">Visto bueno</option>
+          <option value="validar">Validar paso</option>
           <option value="aprobar">Aprobar</option>
           <option value="rechazar">Rechazar</option>
           <option value="devolver">Devolver</option>

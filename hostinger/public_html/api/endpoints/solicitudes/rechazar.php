@@ -42,4 +42,11 @@ try {
     Response::error('No se pudo rechazar la solicitud', 500);
 }
 
+Auditoria::registrar(
+    'rechazar',
+    "Radicado {$sol['numero_radicado']} · paso: {$sol['paso_actual']} · Motivo: {$motivo}",
+    true,
+    (int)$jwt['sub']
+);
+
 Response::json(['ok' => true, 'estado' => 'rechazado']);

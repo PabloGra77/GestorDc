@@ -154,6 +154,11 @@ try {
     Response::error('No se pudo validar la solicitud', 500);
 }
 
+$accionAudit = ($nuevoEstado === 'en_validacion') ? 'validar' : 'aprobar';
+$detalleAudit = "Radicado {$sol['numero_radicado']} · paso: {$sol['paso_actual']}"
+    . ($nuevoPaso ? " → {$nuevoPaso}" : ' → Aprobado');
+Auditoria::registrar($accionAudit, $detalleAudit, true, (int)$jwt['sub']);
+
 // Si avanzó, avisar al validador del siguiente paso
 if ($siguiente) {
     FlujoHelpers::notificarValidadores($pdo, [

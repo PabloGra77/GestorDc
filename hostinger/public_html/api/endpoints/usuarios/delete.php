@@ -34,4 +34,9 @@ try {
     );
 }
 
+Auditoria::registrar(
+    'eliminar_usuario',
+    "Usuario ID {$id} eliminado · Rol: {$u['rol']}"
+);
+
 Response::json(['ok' => true]);

@@ -109,6 +109,14 @@ try {
     Response::error('No se pudo registrar el visto bueno', 500);
 }
 
+Auditoria::registrar(
+    'visto_bueno',
+    "Radicado {$sol['numero_radicado']} · visto bueno de {$user['nombre_completo']}"
+    . ($siguiente ? " → {$siguiente['rol']}" : ' → Aprobado'),
+    true,
+    (int)$jwt['sub']
+);
+
 // Notificar al solicitante que avanzó
 FlujoHelpers::notificarSolicitante($sol,
     "Visto bueno recibido: {$sol['numero_radicado']}",

@@ -252,4 +252,9 @@ if ($seEstaActivando && $nuevaPasswordTemp !== null) {
     }
 }
 
+Auditoria::registrar(
+    'editar_usuario',
+    "Usuario editado: {$row['nombre_completo']} ({$row['correo']}) · Rol: {$rolNombre}"
+);
+
 Response::json(Shapes::usuario($usuarioActualizado));

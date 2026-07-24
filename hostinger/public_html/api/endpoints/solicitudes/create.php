@@ -333,6 +333,13 @@ try {
     Response::error('No se pudo crear la solicitud', 500);
 }
 
+Auditoria::registrar(
+    'crear_solicitud',
+    "Radicado {$numero} · {$tipo['nombre']} · Área: {$tipo['area_nombre']}",
+    true,
+    $usuarioId
+);
+
 // Notificaciones (no bloquean la respuesta si fallan)
 require_once __DIR__ . '/_flujo.php';
 

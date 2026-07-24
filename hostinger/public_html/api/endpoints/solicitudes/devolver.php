@@ -44,4 +44,11 @@ try {
     Response::error('No se pudo devolver la solicitud', 500);
 }
 
+Auditoria::registrar(
+    'devolver',
+    "Radicado {$sol['numero_radicado']} · paso: {$sol['paso_actual']} · Motivo: {$motivo}",
+    true,
+    (int)$jwt['sub']
+);
+
 Response::json(['ok' => true, 'estado' => 'devuelto']);

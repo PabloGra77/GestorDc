@@ -13,4 +13,6 @@ setcookie('payops_token', '', [
     'samesite' => 'Strict',
 ]);
 
+Auditoria::registrar('logout', 'Cierre de sesión');
+
 Response::json(['ok' => true]);
