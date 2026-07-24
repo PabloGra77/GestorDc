@@ -54,16 +54,9 @@ final class FlujoHelpers
             in_array($nivelUsuario, ['analista', 'coordinador', 'director'])
         ) {
             // Cualquier nivel jerárquico del área puede validar pasos analista/coordinador/director
+            // Solo se permite si pertenece al área (evita que el autorizador externo valide pasos internos)
             if ((int)($user['area_id'] ?? 0) === (int)$sol['area_id']) {
                 $puede = true;
-            }
-            // Si el usuario fue el autorizador designado puede validar el paso siguiente
-            // aunque sea de otra área (ya dio el visto bueno y sigue en la cadena)
-            if (!$puede) {
-                $datos = json_decode($sol['datos_formulario'] ?? '{}', true) ?: [];
-                if ((int)($datos['autorizadorId'] ?? 0) === $usuarioId) {
-                    $puede = true;
-                }
             }
         } elseif ($nivelUsuario === $pasoActual) {
             if ($nivelUsuario === 'contabilidad') {

@@ -62,11 +62,8 @@ if (($flujoEfectivo[0]['rol'] ?? '') !== 'autorizador_visto_bueno') {
 }
 $siguiente = FlujoHelpers::siguientePaso(json_encode($flujoEfectivo), 'autorizador_visto_bueno');
 
-// Guardar firma del autorizador bajo ambas claves posibles para compatibilidad
-// con plantillas PDF que usen 'autorizador' o 'autorizador_visto_bueno'
 $firmasActuales = json_decode($sol['firmas'] ?? 'null', true) ?: [];
 $firmasActuales['autorizador_visto_bueno'] = $firma;
-$firmasActuales['autorizador'] = $firma;
 $firmasJson = json_encode($firmasActuales, JSON_UNESCAPED_UNICODE);
 
 $pdo->beginTransaction();

@@ -36,7 +36,7 @@ type PdfBloque = BloqueBase & (
   | { tipo: 'campo'; campoKey: string; etiqueta: string; alineacion: PdfAlineacion }
   | { tipo: 'tabla'; columnas: string[]; conTotal?: boolean; etiquetaTotal?: string }
   | { tipo: 'divider' }
-  | { tipo: 'firma'; etiqueta: string; campoFirma: 'profesional' | 'coordinador' | 'contabilidad' }
+  | { tipo: 'firma'; etiqueta: string; campoFirma: 'profesional' | 'coordinador' | 'contabilidad' | 'autorizador_visto_bueno' | 'analista' | 'director' | string }
   | { tipo: 'caja'; alto: number; relleno: boolean; etiqueta?: string }
   | { tipo: 'imagen'; src: string; etiqueta?: string }
   | { tipo: 'lista'; items: string[]; conVinetas: boolean }

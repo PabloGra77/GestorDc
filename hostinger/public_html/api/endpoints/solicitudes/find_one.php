@@ -47,16 +47,12 @@ $nivelHabilitado = $nivelUser !== '' && (
 );
 $esValidadorEnTurno = $nivelHabilitado && ($esContabilidad || $mismaArea);
 
-// Autorizador designado: puede ver cuando es su turno o cuando ya dio visto bueno y tiene nivel siguiente
+// Autorizador designado: puede ver solo cuando es su turno (paso autorizador_visto_bueno)
 $datos = json_decode($r['datos_formulario'] ?? '{}', true) ?: [];
 $esAutorizadorDesignado = (int)($datos['autorizadorId'] ?? 0) === $usuarioId;
 $esAutorizador = $esAutorizadorDesignado && $pasoActual === 'autorizador_visto_bueno';
-// Si ya dio visto bueno y tiene nivel para el siguiente paso, también puede ver y actuar
-$esAutorizadorConNivel = $esAutorizadorDesignado &&
-    in_array($nivelUser, ['analista', 'coordinador', 'director']) &&
-    in_array($pasoActual, ['analista', 'coordinador', 'director']);
 
-if (!$esAdmin && !$esGerente && !$esSolicitante && !$esValidadorEnTurno && !$esAutorizador && !$esAutorizadorConNivel) {
+if (!$esAdmin && !$esGerente && !$esSolicitante && !$esValidadorEnTurno && !$esAutorizador) {
     Response::error('No tienes permiso para ver esta solicitud', 403);
 }
 
