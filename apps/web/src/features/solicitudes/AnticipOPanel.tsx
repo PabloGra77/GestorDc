@@ -204,6 +204,7 @@ export function AnticipOPanel({ onCreada, areaId }: AnticipoPanelProps) {
   const [numeroCuenta, setNumeroCuenta] = useState('');
   const [titularCuenta, setTitularCuenta] = useState('');
   const [firma, setFirma] = useState('');
+  const [autorizacionAceptada, setAutorizacionAceptada] = useState(false);
 
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState('');
@@ -353,6 +354,7 @@ export function AnticipOPanel({ onCreada, areaId }: AnticipoPanelProps) {
       if (topeT && total > topeT) return `El total ($ ${fmtN(total)}) supera el tope configurado de $ ${fmtN(topeT)}.`;
     }
     if (paso === 3) {
+      if (!autorizacionAceptada) return 'Debes aceptar la autorización de descuento para continuar.';
       if (!firma) return 'Firma digital requerida.';
     }
     return '';
@@ -453,6 +455,7 @@ export function AnticipOPanel({ onCreada, areaId }: AnticipoPanelProps) {
           autorizadoPor: autorizadorNombre,
           items: JSON.stringify(items),
           valorPesos: String(total),
+          'autorizacion-descuento': autorizacionAceptada ? 'aceptado' : '',
           banco,
           tipoCuenta,
           numeroCuenta,
@@ -1012,6 +1015,21 @@ export function AnticipOPanel({ onCreada, areaId }: AnticipoPanelProps) {
               mediante la presentación de los soportes correspondientes dentro del plazo
               establecido, conforme a la política de anticipos vigente.
             </p>
+          </div>
+
+          <div style={{ background: 'rgba(239,68,68,0.07)', border: '1.5px solid rgba(239,68,68,0.35)', borderRadius: 8, padding: '14px 16px', marginTop: 12 }}>
+            <p style={{ fontSize: 13, lineHeight: 1.55, margin: '0 0 10px' }}>
+              Autorizo de manera expresa a <strong>IPS GOLEMAN SERVICIOS INTEGRALES SAS</strong>, para que en el evento que no se realice la acción, las atenciones o la prestación de los servicios solicitados por la empresa, sea descontado <strong>el valor total de $ {fmtN(total)} COP</strong> de la presente solicitud. Este descuento será aplicable a conceptos de pago de salarios, primas extralegales, primas legales. Igualmente, en caso de retiro o desvinculación de la empresa, autorizo a que el saldo que en cualquier momento se encuentre en mi contra, sea descontado de mi liquidación de salarios y prestaciones sociales finales, vacaciones, auxilios y en general cualquier concepto que deba cancelarme la Empresa.
+            </p>
+            <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer', fontSize: 13 }}>
+              <input
+                type="checkbox"
+                checked={autorizacionAceptada}
+                onChange={(e) => setAutorizacionAceptada(e.target.checked)}
+                style={{ marginTop: 2, flexShrink: 0 }}
+              />
+              <span>He leído y acepto la autorización de descuento descrita anteriormente.</span>
+            </label>
           </div>
 
           <div className="form-group form-group--wide" style={{ marginTop: 16 }}>

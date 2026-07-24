@@ -536,15 +536,21 @@ async function generarPdfPlantilla(s: SolicitudParaPdf, pl: PlantillaPdf, filena
     }
   }
 
-  // Marca de agua para solicitudes en tramite
+  // Marca de agua repetida para solicitudes en tramite
   if (s.estado === 'en_validacion') {
     const wPages = doc.getNumberOfPages();
     for (let wi = 1; wi <= wPages; wi++) {
       doc.setPage(wi);
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(70);
-      doc.setTextColor(220, 60, 60);
-      doc.text('EN PROCESO', pageWidth / 2, pageHeight / 2, { align: 'center', angle: 45 });
+      doc.setFontSize(14);
+      doc.setTextColor(155, 155, 155);
+      for (let row = 0; row <= 8; row++) {
+        for (let col = 0; col <= 5; col++) {
+          const wx = col * 42 - 10 + (row % 2 === 0 ? 0 : 21);
+          const wy = row * 36 - 15;
+          doc.text('EN PROCESO', wx, wy, { angle: 45 });
+        }
+      }
     }
   }
 
@@ -886,6 +892,26 @@ function _generarPdfEspecial(s: SolicitudParaPdf, opts?: { bloburl?: boolean }):
     const split = doc.splitTextToSize(narrativa, pageWidth - margin * 2);
     doc.text(split, margin, y);
     y += split.length * 5 + 6;
+    {
+      const aceptV = (s.datosFormulario || {})['autorizacion-descuento'] === 'aceptado';
+      const aTxt = 'Autorizo de manera expresa a IPS GOLEMAN SERVICIOS INTEGRALES SAS, para que en el evento que no se realice la accion, las atenciones o la prestacion de los servicios solicitados por la empresa, sea descontado el valor total de la presente solicitud. Este descuento sera aplicable a conceptos de pago de salarios, primas extralegales, primas legales. Igualmente, en caso de retiro o desvinculacion de la empresa, autorizo a que el saldo que en cualquier momento se encuentre en mi contra, sea descontado de mi liquidacion de salarios y prestaciones sociales finales, vacaciones, auxilios y en general cualquier concepto que deba cancelarme la Empresa.';
+      if (y > 218) { doc.addPage(); y = margin; }
+      const aW = pageWidth - margin * 2;
+      doc.setFontSize(8);
+      const aLs = doc.splitTextToSize(aTxt, aW - 8);
+      const aH = aLs.length * 4.2 + 14;
+      doc.setFillColor(255, 245, 245); doc.setDrawColor(200, 60, 60); doc.setLineWidth(0.4);
+      doc.rect(margin, y, aW, aH, 'FD');
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5); doc.setTextColor(180, 30, 30);
+      doc.text('AUTORIZACION DE DESCUENTO', margin + 4, y + 5.5);
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(30, 30, 30);
+      doc.text(aLs, margin + 4, y + 10.5);
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5);
+      doc.setTextColor(aceptV ? 0 : 120, aceptV ? 130 : 0, 0);
+      doc.text((aceptV ? '[X] ' : '[ ] ') + 'El solicitante acepta la autorizacion de descuento.', margin + 4, y + aH - 3.5);
+      doc.setTextColor(15, 23, 42);
+      y += aH + 5;
+    }
   }
 
   // Bloque especial: gastos de legalización (datosFormulario.gastos = JSON array)
@@ -1068,8 +1094,8 @@ function _generarPdfEspecial(s: SolicitudParaPdf, opts?: { bloburl?: boolean }):
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(8);
       doc.setTextColor(15, 23, 42);
-      const rutaIda = ciudadOrigen && ciudadDestino ? `${ciudadOrigen} → ${ciudadDestino}` : '';
-      const rutaVuelta = ciudadOrigen && ciudadDestino ? `${ciudadDestino} → ${ciudadOrigen}` : '';
+      const rutaIda = ciudadOrigen && ciudadDestino ? `${ciudadOrigen} - ${ciudadDestino}` : '';
+      const rutaVuelta = ciudadOrigen && ciudadDestino ? `${ciudadDestino} - ${ciudadOrigen}` : '';
       const tRows = [['Ida', tIda], ...(tVuelta ? [['Vuelta', tVuelta]] : [])] as [string, Record<string, string>][];
       tRows.forEach(([label, t], idx) => {
         if (y > 275) { doc.addPage(); y = margin; }
@@ -1227,6 +1253,26 @@ function _generarPdfEspecial(s: SolicitudParaPdf, opts?: { bloburl?: boolean }):
         const splitNarr = doc.splitTextToSize(narrativa, pageWidth - margin * 2);
         doc.text(splitNarr, margin, y);
         y += splitNarr.length * 5 + 5;
+        {
+          const aceptAnt = (s.datosFormulario || {})['autorizacion-descuento'] === 'aceptado';
+          const aTxtAnt = 'Autorizo de manera expresa a IPS GOLEMAN SERVICIOS INTEGRALES SAS, para que en el evento que no se realice la accion, las atenciones o la prestacion de los servicios solicitados por la empresa, sea descontado el valor total de la presente solicitud. Este descuento sera aplicable a conceptos de pago de salarios, primas extralegales, primas legales. Igualmente, en caso de retiro o desvinculacion de la empresa, autorizo a que el saldo que en cualquier momento se encuentre en mi contra, sea descontado de mi liquidacion de salarios y prestaciones sociales finales, vacaciones, auxilios y en general cualquier concepto que deba cancelarme la Empresa.';
+          if (y > 218) { doc.addPage(); y = margin; }
+          const aWAnt = pageWidth - margin * 2;
+          doc.setFontSize(8);
+          const aLsAnt = doc.splitTextToSize(aTxtAnt, aWAnt - 8);
+          const aHAnt = aLsAnt.length * 4.2 + 14;
+          doc.setFillColor(255, 245, 245); doc.setDrawColor(200, 60, 60); doc.setLineWidth(0.4);
+          doc.rect(margin, y, aWAnt, aHAnt, 'FD');
+          doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5); doc.setTextColor(180, 30, 30);
+          doc.text('AUTORIZACION DE DESCUENTO', margin + 4, y + 5.5);
+          doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(30, 30, 30);
+          doc.text(aLsAnt, margin + 4, y + 10.5);
+          doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5);
+          doc.setTextColor(aceptAnt ? 0 : 120, aceptAnt ? 130 : 0, 0);
+          doc.text((aceptAnt ? '[X] ' : '[ ] ') + 'El solicitante acepta la autorizacion de descuento.', margin + 4, y + aHAnt - 3.5);
+          doc.setTextColor(15, 23, 42);
+          y += aHAnt + 5;
+        }
 
         // Autorización del gasto
         const autorizadorAnticipo = String(s.datosFormulario['autorizadorNombre'] || s.datosFormulario['autorizador'] || s.datosFormulario['autorizadoPor'] || '');
@@ -1786,36 +1832,6 @@ function _generarPdfEspecial(s: SolicitudParaPdf, opts?: { bloburl?: boolean }):
     });
   }
 
-  // Bloque de autorización de descuento (viáticos y anticipos)
-  if (esViaticos || esAnticipo) {
-    const campoAuth = (s.camposPlantilla || []).find((c) => c.type === 'autorizacion-descuento');
-    const aceptado = campoAuth ? (s.datosFormulario || {})[campoAuth.key] === 'aceptado' : false;
-    if (y > 220) { doc.addPage(); y = margin; }
-    y += 4;
-    const textoAuth = 'Autorizo de manera expresa a IPS GOLEMAN SERVICIOS INTEGRALES SAS, para que en el evento que no se realice la accion, las atenciones o la prestacion de los servicios solicitados por la empresa, sea descontado el valor total de la presente solicitud. Este descuento sera aplicable a conceptos de pago de salarios, primas extralegales, primas legales. Igualmente, en caso de retiro o desvinculacion de la empresa, autorizo a que el saldo que en cualquier momento se encuentre en mi contra, sea descontado de mi liquidacion de salarios y prestaciones sociales finales, vacaciones, auxilios y en general cualquier concepto que deba cancelarme la Empresa.';
-    const authW = pageWidth - margin * 2;
-    doc.setFontSize(8);
-    const authLines = doc.splitTextToSize(textoAuth, authW - 8);
-    const authH = authLines.length * 4.2 + 16;
-    doc.setFillColor(255, 245, 245);
-    doc.setDrawColor(200, 60, 60);
-    doc.setLineWidth(0.4);
-    doc.rect(margin, y, authW, authH, 'FD');
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(9);
-    doc.setTextColor(180, 30, 30);
-    doc.text('AUTORIZACION DE DESCUENTO', margin + 4, y + 6);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8);
-    doc.setTextColor(30, 30, 30);
-    doc.text(authLines, margin + 4, y + 11);
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8.5);
-    doc.setTextColor(aceptado ? 0 : 120, aceptado ? 130 : 0, 0);
-    doc.text((aceptado ? '[X] ' : '[ ] ') + 'El solicitante acepta la autorizacion de descuento.', margin + 4, y + authH - 4);
-    y += authH + 4;
-  }
-
   // Firmas
   const firmas = s.firmas || {};
   if (y > 230) { doc.addPage(); y = margin; }
@@ -1860,10 +1876,24 @@ function _generarPdfEspecial(s: SolicitudParaPdf, opts?: { bloburl?: boolean }):
   if (esLegalizacion || esViaticos) {
     const autorizadorNombre = String(s.datosFormulario['autorizadorNombre'] || '');
     const autorizadorLabel = esViaticos ? 'Quien autorizó el viaje' : 'Quien autoriza el gasto';
+    // Pasos validados (en orden cronológico), sin el visto bueno
+    const pasosVal = s.movimientos
+      .filter(m => (m.accion === 'validada' || m.accion === 'aprobada') && m.paso && m.paso !== 'autorizador_visto_bueno')
+      .map(m => m.paso!);
+    const firmaI = pasosVal.length >= 2 ? (firmas[pasosVal[0]] || '') :
+      (firmas.analista || firmas.coordinador || firmas.director || '');
+    const nombreI = pasosVal.length >= 2
+      ? (aprobacionPorPaso[pasosVal[0]] || 'Analista / Coordinador')
+      : (aprobacionPorPaso['analista'] || aprobacionPorPaso['coordinador'] || 'Analista / Coordinador');
+    const firmaF = pasosVal.length >= 1 ? (firmas[pasosVal[pasosVal.length - 1]] || '') :
+      (firmas.contabilidad || firmas.director || '');
+    const nombreF = pasosVal.length >= 1
+      ? (aprobacionPorPaso[pasosVal[pasosVal.length - 1]] || 'Area final')
+      : (aprobacionPorPaso['contabilidad'] || aprobacionPorPaso['director'] || 'Area final');
     drawFirma(firmas.profesional || '', s.solicitanteNombre || 'Solicitante', 'Solicita', 0);
-    drawFirma('', autorizadorNombre || autorizadorLabel, autorizadorLabel, 1);
-    drawFirma(firmas.analista || firmas.coordinador || '', aprobacionPorPaso['analista'] || aprobacionPorPaso['coordinador'] || 'Analista / Coordinador', 'Validó', 2);
-    drawFirma(firmas.contabilidad || '', aprobacionPorPaso['contabilidad'] || aprobacionPorPaso['director'] || 'Área final', 'Aprobó', 3);
+    drawFirma(firmas.autorizador_visto_bueno || '', autorizadorNombre || autorizadorLabel, autorizadorLabel, 1);
+    drawFirma(firmaI, nombreI, 'Validó', 2);
+    drawFirma(firmaF, nombreF, 'Aprobó', 3);
   } else if (esCuentaCobroOps) {
     // Firmas ya renderizadas en Documento 4 dentro del bloque esCuentaCobroOps
   } else {
@@ -1886,15 +1916,22 @@ function _generarPdfEspecial(s: SolicitudParaPdf, opts?: { bloburl?: boolean }):
     );
   }
 
-  // Marca de agua para solicitudes en tramite
+  // Marca de agua repetida para solicitudes en tramite
   if (s.estado === 'en_validacion') {
     const wH = doc.internal.pageSize.getHeight();
+    void wH;
     for (let wi = 1; wi <= totalPages; wi++) {
       doc.setPage(wi);
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(70);
-      doc.setTextColor(220, 60, 60);
-      doc.text('EN PROCESO', pageWidth / 2, wH / 2, { align: 'center', angle: 45 });
+      doc.setFontSize(14);
+      doc.setTextColor(155, 155, 155);
+      for (let row = 0; row <= 8; row++) {
+        for (let col = 0; col <= 5; col++) {
+          const wx = col * 42 - 10 + (row % 2 === 0 ? 0 : 21);
+          const wy = row * 36 - 15;
+          doc.text('EN PROCESO', wx, wy, { angle: 45 });
+        }
+      }
     }
   }
 
