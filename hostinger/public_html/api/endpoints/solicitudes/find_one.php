@@ -38,12 +38,20 @@ $esContabilidad = $nivelUser === 'contabilidad';
 $pasoActual     = strtolower(trim((string)($r['paso_actual'] ?? '')));
 $estadoCerrado  = in_array((string)$r['estado'], ['aprobado', 'rechazado', 'devuelto', 'legalizado'], true);
 
-// Multi-nivel: analista/coordinador/director pueden validar cualquier paso de ese grupo en su área
+// Último paso del flujo (área final) — para saber si pasoActual es intermedio
+$flujoArr      = (function($v){ $d = json_decode($v ?? '[]', true); return (is_array($d) && array_is_list($d)) ? $d : []; })($r['flujo_aprobacion']);
+usort($flujoArr, fn($a, $b) => ($a['orden'] ?? 0) <=> ($b['orden'] ?? 0));
+$ultimoPasoRol = count($flujoArr) > 0
+    ? strtolower(trim((string)($flujoArr[count($flujoArr) - 1]['rol'] ?? '')))
+    : '';
+
+// Pasos intermedios (no visto bueno y no área final) son visibles a cualquier miembro del área con nivel.
+// El último paso (área final) solo lo ve quien tiene ese nivel exacto o el área que aplica.
+$esPasoIntermedio = $pasoActual !== '' && $pasoActual !== 'autorizador_visto_bueno' && $pasoActual !== $ultimoPasoRol;
 $nivelHabilitado = $nivelUser !== '' && (
-    $nivelUser === $pasoActual ||
     $estadoCerrado ||
-    (in_array($nivelUser, ['analista', 'coordinador', 'director']) &&
-     in_array($pasoActual, ['analista', 'coordinador', 'director']))
+    $nivelUser === $pasoActual ||
+    $esPasoIntermedio
 );
 $esValidadorEnTurno = $nivelHabilitado && ($esContabilidad || $mismaArea);
 

@@ -35,34 +35,38 @@ final class FlujoHelpers
         $esGerente    = $rolNorm === 'gerente';
         $pasoActual   = strtolower(trim($sol['paso_actual'] ?? ''));
         $nivelUsuario = strtolower(trim($user['nivel_aprobacion'] ?? ''));
+        $mismaArea    = (int)($user['area_id'] ?? 0) === (int)$sol['area_id'];
 
-        // Admin y gerente pueden actuar en cualquier solicitud.
-        // Contabilidad ve todas las areas en su paso.
-        // Otros niveles requieren que su nivel coincida con el paso actual Y que el area coincida.
-        // Autorizador de visto bueno: puede actuar cuando paso_actual = 'autorizador_visto_bueno'
-        // y su ID coincide con datosFormulario.autorizadorId.
+        // Determinar cuál es el último paso del flujo (el área final)
+        // para saber qué pasos son "intermedios" (validables por cualquier miembro del área)
+        $flujoArray = json_decode($sol['flujo_aprobacion'] ?? '[]', true) ?: [];
+        usort($flujoArray, fn($a, $b) => ($a['orden'] ?? 0) <=> ($b['orden'] ?? 0));
+        $ultimoRol  = count($flujoArray) > 0
+            ? strtolower(trim((string)($flujoArray[count($flujoArray) - 1]['rol'] ?? '')))
+            : '';
+
         $puede = false;
         if ($esAdmin || $esGerente) {
             $puede = true;
         } elseif ($pasoActual === 'autorizador_visto_bueno') {
+            // Solo el autorizador designado puede dar el visto bueno
             $datos = json_decode($sol['datos_formulario'] ?? '{}', true) ?: [];
             if ((int)($datos['autorizadorId'] ?? 0) === $usuarioId) {
                 $puede = true;
             }
-        } elseif (
-            in_array($pasoActual, ['analista', 'coordinador', 'director']) &&
-            in_array($nivelUsuario, ['analista', 'coordinador', 'director'])
-        ) {
-            // Cualquier nivel jerárquico del área puede validar pasos analista/coordinador/director
-            // Solo se permite si pertenece al área (evita que el autorizador externo valide pasos internos)
-            if ((int)($user['area_id'] ?? 0) === (int)$sol['area_id']) {
-                $puede = true;
-            }
-        } elseif ($nivelUsuario === $pasoActual) {
-            if ($nivelUsuario === 'contabilidad') {
-                $puede = true;
-            } elseif ((int)($user['area_id'] ?? 0) === (int)$sol['area_id']) {
-                $puede = true;
+        } elseif ($nivelUsuario !== '' && $pasoActual !== '') {
+            if ($pasoActual === $ultimoRol) {
+                // Último paso (área final): solo el nivel exacto puede actuar.
+                // Contabilidad no requiere misma área (atiende todas las áreas).
+                if ($nivelUsuario === $pasoActual) {
+                    $puede = $nivelUsuario === 'contabilidad' ? true : $mismaArea;
+                }
+            } else {
+                // Pasos intermedios: cualquier miembro del área con nivel puede actuar,
+                // excepto si su nivel coincide con el paso final (ese rol solo valida al final).
+                if ($mismaArea && $nivelUsuario !== $ultimoRol) {
+                    $puede = true;
+                }
             }
         }
 
