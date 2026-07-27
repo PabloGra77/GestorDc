@@ -1955,45 +1955,53 @@ async function _generarPdfEspecial(s: SolicitudParaPdf, opts?: { bloburl?: boole
     drawFirma(firmas.contabilidad || '', 'Contabilidad', 'Finalización', 2);
   }
 
-  // ── Imágenes adjuntas como páginas adicionales ────────────────────────────
-  {
-    const imgAdjuntos: Array<{ id: string; label: string }> = [];
-    for (const [key, val] of Object.entries(s.documentos || {})) {
-      if (val && typeof val === 'object') {
-        const v = val as Record<string, unknown>;
-        const id = typeof v.archivoId === 'string' ? v.archivoId : null;
-        if (id && /\.(jpg|jpeg|png)$/i.test(id)) {
-          imgAdjuntos.push({ id, label: typeof v.nombre === 'string' ? v.nombre : key });
-        }
-      }
+  // ── Adjuntos como páginas adicionales ────────────────────────────────────
+  // pdfAdjuntos se declara aquí para ser accesible al final (después del footer/watermark)
+  const _imgAdjuntos: Array<{ id: string; label: string }> = [];
+  const _pdfAdjuntos: Array<{ id: string; label: string }> = [];
+
+  for (const [key, val] of Object.entries(s.documentos || {})) {
+    if (val && typeof val === 'object') {
+      const v = val as Record<string, unknown>;
+      const id = typeof v.archivoId === 'string' ? v.archivoId : null;
+      if (!id) continue;
+      const label = typeof v.nombre === 'string' ? v.nombre : key;
+      if (/\.(jpg|jpeg|png)$/i.test(id)) _imgAdjuntos.push({ id, label });
+      else if (/\.pdf$/i.test(id))        _pdfAdjuntos.push({ id, label });
     }
+  }
+  {
     const rawGastos = typeof s.datosFormulario['gastos'] === 'string' ? s.datosFormulario['gastos'] : null;
     if (rawGastos) {
       try {
         const gastos = JSON.parse(rawGastos) as Array<Record<string, string>>;
         for (const g of gastos) {
           const id = g._facturaArchivoId || '';
-          if (id && /\.(jpg|jpeg|png)$/i.test(id)) {
-            imgAdjuntos.push({ id, label: g._factura || g.descripcion || 'Factura' });
-          }
+          if (!id) continue;
+          const label = g._factura || g.descripcion || 'Factura';
+          if (/\.(jpg|jpeg|png)$/i.test(id)) _imgAdjuntos.push({ id, label });
+          else if (/\.pdf$/i.test(id))        _pdfAdjuntos.push({ id, label });
         }
       } catch { /* gastos inválidos */ }
     }
-    for (const { id, label } of imgAdjuntos) {
-      const dataUrl = await cargarImagenDataUrl(`/api/index.php/archivos/ver?id=${encodeURIComponent(id)}`);
-      if (!dataUrl) continue;
-      const ext = (id.split('.').pop() || 'jpg').toLowerCase();
-      const fmt = ext === 'png' ? 'PNG' : 'JPEG';
-      doc.addPage();
-      const ph = doc.internal.pageSize.getHeight();
-      try {
-        doc.addImage(dataUrl, fmt, margin, 8, pageWidth - margin * 2, ph - 20, undefined, 'FAST');
-      } catch { /* formato no soportado por jsPDF */ }
-      doc.setFontSize(7);
-      doc.setTextColor(120, 120, 120);
-      doc.text(`Adjunto: ${label}`, pageWidth / 2, ph - 4, { align: 'center' });
-    }
   }
+
+  // Imágenes → embeber directamente con jsPDF
+  for (const { id, label } of _imgAdjuntos) {
+    const dataUrl = await cargarImagenDataUrl(`/api/index.php/archivos/ver?id=${encodeURIComponent(id)}`);
+    if (!dataUrl) continue;
+    const ext = (id.split('.').pop() || 'jpg').toLowerCase();
+    const fmt = ext === 'png' ? 'PNG' : 'JPEG';
+    doc.addPage();
+    const ph = doc.internal.pageSize.getHeight();
+    try {
+      doc.addImage(dataUrl, fmt, margin, 8, pageWidth - margin * 2, ph - 20, undefined, 'FAST');
+    } catch { /* formato no soportado por jsPDF */ }
+    doc.setFontSize(7);
+    doc.setTextColor(120, 120, 120);
+    doc.text(`Adjunto: ${label}`, pageWidth / 2, ph - 4, { align: 'center' });
+  }
+  // Los _pdfAdjuntos se fusionan al final con pdf-lib, después del footer y watermark
 
   // Footer en cada pagina
   const totalPages = doc.getNumberOfPages();
@@ -2026,6 +2034,36 @@ async function _generarPdfEspecial(s: SolicitudParaPdf, opts?: { bloburl?: boole
         }
       }
     }
+  }
+
+  // PDFs adjuntos → fusionar con pdf-lib después del footer/watermark
+  if (_pdfAdjuntos.length > 0) {
+    const { PDFDocument } = await import('pdf-lib');
+    const mainBytes = doc.output('arraybuffer') as ArrayBuffer;
+    const mainPdf = await PDFDocument.load(mainBytes);
+    for (const { id } of _pdfAdjuntos) {
+      try {
+        const resp = await fetch(`/api/index.php/archivos/ver?id=${encodeURIComponent(id)}`);
+        if (!resp.ok) continue;
+        const attachBytes = await resp.arrayBuffer();
+        const attachPdf = await PDFDocument.load(attachBytes);
+        const copied = await mainPdf.copyPages(attachPdf, attachPdf.getPageIndices());
+        copied.forEach(p => mainPdf.addPage(p));
+      } catch { /* adjunto inaccesible o PDF corrupto */ }
+    }
+    const finalBytes = await mainPdf.save();
+    // new Uint8Array(typedArray) copia al buffer plano requerido por Blob
+    const blob = new Blob([new Uint8Array(finalBytes)], { type: 'application/pdf' });
+    if (opts?.bloburl) return URL.createObjectURL(blob) as string;
+    const dlUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = dlUrl;
+    a.download = `Payops_${s.numeroRadicado}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(dlUrl);
+    return;
   }
 
   if (opts?.bloburl) {
