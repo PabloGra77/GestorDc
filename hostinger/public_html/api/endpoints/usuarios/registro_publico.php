@@ -92,45 +92,45 @@ try {
     $upd = $pdo->prepare("UPDATE personal_autorizado SET usado = 1, usado_en = NOW() WHERE id = :id");
     $upd->execute([':id' => (int)$auth['id']]);
 
-    // Correo con contrasena temporal
-    $base = rtrim(Config::get('WEB_BASE_URL', 'https://payops.ipsgoleman.com'), '/');
-    $loginLink = $base . '/login';
-    $textUser = "Hola {$nombreCompleto},\n\n"
-        . "Tu cuenta en Payops (Goleman IPS) fue creada correctamente.\n\n"
-        . "  Correo: {$correo}\n"
-        . "  Rol: {$rolNombre}\n"
-        . "  Contrasena temporal: {$tempPassword}\n\n"
-        . "Ingresa en {$loginLink} y cambia tu contrasena en el primer inicio de sesion.\n\n"
-        . "Si no realizaste esta solicitud, contacta al administrador.\n\nEquipo Payops - Goleman IPS";
-    $htmlUser = '<div style="font-family:Arial,sans-serif;color:#0F172A;line-height:1.6;max-width:560px;margin:0 auto;">'
-        . '<div style="background:#070B1D;color:#D4AF37;padding:18px 22px;border-radius:10px 10px 0 0;">'
-        . '<h1 style="margin:0;font-size:22px;">PAYOPS</h1>'
-        . '<p style="margin:4px 0 0;color:#C8CEE0;font-size:13px;">Goleman IPS - Plataforma documental</p></div>'
-        . '<div style="background:#FFF;border:1px solid rgba(212,175,55,0.4);border-top:none;padding:24px 22px;border-radius:0 0 10px 10px;">'
-        . '<h2 style="color:#B8901F;margin:0 0 12px;font-size:18px;">Tu cuenta esta lista</h2>'
-        . '<p>Hola <strong>' . htmlspecialchars($nombreCompleto, ENT_QUOTES, 'UTF-8') . '</strong>, ya puedes ingresar a Payops.</p>'
-        . '<table style="background:#F7F4EC;border:1px solid rgba(212,175,55,0.35);border-radius:8px;padding:14px;margin:14px 0;width:100%;">'
-        . '<tr><td style="padding:4px 0;color:#6B7280;font-size:13px;">Correo</td><td style="padding:4px 0;"><strong>' . htmlspecialchars($correo, ENT_QUOTES, 'UTF-8') . '</strong></td></tr>'
-        . '<tr><td style="padding:4px 0;color:#6B7280;font-size:13px;">Rol</td><td style="padding:4px 0;"><strong>' . htmlspecialchars($rolNombre, ENT_QUOTES, 'UTF-8') . '</strong></td></tr>'
-        . '<tr><td style="padding:4px 0;color:#6B7280;font-size:13px;">Contrasena temporal</td><td style="padding:4px 0;"><strong>' . htmlspecialchars($tempPassword, ENT_QUOTES, 'UTF-8') . '</strong></td></tr>'
-        . '</table>'
-        . '<p><a href="' . htmlspecialchars($loginLink, ENT_QUOTES, 'UTF-8') . '" style="display:inline-block;background:#D4AF37;color:#070B1D;font-weight:700;text-decoration:none;padding:10px 18px;border-radius:8px;">Ingresar a Payops</a></p>'
-        . '<p style="color:#6B7280;font-size:12px;margin-top:18px;">Por seguridad, cambia tu contrasena en el primer ingreso.</p>'
-        . '</div></div>';
-    try {
-        Mailer::send(['to' => [$correo], 'subject' => 'Tu cuenta Payops esta lista', 'text' => $textUser, 'html' => $htmlUser]);
-        $correoEnviado = true;
-    } catch (Throwable $e) {
-        error_log('[registro_publico email] ' . $e->getMessage());
-        $correoEnviado = false;
-    }
-
     $nuevoId = (int)$pdo->lastInsertId();
     $pdo->commit();
 } catch (Throwable $e) {
     $pdo->rollBack();
     error_log('[registro_publico] ' . $e->getMessage());
     Response::error('No se pudo crear la cuenta', 500);
+}
+
+// Correo con contrasena temporal — enviado DESPUÉS del commit para no bloquear la transacción
+$base = rtrim(Config::get('WEB_BASE_URL', 'https://payops.ipsgoleman.com'), '/');
+$loginLink = $base . '/login';
+$textUser = "Hola {$nombreCompleto},\n\n"
+    . "Tu cuenta en Payops (Goleman IPS) fue creada correctamente.\n\n"
+    . "  Correo: {$correo}\n"
+    . "  Rol: {$rolNombre}\n"
+    . "  Contrasena temporal: {$tempPassword}\n\n"
+    . "Ingresa en {$loginLink} y cambia tu contrasena en el primer inicio de sesion.\n\n"
+    . "Si no realizaste esta solicitud, contacta al administrador.\n\nEquipo Payops - Goleman IPS";
+$htmlUser = '<div style="font-family:Arial,sans-serif;color:#0F172A;line-height:1.6;max-width:560px;margin:0 auto;">'
+    . '<div style="background:#070B1D;color:#D4AF37;padding:18px 22px;border-radius:10px 10px 0 0;">'
+    . '<h1 style="margin:0;font-size:22px;">PAYOPS</h1>'
+    . '<p style="margin:4px 0 0;color:#C8CEE0;font-size:13px;">Goleman IPS - Plataforma documental</p></div>'
+    . '<div style="background:#FFF;border:1px solid rgba(212,175,55,0.4);border-top:none;padding:24px 22px;border-radius:0 0 10px 10px;">'
+    . '<h2 style="color:#B8901F;margin:0 0 12px;font-size:18px;">Tu cuenta esta lista</h2>'
+    . '<p>Hola <strong>' . htmlspecialchars($nombreCompleto, ENT_QUOTES, 'UTF-8') . '</strong>, ya puedes ingresar a Payops.</p>'
+    . '<table style="background:#F7F4EC;border:1px solid rgba(212,175,55,0.35);border-radius:8px;padding:14px;margin:14px 0;width:100%;">'
+    . '<tr><td style="padding:4px 0;color:#6B7280;font-size:13px;">Correo</td><td style="padding:4px 0;"><strong>' . htmlspecialchars($correo, ENT_QUOTES, 'UTF-8') . '</strong></td></tr>'
+    . '<tr><td style="padding:4px 0;color:#6B7280;font-size:13px;">Rol</td><td style="padding:4px 0;"><strong>' . htmlspecialchars($rolNombre, ENT_QUOTES, 'UTF-8') . '</strong></td></tr>'
+    . '<tr><td style="padding:4px 0;color:#6B7280;font-size:13px;">Contrasena temporal</td><td style="padding:4px 0;"><strong>' . htmlspecialchars($tempPassword, ENT_QUOTES, 'UTF-8') . '</strong></td></tr>'
+    . '</table>'
+    . '<p><a href="' . htmlspecialchars($loginLink, ENT_QUOTES, 'UTF-8') . '" style="display:inline-block;background:#D4AF37;color:#070B1D;font-weight:700;text-decoration:none;padding:10px 18px;border-radius:8px;">Ingresar a Payops</a></p>'
+    . '<p style="color:#6B7280;font-size:12px;margin-top:18px;">Por seguridad, cambia tu contrasena en el primer ingreso.</p>'
+    . '</div></div>';
+$correoEnviado = false;
+try {
+    Mailer::send(['to' => [$correo], 'subject' => 'Tu cuenta Payops esta lista', 'text' => $textUser, 'html' => $htmlUser]);
+    $correoEnviado = true;
+} catch (Throwable $e) {
+    error_log('[registro_publico email] ' . $e->getMessage());
 }
 
 Auditoria::registrar('registro', "Nuevo usuario: {$nombreCompleto} ({$correo}) — rol: {$rolNombre}", true, $nuevoId, $correo, $nombreCompleto);

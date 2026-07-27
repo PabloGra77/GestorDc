@@ -55,10 +55,6 @@ try {
             $pdo, $id, 'validada', $sol['paso_actual'],
             'en_validacion', $user, $comentario, 'publico'
         );
-        FlujoHelpers::notificarSolicitante($sol,
-            "Avance de su solicitud {$sol['numero_radicado']}",
-            "Su solicitud {$sol['numero_radicado']} avanzo al siguiente paso de validacion: " . ($siguiente['label'] ?? $siguiente['rol'])
-        );
         $nuevoEstado = 'en_validacion';
         $nuevoPaso = $siguiente['rol'];
         $nuevoPasoLabel = $siguiente['label'] ?? $siguiente['rol'];
@@ -113,7 +109,7 @@ try {
                     ':cat' => mb_substr(trim((string)($gasto['categoria'] ?? '')), 0, 80) ?: null,
                 ]);
             }
-            // Mensaje de pago personalizable
+            // Mensaje de pago personalizable — se guarda en movimientos, la notificación va fuera
             $mensajePlantilla = Settings::get(
                 'legalizacion.mensaje_pago',
                 'Tu solicitud de legalización con número de radicado {radicado} fue aprobada. El pago será realizado en el transcurso de los días hábiles.'
@@ -123,24 +119,6 @@ try {
                 $pdo, $id, 'mensaje_pago', null, 'aprobado',
                 ['id' => 0, 'nombre_completo' => 'Sistema Payops', 'nivel_aprobacion' => 'sistema'],
                 $mensajeFinal, 'publico'
-            );
-            FlujoHelpers::notificarSolicitante($sol,
-                "Legalización {$sol['numero_radicado']} aprobada — pago en proceso",
-                $mensajeFinal
-            );
-        } elseif ($esAnticipo) {
-            $datosSol = json_decode($sol['datos_formulario'] ?? '{}', true) ?: [];
-            $fechaLeg = (string)($datosSol['fechaLegalizacion'] ?? '');
-            FlujoHelpers::notificarSolicitante($sol,
-                "Anticipo {$sol['numero_radicado']} aprobado - debes legalizar",
-                "Tu anticipo {$sol['numero_radicado']} fue APROBADO." .
-                ($fechaLeg ? " Recuerda que te comprometiste a legalizarlo a mas tardar el {$fechaLeg}." : " Recuerda legalizarlo subiendo las facturas/soportes del gasto.") .
-                "\n\nIngresa a Payops -> Mis solicitudes -> Legalizar y adjunta las evidencias del gasto."
-            );
-        } else {
-            FlujoHelpers::notificarSolicitante($sol,
-                "Solicitud {$sol['numero_radicado']} aprobada",
-                "Su solicitud {$sol['numero_radicado']} fue aprobada definitivamente. Comentario: {$comentario}"
             );
         }
         $nuevoEstado    = $estadoFinal;
@@ -159,13 +137,44 @@ $detalleAudit = "Radicado {$sol['numero_radicado']} · paso: {$sol['paso_actual'
     . ($nuevoPaso ? " → {$nuevoPaso}" : ' → Aprobado');
 Auditoria::registrar($accionAudit, $detalleAudit, true, (int)$jwt['sub']);
 
-// Si avanzó, avisar al validador del siguiente paso
+// Notificaciones fuera de transacción para no bloquear la DB mientras SMTP responde
 if ($siguiente) {
+    FlujoHelpers::notificarSolicitante($sol,
+        "Avance de su solicitud {$sol['numero_radicado']}",
+        "Su solicitud {$sol['numero_radicado']} avanzo al siguiente paso de validacion: " . ($nuevoPasoLabel ?? $nuevoPaso)
+    );
     FlujoHelpers::notificarValidadores($pdo, [
         'numero_radicado'    => $sol['numero_radicado'],
         'tipo_nombre'        => $sol['tipo_nombre'] ?? '',
         'solicitante_nombre' => $sol['solicitante_nombre'] ?? '',
     ], $siguiente['rol'] ?? null, (int)$sol['area_id']);
+} else {
+    $esLegalizacionFinal = (($sol['tipo_slug'] ?? '') === 'legalizacion');
+    $esAnticipoFinal     = (($sol['tipo_slug'] ?? '') === 'anticipo');
+    if ($esLegalizacionFinal) {
+        $msgPago = str_replace('{radicado}', $sol['numero_radicado'], (string)(Settings::get(
+            'legalizacion.mensaje_pago',
+            'Tu solicitud de legalización con número de radicado {radicado} fue aprobada. El pago será realizado en el transcurso de los días hábiles.'
+        ) ?? ''));
+        FlujoHelpers::notificarSolicitante($sol,
+            "Legalización {$sol['numero_radicado']} aprobada — pago en proceso",
+            $msgPago
+        );
+    } elseif ($esAnticipoFinal) {
+        $datosSolFinal = json_decode($sol['datos_formulario'] ?? '{}', true) ?: [];
+        $fechaLegFinal = (string)($datosSolFinal['fechaLegalizacion'] ?? '');
+        FlujoHelpers::notificarSolicitante($sol,
+            "Anticipo {$sol['numero_radicado']} aprobado - debes legalizar",
+            "Tu anticipo {$sol['numero_radicado']} fue APROBADO." .
+            ($fechaLegFinal ? " Recuerda que te comprometiste a legalizarlo a mas tardar el {$fechaLegFinal}." : " Recuerda legalizarlo subiendo las facturas/soportes del gasto.") .
+            "\n\nIngresa a Payops -> Mis solicitudes -> Legalizar y adjunta las evidencias del gasto."
+        );
+    } else {
+        FlujoHelpers::notificarSolicitante($sol,
+            "Solicitud {$sol['numero_radicado']} aprobada",
+            "Su solicitud {$sol['numero_radicado']} fue aprobada definitivamente. Comentario: {$comentario}"
+        );
+    }
 }
 
 Response::json([

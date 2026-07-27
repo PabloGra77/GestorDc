@@ -40,12 +40,12 @@ final class Mailer
 
         $remote = ($secure ? 'ssl://' : '') . $host . ':' . $port;
         $errno = 0; $errstr = '';
-        $sock = @stream_socket_client($remote, $errno, $errstr, 15);
+        $sock = @stream_socket_client($remote, $errno, $errstr, 8);
         if (!$sock) {
             error_log("SMTP connect fallo: {$errstr}");
             return false;
         }
-        stream_set_timeout($sock, 15);
+        stream_set_timeout($sock, 8);
 
         try {
             self::expect($sock, 220);
