@@ -208,6 +208,7 @@ export function BandejaPanel({ initialOpenId }: { initialOpenId?: number } = {})
   const [areaRemitir, setAreaRemitir] = useState<number | ''>('');
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [generandoPdf, setGenerandoPdf] = useState(false);
+  const [previewId, setPreviewId] = useState<string | null>(null);
 
   // Genera el formato diligenciado (PDF) para verlo embebido cuando se abre un detalle
   useEffect(() => {
@@ -300,6 +301,32 @@ export function BandejaPanel({ initialOpenId }: { initialOpenId?: number } = {})
     } catch {
       setErr('No se pudo abrir el adjunto.');
     }
+  }
+
+  const archivoUrl = (id: string) => `/api/index.php/archivos/ver?id=${encodeURIComponent(id)}`;
+  const esImagen   = (id: string) => /\.(jpg|jpeg|png|webp)$/i.test(id);
+  const togglePreview = (id: string) => setPreviewId(prev => prev === id ? null : id);
+
+  function AdjuntoPreview({ id, label }: { id: string; label: string }) {
+    return (
+      <div className="bandeja-adjunto-wrap">
+        <button type="button" className="bandeja-abrir-adjunto" onClick={() => togglePreview(id)}>
+          📎 {label} {previewId === id ? '▲ Ocultar' : '▼ Ver'}
+        </button>
+        {previewId === id && (
+          <div className="bandeja-preview-wrap">
+            {esImagen(id)
+              ? <img src={archivoUrl(id)} className="bandeja-preview-img" alt={label} />
+              : <iframe src={archivoUrl(id)} className="bandeja-preview-iframe" title={label} />}
+            <div className="bandeja-preview-actions">
+              <button type="button" className="bandeja-abrir-adjunto bandeja-abrir-nueva-pestana" onClick={() => abrirArchivo(id)}>
+                ↗ Abrir en pestaña nueva
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
   }
 
   async function accionLeg(id: number, ruta: string, okMsg: string, confirmTxt?: string) {
@@ -651,9 +678,7 @@ export function BandejaPanel({ initialOpenId }: { initialOpenId?: number } = {})
                                   </td>
                                   <td>
                                     {g._facturaArchivoId ? (
-                                      <button type="button" className="bandeja-abrir-adjunto" onClick={() => abrirArchivo(g._facturaArchivoId)}>
-                                        📎 {g._factura || 'Ver factura'}
-                                      </button>
+                                      <AdjuntoPreview id={g._facturaArchivoId} label={g._factura || 'Ver factura'} />
                                     ) : g._factura ? (
                                       <span>📎 {g._factura}</span>
                                     ) : (
@@ -764,6 +789,12 @@ export function BandejaPanel({ initialOpenId }: { initialOpenId?: number } = {})
                             </tbody>
                             {Number(totalTransporte) > 0 && <tfoot><tr><td colSpan={3}><strong>Total transporte</strong></td><td><strong>{fmt(totalTransporte)}</strong></td></tr></tfoot>}
                           </table>
+                          {docTiquete?.archivoId && (
+                            <div style={{ marginTop: 6 }}>
+                              <AdjuntoPreview id={docTiquete.archivoId} label={docTiquete.nombre || 'Ver soporte tiquete'} />
+                              {docTiquete.ocrAlertas && docTiquete.ocrAlertas.length > 0 && <ul className="bandeja-factura-alertas">{docTiquete.ocrAlertas.map((a, ai) => <li key={ai}>⚠ {a}</li>)}</ul>}
+                            </div>
+                          )}
                           {/* Hospedaje */}
                           {tieneHospedaje && (
                             <div style={{ marginTop: 12 }}>
@@ -777,6 +808,12 @@ export function BandejaPanel({ initialOpenId }: { initialOpenId?: number } = {})
                                   </tr>
                                 </tbody>
                               </table>
+                              {docHotel?.archivoId && (
+                                <div style={{ marginTop: 6 }}>
+                                  <AdjuntoPreview id={docHotel.archivoId} label={docHotel.nombre || 'Ver soporte hotel'} />
+                                  {docHotel.ocrAlertas && docHotel.ocrAlertas.length > 0 && <ul className="bandeja-factura-alertas">{docHotel.ocrAlertas.map((a, ai) => <li key={ai}>⚠ {a}</li>)}</ul>}
+                                </div>
+                              )}
                             </div>
                           )}
                           {/* Alimentación */}
@@ -792,7 +829,12 @@ export function BandejaPanel({ initialOpenId }: { initialOpenId?: number } = {})
                                 </tbody>
                                 {Number(totalComidas) > 0 && <tfoot><tr><td colSpan={3}><strong>Total alimentación</strong></td><td><strong>{fmt(totalComidas)}</strong></td></tr></tfoot>}
                               </table>
-                              {docComidas?.archivoId && <div style={{ marginTop: 4 }}><button type="button" className="bandeja-abrir-adjunto" onClick={() => abrirArchivo(docComidas.archivoId!)}>📎 {docComidas.nombre || 'Ver soporte comidas'}</button>{docComidas?.ocrAlertas && docComidas.ocrAlertas.length > 0 && <ul className="bandeja-factura-alertas">{docComidas.ocrAlertas.map((a, ai) => <li key={ai}>⚠ {a}</li>)}</ul>}</div>}
+                              {docComidas?.archivoId && (
+                                <div style={{ marginTop: 6 }}>
+                                  <AdjuntoPreview id={docComidas.archivoId} label={docComidas.nombre || 'Ver soporte comidas'} />
+                                  {docComidas.ocrAlertas && docComidas.ocrAlertas.length > 0 && <ul className="bandeja-factura-alertas">{docComidas.ocrAlertas.map((a, ai) => <li key={ai}>⚠ {a}</li>)}</ul>}
+                                </div>
+                              )}
                             </div>
                           )}
                           {Number(totalGeneral) > 0 && <div style={{ marginTop: 12, textAlign: 'right' }}><strong style={{ fontSize: 15 }}>Total general: {fmt(totalGeneral)}</strong></div>}
@@ -939,7 +981,7 @@ export function BandejaPanel({ initialOpenId }: { initialOpenId?: number } = {})
                               <strong>{c.label}:</strong>{' '}
                               {doc ? (
                                 doc.archivoId ? (
-                                  <button type="button" className="bandeja-abrir-adjunto" onClick={() => abrirArchivo(doc.archivoId!)}>📎 {doc.texto} · Abrir</button>
+                                  <AdjuntoPreview id={doc.archivoId} label={doc.texto} />
                                 ) : doc.url ? (
                                   <a href={doc.url} target="_blank" rel="noopener noreferrer">📎 {doc.texto}</a>
                                 ) : (

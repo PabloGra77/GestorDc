@@ -582,7 +582,7 @@ export async function generarFormatoBlobUrl(s: SolicitudParaPdf): Promise<string
     || typeof s.datosFormulario['items'] === 'string';
   const esCuentaCobroOpsB = s.tipoSlug === 'cuenta-cobro-ops';
   if (esLegalizacion || esViaticos || esAnticipo || esCuentaCobroOpsB) {
-    const url = _generarPdfEspecial(s, { bloburl: true });
+    const url = await _generarPdfEspecial(s, { bloburl: true });
     return typeof url === 'string' ? url : null;
   }
   if (!s.plantillaPdf) return null;
@@ -724,7 +724,7 @@ function drawInfoGrid(
   return y;
 }
 
-function _generarPdfEspecial(s: SolicitudParaPdf, opts?: { bloburl?: boolean }): string | void {
+async function _generarPdfEspecial(s: SolicitudParaPdf, opts?: { bloburl?: boolean }): Promise<string | void> {
   const esLegalizacion = s.tipoSlug === 'legalizacion'
     || typeof s.datosFormulario['gastos'] === 'string';
   const esViaticos = s.tipoSlug === 'viaticos'
@@ -1955,6 +1955,46 @@ function _generarPdfEspecial(s: SolicitudParaPdf, opts?: { bloburl?: boolean }):
     drawFirma(firmas.contabilidad || '', 'Contabilidad', 'Finalización', 2);
   }
 
+  // ── Imágenes adjuntas como páginas adicionales ────────────────────────────
+  {
+    const imgAdjuntos: Array<{ id: string; label: string }> = [];
+    for (const [key, val] of Object.entries(s.documentos || {})) {
+      if (val && typeof val === 'object') {
+        const v = val as Record<string, unknown>;
+        const id = typeof v.archivoId === 'string' ? v.archivoId : null;
+        if (id && /\.(jpg|jpeg|png)$/i.test(id)) {
+          imgAdjuntos.push({ id, label: typeof v.nombre === 'string' ? v.nombre : key });
+        }
+      }
+    }
+    const rawGastos = typeof s.datosFormulario['gastos'] === 'string' ? s.datosFormulario['gastos'] : null;
+    if (rawGastos) {
+      try {
+        const gastos = JSON.parse(rawGastos) as Array<Record<string, string>>;
+        for (const g of gastos) {
+          const id = g._facturaArchivoId || '';
+          if (id && /\.(jpg|jpeg|png)$/i.test(id)) {
+            imgAdjuntos.push({ id, label: g._factura || g.descripcion || 'Factura' });
+          }
+        }
+      } catch { /* gastos inválidos */ }
+    }
+    for (const { id, label } of imgAdjuntos) {
+      const dataUrl = await cargarImagenDataUrl(`/api/index.php/archivos/ver?id=${encodeURIComponent(id)}`);
+      if (!dataUrl) continue;
+      const ext = (id.split('.').pop() || 'jpg').toLowerCase();
+      const fmt = ext === 'png' ? 'PNG' : 'JPEG';
+      doc.addPage();
+      const ph = doc.internal.pageSize.getHeight();
+      try {
+        doc.addImage(dataUrl, fmt, margin, 8, pageWidth - margin * 2, ph - 20, undefined, 'FAST');
+      } catch { /* formato no soportado por jsPDF */ }
+      doc.setFontSize(7);
+      doc.setTextColor(120, 120, 120);
+      doc.text(`Adjunto: ${label}`, pageWidth / 2, ph - 4, { align: 'center' });
+    }
+  }
+
   // Footer en cada pagina
   const totalPages = doc.getNumberOfPages();
   for (let i = 1; i <= totalPages; i++) {
@@ -2006,6 +2046,6 @@ export function generarPdfFormato(s: SolicitudParaPdf): void {
     void generarPdfPlantilla(s, s.plantillaPdf);
     return;
   }
-  _generarPdfEspecial(s);
+  void _generarPdfEspecial(s);
 }
 
