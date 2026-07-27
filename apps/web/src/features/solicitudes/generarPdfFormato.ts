@@ -1896,10 +1896,10 @@ async function _generarPdfEspecial(s: SolicitudParaPdf, opts?: { bloburl?: boole
   const firmaImgH = 18;
   const firmaImgW = colWidth - 6;
 
-  // Extraer nombres de validadores desde movimientos
+  // Extraer nombres de validadores desde movimientos (incluye visto_bueno del autorizador)
   const aprobacionPorPaso: Record<string, string> = {};
   s.movimientos.forEach((m) => {
-    if ((m.accion === 'validada' || m.accion === 'reenviada' || m.accion === 'aprobada') && m.paso && m.usuarioNombre) {
+    if ((m.accion === 'validada' || m.accion === 'reenviada' || m.accion === 'aprobada' || m.accion === 'visto_bueno') && m.paso && m.usuarioNombre) {
       aprobacionPorPaso[m.paso] = m.usuarioNombre;
     }
   });
@@ -1950,9 +1950,25 @@ async function _generarPdfEspecial(s: SolicitudParaPdf, opts?: { bloburl?: boole
   } else if (esCuentaCobroOps) {
     // Firmas ya renderizadas en Documento 4 dentro del bloque esCuentaCobroOps
   } else {
-    drawFirma(firmas.profesional || firmas.analista || '', 'Profesional solicitante', 'Diligenciamiento', 0);
-    drawFirma(firmas.coordinador || '', 'Coordinador', 'Validación', 1);
-    drawFirma(firmas.contabilidad || '', 'Contabilidad', 'Finalización', 2);
+    // Firmas dinámicas: primer validador en slot 1, último aprobador en slot 2
+    const pasosElse = s.movimientos
+      .filter(m => (m.accion === 'validada' || m.accion === 'aprobada') && m.paso)
+      .map(m => m.paso!);
+    const firmaV1 = pasosElse.length >= 1
+      ? (firmas[pasosElse[0]] || '')
+      : (firmas.analista || firmas.coordinador || firmas.director || '');
+    const nombreV1 = pasosElse.length >= 1
+      ? (aprobacionPorPaso[pasosElse[0]] || 'Coordinador')
+      : (aprobacionPorPaso['analista'] || aprobacionPorPaso['coordinador'] || aprobacionPorPaso['director'] || 'Coordinador');
+    const firmaV2 = pasosElse.length >= 2
+      ? (firmas[pasosElse[pasosElse.length - 1]] || '')
+      : (firmas.contabilidad || firmas.director || '');
+    const nombreV2 = pasosElse.length >= 2
+      ? (aprobacionPorPaso[pasosElse[pasosElse.length - 1]] || 'Contabilidad')
+      : (aprobacionPorPaso['contabilidad'] || aprobacionPorPaso['director'] || 'Contabilidad');
+    drawFirma(firmas.profesional || '', s.solicitanteNombre || 'Profesional solicitante', 'Diligenciamiento', 0);
+    drawFirma(firmaV1, nombreV1, 'Validación', 1);
+    drawFirma(firmaV2, nombreV2, 'Finalización', 2);
   }
 
   // ── Adjuntos como páginas adicionales ────────────────────────────────────
@@ -2041,15 +2057,21 @@ async function _generarPdfEspecial(s: SolicitudParaPdf, opts?: { bloburl?: boole
     const { PDFDocument } = await import('pdf-lib');
     const mainBytes = doc.output('arraybuffer') as ArrayBuffer;
     const mainPdf = await PDFDocument.load(mainBytes);
-    for (const { id } of _pdfAdjuntos) {
+    for (const { id, label } of _pdfAdjuntos) {
       try {
         const resp = await fetch(`/api/index.php/archivos/ver?id=${encodeURIComponent(id)}`);
-        if (!resp.ok) continue;
+        if (!resp.ok) {
+          console.error(`[pdf-adjunto] fetch falló ${resp.status} para "${label}" (id: ${id})`);
+          continue;
+        }
         const attachBytes = await resp.arrayBuffer();
-        const attachPdf = await PDFDocument.load(attachBytes);
+        // ignoreEncryption: true permite embeber PDFs protegidos/encriptados (ej. certificados bancarios)
+        const attachPdf = await PDFDocument.load(attachBytes, { ignoreEncryption: true });
         const copied = await mainPdf.copyPages(attachPdf, attachPdf.getPageIndices());
         copied.forEach(p => mainPdf.addPage(p));
-      } catch { /* adjunto inaccesible o PDF corrupto */ }
+      } catch (err) {
+        console.error(`[pdf-adjunto] no se pudo embeber "${label}" (id: ${id}):`, err);
+      }
     }
     const finalBytes = await mainPdf.save();
     // new Uint8Array(typedArray) copia al buffer plano requerido por Blob

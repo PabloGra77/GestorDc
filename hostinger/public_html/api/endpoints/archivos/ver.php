@@ -105,7 +105,11 @@ $mimeType = $mimes[$ext] ?? 'application/octet-stream';
 // Verificar que el MIME real coincide con la extensión
 $finfo = new finfo(FILEINFO_MIME_TYPE);
 $realMime = $finfo->file($realPath);
-if ($realMime !== $mimeType) {
+// PDFs: libmagic puede devolver 'application/x-pdf' o variantes según la versión del sistema
+$PDF_MIMES = ['application/pdf', 'application/x-pdf', 'application/acrobat', 'application/vnd.pdf'];
+$mimeOk = ($realMime === $mimeType)
+    || ($mimeType === 'application/pdf' && in_array($realMime, $PDF_MIMES, true));
+if (!$mimeOk) {
     Logger::warning('MIME type mismatch en archivo', [
         'file_id' => $id,
         'expected' => $mimeType,
