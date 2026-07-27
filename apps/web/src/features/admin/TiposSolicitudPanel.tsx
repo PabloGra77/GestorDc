@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '../../services/http/api';
 import { formatearMiles } from '../../utils/numeroALetras';
+import { generarInformeTipo } from './generarInformeTipo';
 
 /* ─── Interfaces ─────────────────────────────────────────────── */
 interface FlujoStep {
@@ -149,6 +150,17 @@ export function TiposSolicitudPanel() {
     }
   }
 
+  async function generarInforme(t: TipoSolicitud) {
+    setMsg(''); setErr('');
+    try {
+      const r = await api.get<object>(`/tipos/${t.id}/informe`);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await generarInformeTipo(r.data as any);
+    } catch {
+      setErr(`No se pudo generar el informe de "${t.nombre}".`);
+    }
+  }
+
   async function eliminarTipo(t: TipoSolicitud) {
     if (!window.confirm(`¿Eliminar permanentemente el tipo "${t.nombre}"?\n\nSi tiene solicitudes asociadas, el sistema lo impedirá.`)) return;
     setMsg(''); setErr('');
@@ -197,6 +209,7 @@ export function TiposSolicitudPanel() {
       onGuardar: guardarTipo,
       onToggle: () => toggleActivo(t),
       onEliminar: () => eliminarTipo(t),
+      onInforme: () => generarInforme(t),
       guardando,
     };
   }
@@ -268,10 +281,11 @@ interface TipoRowProps {
   onGuardar: (id: number, data: object) => Promise<void>;
   onToggle: () => void;
   onEliminar: () => void;
+  onInforme: () => void;
   guardando: boolean;
 }
 
-function TipoRow({ tipo, areas, editando, onAbrir, onCancelar, onGuardar, onToggle, onEliminar, guardando }: TipoRowProps) {
+function TipoRow({ tipo, areas, editando, onAbrir, onCancelar, onGuardar, onToggle, onEliminar, onInforme, guardando }: TipoRowProps) {
   const hint = SLUGS_ESPECIALES[tipo.slug] ?? null;
 
   /* ── Estado del editor (inicializado al abrir) ── */
@@ -488,6 +502,7 @@ function TipoRow({ tipo, areas, editando, onAbrir, onCancelar, onGuardar, onTogg
           </button>
           {!editando
             ? <>
+                <button type="button" className="admin-ghost-button tipos-informe-btn" onClick={onInforme} title="Generar informe PDF">📊 Informe</button>
                 <button type="button" className="admin-ghost-button" onClick={onAbrir}>⚙ Configurar</button>
                 <button type="button" className="tipos-eliminar-btn" onClick={onEliminar}>🗑 Eliminar</button>
               </>

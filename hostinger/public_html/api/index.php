@@ -64,6 +64,7 @@ $routes = [
     ['POST',   '#^/tipos/ensure$#',                              'tipos/ensure'],
     ['POST',   '#^/tipos$#',                                     'tipos/create'],
     ['GET',    '#^/tipos$#',                                     'tipos/find_all'],
+    ['GET',    '#^/tipos/(?P<id>\d+)/informe$#',                  'tipos/informe'],
     ['PATCH',  '#^/tipos/(?P<id>\d+)$#',                         'tipos/update'],
     ['DELETE', '#^/tipos/(?P<id>\d+)$#',                         'tipos/delete'],
 

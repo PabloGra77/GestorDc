@@ -19,10 +19,10 @@ final class Auditoria
             $ip        = self::clientIp();
             $userAgent = substr((string)($_SERVER['HTTP_USER_AGENT'] ?? ''), 0, 300);
 
-            // Si no se pasan datos del usuario, intentar obtenerlos del JWT
+            // Si no se pasan datos del usuario, intentar obtenerlos del JWT (header o cookie)
             if ($usuarioId === null) {
                 try {
-                    $token = Jwt::bearer();
+                    $token = Jwt::bearer() ?? ($_COOKIE['payops_token'] ?? null);
                     if ($token) {
                         $payload = Jwt::verify($token);
                         if ($payload) {
