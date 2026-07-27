@@ -12,10 +12,11 @@ Auth::requireAdmin();
 
 $pdo = Db::pdo();
 
-$tipoId   = (int)($_GET['tipo'] ?? 0);
-$desde    = trim((string)($_GET['desde'] ?? ''));
-$hasta    = trim((string)($_GET['hasta'] ?? ''));
-$estado   = trim((string)($_GET['estado'] ?? ''));
+$tipoId      = (int)($_GET['tipo'] ?? 0);
+$desde       = trim((string)($_GET['desde'] ?? ''));
+$hasta       = trim((string)($_GET['hasta'] ?? ''));
+$estado      = trim((string)($_GET['estado'] ?? ''));
+$solicitante = trim((string)($_GET['solicitante'] ?? ''));
 $columnasRaw = trim((string)($_GET['columnas'] ?? ''));
 
 $reFecha = '/^\d{4}-\d{2}-\d{2}$/';
@@ -26,6 +27,7 @@ if (preg_match($reFecha, $desde)) { $wheres[] = 's.creado_en >= :desde'; $args['
 if (preg_match($reFecha, $hasta)) { $wheres[] = 's.creado_en <= :hasta'; $args[':hasta'] = $hasta . ' 23:59:59'; }
 $estadosValidos = ['en_validacion', 'aprobado', 'rechazado', 'devuelto', 'borrador'];
 if (in_array($estado, $estadosValidos, true)) { $wheres[] = 's.estado = :estado'; $args[':estado'] = $estado; }
+if ($solicitante !== '') { $wheres[] = 's.solicitante_nombre LIKE :sol'; $args[':sol'] = '%' . $solicitante . '%'; }
 $whereSql = $wheres ? ('WHERE ' . implode(' AND ', $wheres)) : '';
 
 $stmt = $pdo->prepare(

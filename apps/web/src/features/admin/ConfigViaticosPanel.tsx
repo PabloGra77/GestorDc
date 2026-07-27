@@ -53,6 +53,13 @@ export function ConfigViaticosPanel() {
   const [err, setErr] = useState('');
   const [ok, setOk] = useState('');
 
+  /* ── Informe ── */
+  const [infDesde, setInfDesde] = useState('');
+  const [infHasta, setInfHasta] = useState('');
+  const [infSolicitante, setInfSolicitante] = useState('');
+  const [infEstado, setInfEstado] = useState('');
+  const [descargando, setDescargando] = useState(false);
+
   /* ── Información básica ── */
   const [nombre, setNombre] = useState('');
   const [descripcion, setDescripcion] = useState('');
@@ -166,6 +173,41 @@ export function ConfigViaticosPanel() {
       precioHospedaje:  parseNum(nHospedaje),
     }]);
     resetFormRuta();
+  }
+
+  async function descargarInforme() {
+    if (!tipoId) return;
+    setDescargando(true); setErr(''); setOk('');
+    try {
+      const cols = [
+        'radicado','fecha','aprobado','solicitante','documento','correo',
+        'area','estado','paso',
+        'dato:destino','dato:origen','dato:fechaInicio','dato:fechaFin',
+        'dato:diasViaje','dato:tipoTransporte','dato:totalViaje',
+      ].join(',');
+      const params = new URLSearchParams({ tipo: String(tipoId), columnas: cols });
+      if (infDesde)       params.set('desde',       infDesde);
+      if (infHasta)       params.set('hasta',        infHasta);
+      if (infEstado)      params.set('estado',       infEstado);
+      if (infSolicitante.trim()) params.set('solicitante', infSolicitante.trim());
+      const r = await fetch(`/api/index.php/solicitudes/reporte?${params}`, { credentials: 'include' });
+      if (!r.ok) { setErr('No se pudo generar el informe.'); return; }
+      const blob = await r.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      const fecha = new Date().toISOString().slice(0, 10);
+      link.href = url;
+      link.download = `Informe_Viaticos_${fecha}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      setOk('Informe descargado. Ábrelo con Excel para visualizarlo.');
+    } catch {
+      setErr('Error al descargar el informe.');
+    } finally {
+      setDescargando(false);
+    }
   }
 
   async function guardar() {
@@ -501,6 +543,59 @@ export function ConfigViaticosPanel() {
             )}
           </div>
         )}
+      </section>
+
+      {/* ── Informe Excel ── */}
+      <section className="leg-config-section">
+        <h3>Informe Excel de viáticos</h3>
+        <p className="leg-config-hint">
+          Genera un archivo Excel con todas las solicitudes de viático. Puedes filtrar por período, estado y profesional.
+        </p>
+        <div className="tipos-editor-fields">
+          <div className="tipos-editor-fila-doble">
+            <div className="leg-field">
+              <label>Desde</label>
+              <input type="date" value={infDesde} onChange={(e) => setInfDesde(e.target.value)} />
+            </div>
+            <div className="leg-field">
+              <label>Hasta</label>
+              <input type="date" value={infHasta} onChange={(e) => setInfHasta(e.target.value)} />
+            </div>
+          </div>
+          <div className="leg-field">
+            <label>Profesional (nombre, búsqueda parcial)</label>
+            <input
+              type="text"
+              value={infSolicitante}
+              onChange={(e) => setInfSolicitante(e.target.value)}
+              placeholder="Ej: María García — deja vacío para todos"
+            />
+          </div>
+          <div className="leg-field">
+            <label>Estado</label>
+            <select value={infEstado} onChange={(e) => setInfEstado(e.target.value)}>
+              <option value="">Todos los estados</option>
+              <option value="borrador">Borrador</option>
+              <option value="en_validacion">En validación</option>
+              <option value="aprobado">Aprobado</option>
+              <option value="rechazado">Rechazado</option>
+              <option value="devuelto">Devuelto</option>
+            </select>
+          </div>
+        </div>
+        <div style={{ marginTop: 14 }}>
+          <button
+            type="button"
+            className="admin-primary-button"
+            onClick={descargarInforme}
+            disabled={descargando || !tipoId}
+          >
+            {descargando ? 'Generando…' : '⬇ Descargar informe Excel'}
+          </button>
+          <p className="leg-config-hint" style={{ marginTop: 8 }}>
+            El archivo .csv se abre directamente en Excel con todas las columnas organizadas.
+          </p>
+        </div>
       </section>
 
       <div className="leg-config-footer">

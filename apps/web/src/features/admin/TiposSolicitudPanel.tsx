@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '../../services/http/api';
 import { formatearMiles } from '../../utils/numeroALetras';
-import { generarInformeTipo } from './generarInformeTipo';
 
 /* ─── Interfaces ─────────────────────────────────────────────── */
 interface FlujoStep {
@@ -153,9 +152,20 @@ export function TiposSolicitudPanel() {
   async function generarInforme(t: TipoSolicitud) {
     setMsg(''); setErr('');
     try {
-      const r = await api.get<object>(`/tipos/${t.id}/informe`);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await generarInformeTipo(r.data as any);
+      const cols = ['radicado','fecha','aprobado','solicitante','documento','correo','area','estado','paso'].join(',');
+      const params = new URLSearchParams({ tipo: String(t.id), columnas: cols });
+      const r = await fetch(`/api/index.php/solicitudes/reporte?${params}`, { credentials: 'include' });
+      if (!r.ok) { setErr(`No se pudo generar el informe de "${t.nombre}".`); return; }
+      const blob = await r.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `Informe_${t.slug}_${new Date().toISOString().slice(0,10)}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      setMsg(`Informe de "${t.nombre}" descargado.`);
     } catch {
       setErr(`No se pudo generar el informe de "${t.nombre}".`);
     }
