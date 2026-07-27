@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
 
+require_once __DIR__ . '/../../bootstrap.php';
+
 $jwt = Auth::requireUser();
 Throttle::hit('chg-init-pwd:' . Throttle::clientIp(), 5, 60);
 $usuarioId = (int)($jwt['sub'] ?? 0);
@@ -34,5 +36,7 @@ if ($current === $new) {
 $hash = password_hash($new, PASSWORD_BCRYPT, ['cost' => 12]);
 $upd = $pdo->prepare("UPDATE usuarios SET password_hash = :p, must_change_password = 0, password_changed_at = UTC_TIMESTAMP() WHERE id = :id");
 $upd->execute([':p' => $hash, ':id' => (int)$u['id']]);
+
+Auditoria::registrar('password_initial_change', 'Cambio de contraseña inicial completado', true, (int)$u['id']);
 
 Response::json(['message' => 'Contrasena actualizada correctamente']);

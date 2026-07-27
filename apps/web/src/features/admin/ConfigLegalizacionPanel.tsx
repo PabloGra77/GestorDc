@@ -43,6 +43,13 @@ export function ConfigLegalizacionPanel() {
   /* ── Visibilidad ── */
   const [areasVisibles, setAreasVisibles] = useState<'todas' | number[]>('todas');
 
+  /* ── Informe ── */
+  const [infDesde, setInfDesde] = useState('');
+  const [infHasta, setInfHasta] = useState('');
+  const [infSolicitante, setInfSolicitante] = useState('');
+  const [infEstado, setInfEstado] = useState('');
+  const [descargando, setDescargando] = useState(false);
+
   useEffect(() => {
     setCargando(true);
     Promise.all([
@@ -86,6 +93,33 @@ export function ConfigLegalizacionPanel() {
     const j = i + dir;
     if (j < 0 || j >= categorias.length) return;
     setCategorias((p) => { const a = [...p]; [a[i], a[j]] = [a[j], a[i]]; return a; });
+  }
+
+  async function descargarInforme() {
+    if (!tipoId) return;
+    setDescargando(true); setErr(''); setOk('');
+    try {
+      const cols = [
+        'radicado','fecha','aprobado','solicitante','documento','correo','area','estado','paso',
+        'dato:concepto','dato:fechaPeriodo','dato:autorizadorNombre',
+      ].join(',');
+      const params = new URLSearchParams({ tipo: String(tipoId), columnas: cols });
+      if (infDesde)              params.set('desde',       infDesde);
+      if (infHasta)              params.set('hasta',        infHasta);
+      if (infEstado)             params.set('estado',       infEstado);
+      if (infSolicitante.trim()) params.set('solicitante', infSolicitante.trim());
+      const r = await fetch(`/api/index.php/solicitudes/reporte?${params}`, { credentials: 'include' });
+      if (!r.ok) { setErr('No se pudo generar el informe.'); return; }
+      const blob = await r.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `Informe_Legalizaciones_${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(link); link.click();
+      document.body.removeChild(link); URL.revokeObjectURL(url);
+      setOk('Informe descargado correctamente.');
+    } catch { setErr('No se pudo generar el informe.'); }
+    finally { setDescargando(false); }
   }
 
   async function guardar() {
@@ -261,6 +295,44 @@ export function ConfigLegalizacionPanel() {
             )}
           </div>
         )}
+      </section>
+
+      {/* Informe Excel */}
+      <section className="leg-config-section">
+        <h3>Informe Excel de legalizaciones</h3>
+        <p className="leg-config-hint">
+          Genera un archivo Excel con todas las solicitudes de legalización. Puedes filtrar por período, estado y profesional.
+        </p>
+        <div className="tipos-editor-fila-doble">
+          <div className="leg-field">
+            <label>Desde</label>
+            <input type="date" value={infDesde} onChange={(e) => setInfDesde(e.target.value)} />
+          </div>
+          <div className="leg-field">
+            <label>Hasta</label>
+            <input type="date" value={infHasta} onChange={(e) => setInfHasta(e.target.value)} />
+          </div>
+        </div>
+        <div className="leg-field">
+          <label>Profesional (nombre, búsqueda parcial)</label>
+          <input type="text" value={infSolicitante} onChange={(e) => setInfSolicitante(e.target.value)}
+            placeholder="Ej: Juan Pérez — deja vacío para todos" />
+        </div>
+        <div className="leg-field">
+          <label>Estado</label>
+          <select value={infEstado} onChange={(e) => setInfEstado(e.target.value)}>
+            <option value="">Todos los estados</option>
+            <option value="borrador">Borrador</option>
+            <option value="en_validacion">En validación</option>
+            <option value="aprobado">Aprobado</option>
+            <option value="rechazado">Rechazado</option>
+            <option value="devuelto">Devuelto</option>
+          </select>
+        </div>
+        <button type="button" className="admin-primary-button" onClick={descargarInforme}
+          disabled={descargando || !tipoId}>
+          {descargando ? 'Generando…' : '⬇ Descargar informe Excel'}
+        </button>
       </section>
 
       <div className="leg-config-footer">

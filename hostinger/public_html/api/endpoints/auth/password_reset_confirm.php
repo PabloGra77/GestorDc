@@ -47,4 +47,6 @@ $upd = $pdo->prepare(
 );
 $upd->execute([':p' => $hash, ':id' => $u['id']]);
 
+Auditoria::registrar('password_reset', 'Contraseña restablecida por enlace de recuperación', true, (int)$u['id']);
+
 Response::json(['message' => 'Contrasena restablecida correctamente']);

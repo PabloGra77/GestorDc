@@ -22,6 +22,9 @@ header('X-Content-Type-Options: nosniff');
 header('X-Frame-Options: DENY');
 header('X-XSS-Protection: 0');
 header('Referrer-Policy: no-referrer');
+header('Permissions-Policy: geolocation=(), camera=(), microphone=(), payment=()');
+header('Cross-Origin-Opener-Policy: same-origin');
+header('Cross-Origin-Resource-Policy: same-origin');
 
 require_once __DIR__ . '/lib/config.php';
 require_once __DIR__ . '/lib/logger.php';

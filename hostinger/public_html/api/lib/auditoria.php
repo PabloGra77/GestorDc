@@ -69,12 +69,8 @@ final class Auditoria
 
     private static function clientIp(): string
     {
-        foreach (['HTTP_CF_CONNECTING_IP', 'HTTP_X_FORWARDED_FOR', 'HTTP_X_REAL_IP', 'REMOTE_ADDR'] as $key) {
-            $val = $_SERVER[$key] ?? '';
-            if ($val !== '') {
-                return trim(explode(',', $val)[0]);
-            }
-        }
-        return 'unknown';
+        // Usar solo REMOTE_ADDR: los headers X-Forwarded-For / CF-Connecting-IP
+        // son controlados por el cliente y pueden falsificarse en hosting compartido.
+        return $_SERVER['REMOTE_ADDR'] ?? 'unknown';
     }
 }
