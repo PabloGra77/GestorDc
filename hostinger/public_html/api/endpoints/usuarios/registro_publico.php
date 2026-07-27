@@ -125,12 +125,15 @@ try {
         $correoEnviado = false;
     }
 
+    $nuevoId = (int)$pdo->lastInsertId();
     $pdo->commit();
 } catch (Throwable $e) {
     $pdo->rollBack();
     error_log('[registro_publico] ' . $e->getMessage());
     Response::error('No se pudo crear la cuenta', 500);
 }
+
+Auditoria::registrar('registro', "Nuevo usuario: {$nombreCompleto} ({$correo}) — rol: {$rolNombre}", true, $nuevoId, $correo, $nombreCompleto);
 
 Response::json([
     'ok' => true,
