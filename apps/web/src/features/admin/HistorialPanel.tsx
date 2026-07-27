@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import axios from 'axios';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../../services/http/api';
 
 interface LogEntry {
@@ -22,33 +23,39 @@ interface LogsResponse {
 }
 
 const ACCION_LABEL: Record<string, string> = {
-  login_exitoso:    'Inicio de sesión',
-  login_fallido:    'Intento fallido',
-  logout:           'Cierre de sesión',
-  crear_usuario:    'Crear usuario',
-  editar_usuario:   'Editar usuario',
-  eliminar_usuario: 'Eliminar usuario',
-  crear_solicitud:  'Nueva solicitud',
-  visto_bueno:      'Visto bueno',
-  validar:          'Validar paso',
-  aprobar:          'Aprobar',
-  rechazar:         'Rechazar',
-  devolver:         'Devolver',
+  login_exitoso:           'Inicio de sesión',
+  login_fallido:           'Intento fallido',
+  logout:                  'Cierre de sesión',
+  crear_usuario:           'Crear usuario',
+  editar_usuario:          'Editar usuario',
+  eliminar_usuario:        'Eliminar usuario',
+  crear_solicitud:         'Nueva solicitud',
+  visto_bueno:             'Visto bueno',
+  validar:                 'Validar paso',
+  aprobar:                 'Aprobar',
+  rechazar:                'Rechazar',
+  devolver:                'Devolver',
+  registro:                'Registro de usuario',
+  password_initial_change: 'Cambio de contraseña inicial',
+  password_reset:          'Restablecer contraseña',
 };
 
 const ACCION_COLOR: Record<string, string> = {
-  login_exitoso:    '#22c55e',
-  login_fallido:    '#ef4444',
-  logout:           '#94a3b8',
-  crear_usuario:    '#8b5cf6',
-  editar_usuario:   '#6366f1',
-  eliminar_usuario: '#ef4444',
-  crear_solicitud:  '#3b82f6',
-  visto_bueno:      '#0ea5e9',
-  validar:          '#10b981',
-  aprobar:          '#22c55e',
-  rechazar:         '#ef4444',
-  devolver:         '#f59e0b',
+  login_exitoso:           '#22c55e',
+  login_fallido:           '#ef4444',
+  logout:                  '#94a3b8',
+  crear_usuario:           '#8b5cf6',
+  editar_usuario:          '#6366f1',
+  eliminar_usuario:        '#ef4444',
+  crear_solicitud:         '#3b82f6',
+  visto_bueno:             '#0ea5e9',
+  validar:                 '#10b981',
+  aprobar:                 '#22c55e',
+  rechazar:                '#ef4444',
+  devolver:                '#f59e0b',
+  registro:                '#a855f7',
+  password_initial_change: '#f97316',
+  password_reset:          '#eab308',
 };
 
 function formatFecha(s: string) {
@@ -83,6 +90,9 @@ function generarCsvBlob(logs: LogEntry[]): Blob {
   return new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
 }
 
+interface Filtros { fechaDesde: string; fechaHasta: string; accion: string; busqueda: string; }
+const FILTROS_VACIOS: Filtros = { fechaDesde: '', fechaHasta: '', accion: '', busqueda: '' };
+
 export function HistorialPanel() {
   const [logs, setLogs]           = useState<LogEntry[]>([]);
   const [total, setTotal]         = useState(0);
@@ -90,39 +100,49 @@ export function HistorialPanel() {
   const [loading, setLoading]     = useState(false);
   const [error, setError]         = useState('');
 
+  // Estado "live" de los inputs (cambia en cada keystroke)
   const [fechaDesde, setFechaDesde] = useState('');
   const [fechaHasta, setFechaHasta] = useState('');
   const [accion, setAccion]         = useState('');
   const [busqueda, setBusqueda]     = useState('');
 
+  // Estado "aplicado" — solo cambia al hacer click en Filtrar o Limpiar
+  const [filtros, setFiltros] = useState<Filtros>(FILTROS_VACIOS);
+
+  const abortRef = useRef<AbortController | null>(null);
   const porPagina = 50;
 
   const cargar = useCallback(async (p = 1) => {
+    abortRef.current?.abort();
+    abortRef.current = new AbortController();
+
     setLoading(true);
     setError('');
     try {
       const params: Record<string, string> = { pagina: String(p), por_pagina: String(porPagina) };
-      if (fechaDesde) params.fecha_desde = fechaDesde;
-      if (fechaHasta) params.fecha_hasta = fechaHasta;
-      if (accion)     params.accion      = accion;
-      if (busqueda)   params.q           = busqueda;
+      if (filtros.fechaDesde) params.fecha_desde = filtros.fechaDesde;
+      if (filtros.fechaHasta) params.fecha_hasta = filtros.fechaHasta;
+      if (filtros.accion)     params.accion      = filtros.accion;
+      if (filtros.busqueda)   params.q           = filtros.busqueda;
 
-      const r = await api.get<LogsResponse>('/historial', { params });
+      const r = await api.get<LogsResponse>('/historial', { params, signal: abortRef.current.signal });
       setLogs(r.data.logs);
       setTotal(r.data.total);
       setPagina(p);
-    } catch {
+    } catch (err: unknown) {
+      if (axios.isCancel(err)) return;
       setError('No se pudo cargar el historial. Verifica que la tabla auditoria_logs exista en la base de datos.');
     } finally {
       setLoading(false);
     }
-  }, [fechaDesde, fechaHasta, accion, busqueda]);
+  }, [filtros]);
 
   useEffect(() => { cargar(1); }, [cargar]);
 
-  function handleFiltrar(e: React.FormEvent) {
+  function handleFiltrar(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    cargar(1);
+    setFiltros({ fechaDesde, fechaHasta, accion, busqueda });
+    // cargar(1) se dispara automáticamente via useEffect cuando filtros cambia
   }
 
   function descargarCSV() {
@@ -181,6 +201,9 @@ export function HistorialPanel() {
           <option value="aprobar">Aprobar</option>
           <option value="rechazar">Rechazar</option>
           <option value="devolver">Devolver</option>
+          <option value="registro">Registro de usuario</option>
+          <option value="password_initial_change">Cambio de contraseña inicial</option>
+          <option value="password_reset">Restablecer contraseña</option>
         </select>
         <input
           type="search"
@@ -194,6 +217,7 @@ export function HistorialPanel() {
         </button>
         <button type="button" className="admin-ghost-button" onClick={() => {
           setFechaDesde(''); setFechaHasta(''); setAccion(''); setBusqueda('');
+          setFiltros(FILTROS_VACIOS);
         }}>
           Limpiar
         </button>
