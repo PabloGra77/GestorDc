@@ -103,6 +103,20 @@ final class FlujoHelpers
     {
         $flujo = json_decode($flujoJson ?? '[]', true) ?: [];
         usort($flujo, fn($a, $b) => ($a['orden'] ?? 0) <=> ($b['orden'] ?? 0));
+
+        // autorizador_visto_bueno se inserta dinámicamente en create.php pero NO se guarda
+        // en tipos_solicitud.flujo_aprobacion. Si el paso actual es ese visto bueno y no está
+        // en el flujo del tipo, avanzar al primer paso del flujo (ej. analista).
+        if ($pasoActual === 'autorizador_visto_bueno') {
+            $estaEnFlujo = false;
+            foreach ($flujo as $p) {
+                if (($p['rol'] ?? '') === 'autorizador_visto_bueno') { $estaEnFlujo = true; break; }
+            }
+            if (!$estaEnFlujo) {
+                return $flujo[0] ?? null;
+            }
+        }
+
         $idx = -1;
         foreach ($flujo as $i => $p) {
             if (($p['rol'] ?? '') === $pasoActual) { $idx = $i; break; }
