@@ -292,12 +292,9 @@ export function CuentaCobroOpsPanel({ onCreada, tipoSolicitudId, areaId }: Cuent
   // ── Paso 4: Documentos ──────────────────────────────────────────────────────
   // Nota: los documentos de prestación de servicios y Panacea/360 los carga el analista, no el profesional
   const [opsAlDia, setOpsAlDia] = useState(false);
-  const [esNuevo, setEsNuevo] = useState(false);
-  // Del perfil (solo mostrar estado, re-subir opcional)
+  // Del perfil (todos obligatorios)
   const [docCartaEpsId, setDocCartaEpsId] = useState('');
   const [docCartaEpsNombre, setDocCartaEpsNombre] = useState('');
-  const [docAfiliacionesId, setDocAfiliacionesId] = useState('');
-  const [docAfiliacionesNombre, setDocAfiliacionesNombre] = useState('');
   const [docCuentaId, setDocCuentaId] = useState('');
   const [docCuentaNombre, setDocCuentaNombre] = useState('');
   const [docDocumentoId, setDocDocumentoId] = useState('');
@@ -351,8 +348,7 @@ export function CuentaCobroOpsPanel({ onCreada, tipoSolicitudId, areaId }: Cuent
       if (r.data.titularCuenta) setTitularCuenta(r.data.titularCuenta);
       if (r.data.eps) setEps(r.data.eps);
       if (r.data.profesion) setProfesion(r.data.profesion);
-      if (r.data.archivoEpsId) { setDocAfiliacionesId(r.data.archivoEpsId); setDocAfiliacionesNombre(r.data.archivoEpsNombre || 'Cert. EPS (perfil)'); }
-      if (r.data.archivoCartaEpsId) { setDocCartaEpsId(r.data.archivoCartaEpsId); setDocCartaEpsNombre(r.data.archivoCartaEpsNombre || 'Carta EPS (perfil)'); }
+      if (r.data.archivoCartaEpsId) { setDocCartaEpsId(r.data.archivoCartaEpsId); setDocCartaEpsNombre(r.data.archivoCartaEpsNombre || 'Cert. EPS (perfil)'); }
       if (r.data.archivoCuentaId) { setDocCuentaId(r.data.archivoCuentaId); setDocCuentaNombre(r.data.archivoCuentaNombre || 'Cert. bancario (perfil)'); }
       if (r.data.archivoDocumentoId) { setDocDocumentoId(r.data.archivoDocumentoId); setDocDocumentoNombre(r.data.archivoDocumentoNombre || 'Doc. identidad (perfil)'); }
       if (r.data.archivoRutId) { setDocRutId(r.data.archivoRutId); setDocRutNombre(r.data.archivoRutNombre || 'RUT (perfil)'); }
@@ -386,7 +382,6 @@ export function CuentaCobroOpsPanel({ onCreada, tipoSolicitudId, areaId }: Cuent
       const r = await api.post<{ id: string }>('/archivos', fd, { headers: { 'Content-Type': undefined } });
       const id = r.data.id; const nom = file.name;
       if (campo === 'cartaEps')     { setDocCartaEpsId(id);     setDocCartaEpsNombre(nom); }
-      else if (campo === 'afiliaciones') { setDocAfiliacionesId(id); setDocAfiliacionesNombre(nom); }
       else if (campo === 'cuenta')       { setDocCuentaId(id);       setDocCuentaNombre(nom); }
       else if (campo === 'documento')    { setDocDocumentoId(id);    setDocDocumentoNombre(nom); }
       else if (campo === 'rut')          { setDocRutId(id);          setDocRutNombre(nom); }
@@ -432,8 +427,10 @@ export function CuentaCobroOpsPanel({ onCreada, tipoSolicitudId, areaId }: Cuent
     }
     if (paso === 4) {
       if (!opsAlDia) return 'Debes confirmar la certificación de OPS al día.';
-      if (esNuevo && !docDocumentoId) return 'Para primera radicación debes adjuntar la copia del documento de identidad.';
-      if (esNuevo && !docRutId) return 'Para primera radicación debes adjuntar la copia del RUT.';
+      if (!docCartaEpsId) return 'El Certificado EPS o carta de afiliación es obligatorio. Ve a tu Perfil → Documentos para cargarlo.';
+      if (!docCuentaId) return 'El Certificado de cuenta bancaria es obligatorio. Ve a tu Perfil → Documentos para cargarlo.';
+      if (!docDocumentoId) return 'La Copia del documento de identidad es obligatoria. Ve a tu Perfil → Documentos para cargarla.';
+      if (!docRutId) return 'La Copia del RUT es obligatoria. Ve a tu Perfil → Documentos para cargarla.';
     }
     if (paso === 5) {
       if (!firma) return 'La firma digital es obligatoria.';
@@ -486,11 +483,9 @@ export function CuentaCobroOpsPanel({ onCreada, tipoSolicitudId, areaId }: Cuent
           eps, entidadSalud: eps,
           profesion,
           opsAlDia: opsAlDia ? 'si' : 'no',
-          esNuevoColaborador: esNuevo ? 'si' : 'no',
         },
         documentos: {
           ...(docCartaEpsId      ? { cartaEps:                       { nombre: docCartaEpsNombre,      archivoId: docCartaEpsId      } } : {}),
-          ...(docAfiliacionesId  ? { certificadoEpsAdres:            { nombre: docAfiliacionesNombre,  archivoId: docAfiliacionesId  } } : {}),
           ...(docCuentaId        ? { certificadoCuentaBancaria:      { nombre: docCuentaNombre,        archivoId: docCuentaId        } } : {}),
           ...(docDocumentoId     ? { copiaDocumentoIdentidad:        { nombre: docDocumentoNombre,     archivoId: docDocumentoId     } } : {}),
           ...(docRutId           ? { copiaRut:                       { nombre: docRutNombre,           archivoId: docRutId           } } : {}),
@@ -514,7 +509,7 @@ export function CuentaCobroOpsPanel({ onCreada, tipoSolicitudId, areaId }: Cuent
         <p>{msg}</p>
         <p className="leg-nota">Puedes hacer seguimiento en <strong>Mis solicitudes</strong>.</p>
         <button type="button" className="admin-primary-button"
-          onClick={() => { setMsg(''); setPaso(1); setAtenciones([defaultAtencion()]); setConNotasAcl(false); setNotasAcl([defaultNota()]); setComentariosAdicionales(''); setDatosConfirmados(false); setFirma(''); setOpsAlDia(false); setEsNuevo(false); }}>
+          onClick={() => { setMsg(''); setPaso(1); setAtenciones([defaultAtencion()]); setConNotasAcl(false); setNotasAcl([defaultNota()]); setComentariosAdicionales(''); setDatosConfirmados(false); setFirma(''); setOpsAlDia(false); }}>
           Nueva cuenta de cobro
         </button>
       </div>
@@ -997,49 +992,29 @@ export function CuentaCobroOpsPanel({ onCreada, tipoSolicitudId, areaId }: Cuent
             </label>
           </div>
 
-          {/* ── Del profesional (desde perfil) ── */}
+          {/* ── Documentos del profesional (todos obligatorios) ── */}
           <h4 className="ops-docs-grupo-titulo" style={{ marginTop: 20 }}>
-            Documentos del profesional <span className="ops-perfil-badge">✦ desde tu perfil</span>
+            Documentos obligatorios <span className="ops-perfil-badge">✦ desde tu perfil</span>
           </h4>
           <p className="leg-nota" style={{ marginBottom: 10 }}>
-            Estos documentos se toman automáticamente de tu perfil. Solo adjunta uno nuevo si cambió o venció.
+            Todos los documentos son <strong>obligatorios</strong>. Se toman de tu perfil automáticamente. Si alguno falta, ve a <strong>Perfil → Documentos</strong> para cargarlo y vuelve aquí.
           </p>
 
-          <DocField label="Carta EPS / Carta informando afiliación" nota="Carta que informa a qué EPS está afiliado."
+          <DocField label="Certificado EPS o carta de afiliación" nota="Carta o cert. que acredita a qué EPS está afiliado."
             campo="cartaEps" id={docCartaEpsId} nombre={docCartaEpsNombre} subiendo={subiendoDoc}
-            onSubir={subirDoc} onQuitar={() => { setDocCartaEpsId(''); setDocCartaEpsNombre(''); }} opcional />
+            onSubir={subirDoc} onQuitar={() => { setDocCartaEpsId(''); setDocCartaEpsNombre(''); }} />
 
-          <DocField label="Certificado de EPS o consulta ADRES" nota="Certificado que evidencia que está activo en EPS / ARL / Pensión."
-            campo="afiliaciones" id={docAfiliacionesId} nombre={docAfiliacionesNombre} subiendo={subiendoDoc}
-            onSubir={subirDoc} onQuitar={() => { setDocAfiliacionesId(''); setDocAfiliacionesNombre(''); }} opcional />
-
-          <DocField label="Certificado bancario" nota="Certificado del banco que acredita la cuenta para el pago."
+          <DocField label="Certificado de cuenta bancaria" nota="Certificado del banco que acredita la cuenta para el pago."
             campo="cuenta" id={docCuentaId} nombre={docCuentaNombre} subiendo={subiendoDoc}
-            onSubir={subirDoc} onQuitar={() => { setDocCuentaId(''); setDocCuentaNombre(''); }} opcional />
+            onSubir={subirDoc} onQuitar={() => { setDocCuentaId(''); setDocCuentaNombre(''); }} />
 
-          {/* ── Primera radicación ── */}
-          <h4 className="ops-docs-grupo-titulo" style={{ marginTop: 20 }}>Primera radicación</h4>
-          <div className="leg-field">
-            <label className="leg-check-label" style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer' }}>
-              <input type="checkbox" checked={esNuevo} onChange={(e) => setEsNuevo(e.target.checked)}
-                style={{ marginTop: 3, width: 16, height: 16, accentColor: 'var(--accent)', flexShrink: 0 }} />
-              <span>
-                <strong>Soy colaborador nuevo / es mi primera radicación</strong><br />
-                <span className="leg-nota">Si marcas esta opción debes adjuntar copia del RUT y del documento de identidad.</span>
-              </span>
-            </label>
-          </div>
+          <DocField label="Copia del documento de identidad" nota="Copia legible de la cédula u otro documento de identidad."
+            campo="documento" id={docDocumentoId} nombre={docDocumentoNombre} subiendo={subiendoDoc}
+            onSubir={subirDoc} onQuitar={() => { setDocDocumentoId(''); setDocDocumentoNombre(''); }} />
 
-          {esNuevo && (
-            <>
-              <DocField label="Copia del documento de identidad" nota="Copia legible de la cédula u otro documento."
-                campo="documento" id={docDocumentoId} nombre={docDocumentoNombre} subiendo={subiendoDoc}
-                onSubir={subirDoc} onQuitar={() => { setDocDocumentoId(''); setDocDocumentoNombre(''); }} />
-              <DocField label="Copia del RUT" nota="Registro Único Tributario actualizado."
-                campo="rut" id={docRutId} nombre={docRutNombre} subiendo={subiendoDoc}
-                onSubir={subirDoc} onQuitar={() => { setDocRutId(''); setDocRutNombre(''); }} />
-            </>
-          )}
+          <DocField label="Copia del RUT" nota="Registro Único Tributario actualizado."
+            campo="rut" id={docRutId} nombre={docRutNombre} subiendo={subiendoDoc}
+            onSubir={subirDoc} onQuitar={() => { setDocRutId(''); setDocRutNombre(''); }} />
 
           <div className="leg-actions">
             <button type="button" className="admin-ghost-button" onClick={anterior}>← Atrás</button>

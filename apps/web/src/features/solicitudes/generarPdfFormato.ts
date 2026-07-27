@@ -1738,6 +1738,31 @@ function _generarPdfEspecial(s: SolicitudParaPdf, opts?: { bloburl?: boolean }):
 
     y = row2Y + sigH + 20;
 
+    // Documentos adjuntos del profesional
+    const ccoDocEntries = [
+      { label: 'Certificado EPS / carta de afiliación', key: 'cartaEps' },
+      { label: 'Certificado de cuenta bancaria',        key: 'certificadoCuentaBancaria' },
+      { label: 'Copia del documento de identidad',      key: 'copiaDocumentoIdentidad' },
+      { label: 'Copia del RUT',                         key: 'copiaRut' },
+    ];
+    const anyDoc = ccoDocEntries.some(e => s.documentos[e.key]);
+    if (anyDoc) {
+      if (y > 250) { doc.addPage(); y = margin; }
+      doc.setDrawColor(212, 175, 55); doc.setLineWidth(0.5);
+      doc.line(margin, y, pageWidth - margin, y); y += 5;
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(184, 144, 31);
+      doc.text('DOCUMENTOS ADJUNTOS DEL PROFESIONAL', margin, y); y += 6;
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(15, 23, 42);
+      ccoDocEntries.forEach(e => {
+        const d = s.documentos[e.key];
+        if (!d) return;
+        const nombre = typeof d === 'object' && d !== null ? (d as { nombre?: string }).nombre || '—' : String(d);
+        if (y > 280) { doc.addPage(); y = margin; }
+        doc.text(`✓  ${e.label}: ${nombre}`, margin, y); y += 5;
+      });
+      y += 4;
+    }
+
     // Pie de página del documento 4
     doc.setFont('helvetica', 'italic'); doc.setFontSize(8); doc.setTextColor(150, 150, 150);
     doc.text('I.P.S Goleman Servicio Integral S.A.S  ·  NIT 900.231.829  ·  Área PPL', pageWidth / 2, y, { align: 'center' });
@@ -1830,6 +1855,34 @@ function _generarPdfEspecial(s: SolicitudParaPdf, opts?: { bloburl?: boolean }):
       doc.text(split, margin, y);
       y += split.length * 4 + 1;
     });
+  }
+
+  // ── Documentos adjuntos (legalizaciones y viáticos) ────────────────────────
+  if (esLegalizacion || esViaticos) {
+    const docEntries: Array<{ label: string; key: string }> = esLegalizacion
+      ? [{ label: 'Certificado de cuenta bancaria', key: 'certificadoCuentaBancaria' }]
+      : [
+          { label: 'Certificado de cuenta bancaria',       key: 'certificadoCuentaBancaria' },
+          { label: 'Copia del documento de identidad',     key: 'copiaDocumentoIdentidad' },
+          { label: 'Certificado EPS / carta de afiliación',key: 'certificadoEps' },
+        ];
+    const anyDoc = docEntries.some(e => s.documentos[e.key]);
+    if (anyDoc) {
+      if (y > 250) { doc.addPage(); y = margin; }
+      y += 6;
+      doc.setDrawColor(212, 175, 55); doc.setLineWidth(0.5);
+      doc.line(margin, y, pageWidth - margin, y); y += 5;
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(184, 144, 31);
+      doc.text('DOCUMENTOS ADJUNTOS', margin, y); y += 6;
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(15, 23, 42);
+      docEntries.forEach(e => {
+        const d = s.documentos[e.key];
+        if (!d) return;
+        const nombre = typeof d === 'object' && d !== null ? (d as { nombre?: string }).nombre || '—' : String(d);
+        if (y > 275) { doc.addPage(); y = margin; }
+        doc.text(`✓  ${e.label}: ${nombre}`, margin, y); y += 5;
+      });
+    }
   }
 
   // Firmas

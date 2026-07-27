@@ -110,6 +110,32 @@ function TipoTransporteBloque({
   );
 }
 
+function DocFieldViat({ label, nota, campo, id, nombre, subiendo, onSubir, onQuitar }: {
+  label: string; nota: string; campo: string; id: string; nombre: string;
+  subiendo: string | null; onSubir: (file: File, campo: string) => void; onQuitar: () => void;
+}) {
+  return (
+    <div className="leg-field" style={{ marginTop: 14 }}>
+      <label>{label}<span className="req"> *</span></label>
+      {nota && <p className="leg-nota" style={{ marginBottom: 6 }}>{nota}</p>}
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+        {subiendo === campo ? (
+          <span className="leg-validando">Subiendo…</span>
+        ) : (
+          <label className={`admin-ghost-button${id ? ' ops-doc-ok' : ''}`} style={{ cursor: 'pointer' }}>
+            {id ? `✓ ${nombre}` : '+ Adjuntar'}
+            <input type="file" accept="application/pdf,image/*" style={{ display: 'none' }}
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) onSubir(f, campo); e.target.value = ''; }} />
+          </label>
+        )}
+        {id && subiendo !== campo && (
+          <button type="button" className="admin-ghost-button" style={{ fontSize: 12 }} onClick={onQuitar}>✕ quitar</button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /* ─── Panel Viáticos ────────────────────────────────────────── */
 export function ViaticosPanel({ onCreada, areaId }: { onCreada?: (info: { id: number; numeroRadicado: string }) => void; areaId?: number }) {
   const [paso, setPaso] = useState<1 | 2 | 3 | 4 | 5>(1);
@@ -152,6 +178,15 @@ export function ViaticosPanel({ onCreada, areaId }: { onCreada?: (info: { id: nu
   const [firma, setFirma] = useState('');
   const [autorizacionAceptada, setAutorizacionAceptada] = useState(false);
 
+  /* Documentos obligatorios (desde perfil) */
+  const [docCuentaId, setDocCuentaId] = useState('');
+  const [docCuentaNombre, setDocCuentaNombre] = useState('');
+  const [docDocumentoId, setDocDocumentoId] = useState('');
+  const [docDocumentoNombre, setDocDocumentoNombre] = useState('');
+  const [docCartaEpsId, setDocCartaEpsId] = useState('');
+  const [docCartaEpsNombre, setDocCartaEpsNombre] = useState('');
+  const [subiendoDoc, setSubiendoDoc] = useState<string | null>(null);
+
   const [err, setErr] = useState('');
   const [msg, setMsg] = useState('');
   const [enviando, setEnviando] = useState(false);
@@ -159,6 +194,14 @@ export function ViaticosPanel({ onCreada, areaId }: { onCreada?: (info: { id: nu
   useEffect(() => {
     api.get<TarifasViaticos>('/tarifas-viaticos').then((r) => setTarifas(r.data)).catch(() => {});
     api.get<UsuarioSugerido[]>('/usuarios/nombres').then((r) => setUsuarios(r.data)).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    api.get<Record<string, string>>('/usuarios/perfil').then((r) => {
+      if (r.data.archivoCuentaId)   { setDocCuentaId(r.data.archivoCuentaId);   setDocCuentaNombre(r.data.archivoCuentaNombre || 'Cert. bancario (perfil)'); }
+      if (r.data.archivoDocumentoId){ setDocDocumentoId(r.data.archivoDocumentoId); setDocDocumentoNombre(r.data.archivoDocumentoNombre || 'Doc. identidad (perfil)'); }
+      if (r.data.archivoCartaEpsId) { setDocCartaEpsId(r.data.archivoCartaEpsId);  setDocCartaEpsNombre(r.data.archivoCartaEpsNombre || 'Cert. EPS (perfil)'); }
+    }).catch(() => {});
   }, []);
 
   const sugeridos = useMemo(() => {
@@ -227,6 +270,9 @@ export function ViaticosPanel({ onCreada, areaId }: { onCreada?: (info: { id: nu
       }
     }
     if (paso === 5) {
+      if (!docCuentaId)    return 'El Certificado de cuenta bancaria es obligatorio. Ve a tu Perfil → Documentos para cargarlo.';
+      if (!docDocumentoId) return 'La Copia del documento de identidad es obligatoria. Ve a tu Perfil → Documentos para cargarla.';
+      if (!docCartaEpsId)  return 'El Certificado EPS o carta de afiliación es obligatorio. Ve a tu Perfil → Documentos para cargarlo.';
       if (!autorizacionAceptada) return 'Debes aceptar la autorización de descuento para continuar.';
       if (!firma) return 'La firma digital es obligatoria';
     }
@@ -253,6 +299,20 @@ export function ViaticosPanel({ onCreada, areaId }: { onCreada?: (info: { id: nu
     setPaso((p) => Math.min(5, p + 1) as 1|2|3|4|5);
   }
   function anterior() { setErr(''); setPaso((p) => Math.max(1, p - 1) as 1|2|3|4|5); }
+
+  async function subirDocViat(file: File, campo: string) {
+    setSubiendoDoc(campo);
+    try {
+      const fd = new FormData();
+      fd.append('archivo', file);
+      const r = await api.post<{ id: string }>('/archivos', fd, { headers: { 'Content-Type': undefined } });
+      const id = r.data.id; const nom = file.name;
+      if (campo === 'cuenta')    { setDocCuentaId(id);    setDocCuentaNombre(nom); }
+      if (campo === 'documento') { setDocDocumentoId(id); setDocDocumentoNombre(nom); }
+      if (campo === 'cartaEps')  { setDocCartaEpsId(id);  setDocCartaEpsNombre(nom); }
+    } catch { setErr('No se pudo subir el archivo. Máx 10 MB, formatos: PDF, JPG, PNG.'); }
+    finally { setSubiendoDoc(null); }
+  }
 
   function resetear() {
     setPaso(1);
@@ -311,7 +371,11 @@ export function ViaticosPanel({ onCreada, areaId }: { onCreada?: (info: { id: nu
           totalGeneral:    String(totalGeneral),
           'autorizacion-descuento': autorizacionAceptada ? 'aceptado' : '',
         },
-        documentos: {},
+        documentos: {
+          ...(docCuentaId    ? { certificadoCuentaBancaria: { nombre: docCuentaNombre,    archivoId: docCuentaId    } } : {}),
+          ...(docDocumentoId ? { copiaDocumentoIdentidad:   { nombre: docDocumentoNombre, archivoId: docDocumentoId } } : {}),
+          ...(docCartaEpsId  ? { certificadoEps:            { nombre: docCartaEpsNombre,  archivoId: docCartaEpsId  } } : {}),
+        },
         firmas: { profesional: firma },
       });
       setMsg(`¡Viático radicado exitosamente! Radicado: ${r.data.numeroRadicado}`);
@@ -669,6 +733,20 @@ export function ViaticosPanel({ onCreada, areaId }: { onCreada?: (info: { id: nu
               <span>TOTAL SOLICITADO:</span>
               <strong>${formatearMiles(totalGeneral)} COP</strong>
             </div>
+          </div>
+
+          <div className="leg-seccion-personal" style={{ marginTop: 20, marginBottom: 16 }}>
+            <h4>Documentos obligatorios <span className="ops-perfil-badge">✦ desde tu perfil</span></h4>
+            <p className="leg-nota" style={{ marginBottom: 8 }}>Todos son requeridos. Si falta alguno, ve a <strong>Perfil → Documentos</strong> para cargarlo.</p>
+            <DocFieldViat label="Certificado de cuenta bancaria" nota="Certificado del banco que acredita la cuenta para el pago."
+              campo="cuenta" id={docCuentaId} nombre={docCuentaNombre} subiendo={subiendoDoc}
+              onSubir={subirDocViat} onQuitar={() => { setDocCuentaId(''); setDocCuentaNombre(''); }} />
+            <DocFieldViat label="Copia del documento de identidad" nota="Copia legible de la cédula u otro documento de identidad."
+              campo="documento" id={docDocumentoId} nombre={docDocumentoNombre} subiendo={subiendoDoc}
+              onSubir={subirDocViat} onQuitar={() => { setDocDocumentoId(''); setDocDocumentoNombre(''); }} />
+            <DocFieldViat label="Certificado EPS o carta de afiliación" nota="Carta o cert. que acredita a qué EPS está afiliado."
+              campo="cartaEps" id={docCartaEpsId} nombre={docCartaEpsNombre} subiendo={subiendoDoc}
+              onSubir={subirDocViat} onQuitar={() => { setDocCartaEpsId(''); setDocCartaEpsNombre(''); }} />
           </div>
 
           <div style={{ background: 'rgba(239,68,68,0.07)', border: '1.5px solid rgba(239,68,68,0.35)', borderRadius: 8, padding: '14px 16px', marginBottom: 16 }}>

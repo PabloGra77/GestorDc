@@ -47,7 +47,7 @@ const SECCIONES: { key: Seccion; label: string; icon: string }[] = [
   { key: 'personal',    label: 'Datos personales', icon: 'person' },
   { key: 'contacto',   label: 'Contacto',          icon: 'mail'   },
   { key: 'banco',      label: 'Cuenta bancaria',   icon: 'card'   },
-  { key: 'documentos', label: 'Documentos OPS',    icon: 'file'   },
+  { key: 'documentos', label: 'Documentos',         icon: 'file'   },
 ];
 
 const CARGOS = [
@@ -618,8 +618,8 @@ export function ProfilePanel() {
         {seccion === 'documentos' && (
           <div className="prof-section">
             <div className="prof-section-head">
-              <h3>Documentos para Cuenta de Cobro OPS</h3>
-              <p>Se adjuntan automáticamente al crear una Cuenta de Cobro OPS. Súbelos una vez y no tendrás que hacerlo de nuevo.</p>
+              <h3>Documentos</h3>
+              <p>Súbelos una vez y se adjuntarán automáticamente a tus solicitudes (viáticos, legalizaciones, cuenta de cobro OPS).</p>
             </div>
 
             {errDoc ? <div className="admin-error" style={{ marginBottom: 12 }}>{errDoc}</div> : null}
@@ -630,19 +630,16 @@ export function ProfilePanel() {
             </div>
 
             <div className="prof-docs-list">
-              <DocAdjunto label="Certificado de afiliaciones (EPS / ARL / Pensión)"
-                tipo="eps" nombre={archivoEpsNombre} subiendoDoc={subiendoDoc}
-                onSubir={subirDoc} onQuitar={() => quitarDoc('eps')} />
+              <DocAdjunto label="Certificado EPS o carta informando EPS" hint="Certificado o carta que acredita a qué EPS está afiliado."
+                tipo="carta_eps" nombre={archivoCartaEpsNombre} subiendoDoc={subiendoDoc}
+                onSubir={subirDoc} onQuitar={() => quitarDoc('carta_eps')} />
               <DocAdjunto label="Copia del documento de identidad"
                 tipo="documento" nombre={archivoDocumentoNombre} subiendoDoc={subiendoDoc}
                 onSubir={subirDoc} onQuitar={() => quitarDoc('documento')} />
               <DocAdjunto label="Certificado de cuenta bancaria"
                 tipo="cuenta" nombre={archivoCuentaNombre} subiendoDoc={subiendoDoc}
                 onSubir={subirDoc} onQuitar={() => quitarDoc('cuenta')} />
-              <DocAdjunto label="Carta informando EPS" hint="Carta o constancia de afiliación a EPS. Se adjunta automáticamente en cada radicación."
-                tipo="carta_eps" nombre={archivoCartaEpsNombre} subiendoDoc={subiendoDoc}
-                onSubir={subirDoc} onQuitar={() => quitarDoc('carta_eps')} />
-              <DocAdjunto label="Copia del RUT" hint="Requerido para colaboradores nuevos. Se adjunta automáticamente si está guardado aquí."
+              <DocAdjunto label="Copia del RUT" hint="Registro Único Tributario. Requerido para cuenta de cobro OPS."
                 tipo="rut" nombre={archivoRutNombre} subiendoDoc={subiendoDoc}
                 onSubir={subirDoc} onQuitar={() => quitarDoc('rut')} />
             </div>

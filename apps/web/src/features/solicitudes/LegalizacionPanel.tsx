@@ -295,6 +295,32 @@ function FilaGasto({
   );
 }
 
+function DocFieldLeg({ label, nota, campo, id, nombre, subiendo, onSubir, onQuitar }: {
+  label: string; nota: string; campo: string; id: string; nombre: string;
+  subiendo: string | null; onSubir: (file: File, campo: string) => void; onQuitar: () => void;
+}) {
+  return (
+    <div className="leg-field" style={{ marginTop: 14 }}>
+      <label>{label}<span className="req"> *</span></label>
+      {nota && <p className="leg-nota" style={{ marginBottom: 6 }}>{nota}</p>}
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+        {subiendo === campo ? (
+          <span className="leg-validando">Subiendo…</span>
+        ) : (
+          <label className={`admin-ghost-button${id ? ' ops-doc-ok' : ''}`} style={{ cursor: 'pointer' }}>
+            {id ? `✓ ${nombre}` : '+ Adjuntar'}
+            <input type="file" accept="application/pdf,image/*" style={{ display: 'none' }}
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) onSubir(f, campo); e.target.value = ''; }} />
+          </label>
+        )}
+        {id && subiendo !== campo && (
+          <button type="button" className="admin-ghost-button" style={{ fontSize: 12 }} onClick={onQuitar}>✕ quitar</button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /* ─── Panel principal ───────────────────────────────────────── */
 export function LegalizacionPanel({ onCreada, tipoSolicitudId, areaId }: LegalizacionPanelProps) {
   const [paso, setPaso] = useState<1 | 2 | 3 | 4>(1);
@@ -321,6 +347,11 @@ export function LegalizacionPanel({ onCreada, tipoSolicitudId, areaId }: Legaliz
   const [tipoCuenta, setTipoCuenta] = useState('Ahorros');
   const [numeroCuenta, setNumeroCuenta] = useState('');
   const [titularCuenta, setTitularCuenta] = useState('');
+
+  // Documento obligatorio desde perfil
+  const [docCuentaId, setDocCuentaId] = useState('');
+  const [docCuentaNombre, setDocCuentaNombre] = useState('');
+  const [subiendoDoc, setSubiendoDoc] = useState<string | null>(null);
 
   // Datos personales (pre-llenados desde perfil, editables antes de enviar)
   const [formTipoDoc, setFormTipoDoc] = useState('CC');
@@ -370,6 +401,7 @@ export function LegalizacionPanel({ onCreada, tipoSolicitudId, areaId }: Legaliz
       setFormFechaExp(r.data.fechaExpedicion || '');
       setFormLugarExp(r.data.lugarExpedicion || '');
       setFormTelefono(r.data.telefono || '');
+      if (r.data.archivoCuentaId) { setDocCuentaId(r.data.archivoCuentaId); setDocCuentaNombre(r.data.archivoCuentaNombre || 'Cert. bancario (perfil)'); }
     }).catch(() => {});
   }, []);
 
@@ -505,6 +537,18 @@ export function LegalizacionPanel({ onCreada, tipoSolicitudId, areaId }: Legaliz
     ));
   }, [procesarArchivo]);
 
+  async function subirDocLeg(file: File, campo: string) {
+    setSubiendoDoc(campo);
+    try {
+      const fd = new FormData();
+      fd.append('archivo', file);
+      const r = await api.post<{ id: string }>('/archivos', fd, { headers: { 'Content-Type': undefined } });
+      const id = r.data.id; const nom = file.name;
+      if (campo === 'cuenta') { setDocCuentaId(id); setDocCuentaNombre(nom); }
+    } catch { setErr('No se pudo subir el archivo. Máx 10 MB, formatos: PDF, JPG, PNG.'); }
+    finally { setSubiendoDoc(null); }
+  }
+
   function validarPaso(): string {
     if (paso === 1) {
       if (!concepto.trim()) return 'Escribe el concepto / motivo del gasto';
@@ -529,6 +573,7 @@ export function LegalizacionPanel({ onCreada, tipoSolicitudId, areaId }: Legaliz
       if (!formPrimerApellido.trim()) return 'Ingresa tu primer apellido';
       if (!formFechaNac) return 'Ingresa tu fecha de nacimiento';
       if (!formFechaExp) return 'Ingresa la fecha de expedición del documento';
+      if (!docCuentaId) return 'El Certificado de cuenta bancaria es obligatorio. Ve a tu Perfil → Documentos para cargarlo.';
     }
     if (paso === 4) {
       if (!firma) return 'La firma digital es obligatoria';
@@ -613,7 +658,9 @@ export function LegalizacionPanel({ onCreada, tipoSolicitudId, areaId }: Legaliz
           nombre_completo: usr?.nombreCompleto ?? '',
           correo_electronico: usr?.correo ?? '',
         },
-        documentos: {},
+        documentos: {
+          ...(docCuentaId ? { certificadoCuentaBancaria: { nombre: docCuentaNombre, archivoId: docCuentaId } } : {}),
+        },
         firmas: { profesional: firma },
       };
 
@@ -887,6 +934,14 @@ export function LegalizacionPanel({ onCreada, tipoSolicitudId, areaId }: Legaliz
                   placeholder="Número celular o fijo" />
               </div>
             </div>
+          </div>
+
+          <div className="leg-seccion-personal" style={{ marginTop: 20 }}>
+            <h4>Documento obligatorio</h4>
+            <p className="leg-nota">El certificado de cuenta bancaria es requerido para el pago del reembolso. Si no lo tienes cargado, ve a <strong>Perfil → Documentos</strong>.</p>
+            <DocFieldLeg label="Certificado de cuenta bancaria" nota="Certificado del banco que acredita la cuenta para el pago."
+              campo="cuenta" id={docCuentaId} nombre={docCuentaNombre} subiendo={subiendoDoc}
+              onSubir={subirDocLeg} onQuitar={() => { setDocCuentaId(''); setDocCuentaNombre(''); }} />
           </div>
 
           <div className="leg-actions">
