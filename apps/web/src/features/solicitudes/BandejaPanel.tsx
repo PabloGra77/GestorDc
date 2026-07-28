@@ -1194,25 +1194,16 @@ export function BandejaPanel({ initialOpenId }: { initialOpenId?: number } = {})
           if (esAdminOrGerente) {
             return <p className="admin-help-text">No hay solicitudes en validación en este momento.</p>;
           }
-          if (!nivelAprobacion) {
-            return (
-              <div className="admin-error" style={{ fontSize: '0.9rem' }}>
-                <strong>Tu bandeja está vacía porque no tienes un nivel de aprobación configurado.</strong>
-                <br />
-                Pide al administrador que vaya a <em>Administración → Usuarios</em>, busque tu usuario y asigne el nivel de aprobación correcto (analista, coordinador, director o contabilidad).
-              </div>
-            );
-          }
           if (nivelAprobacion === 'contabilidad') {
             return (
               <p className="admin-help-text">
-                No hay solicitudes pendientes para contabilidad en este momento. Las solicitudes aparecerán aquí cuando los validadores previos (analista, coordinador) hayan completado su revisión.
+                No hay solicitudes pendientes para contabilidad en este momento. Las solicitudes aparecerán aquí cuando los validadores previos hayan completado su revisión.
               </p>
             );
           }
           return (
             <p className="admin-help-text">
-              No tienes solicitudes pendientes en este momento (nivel: {nivelAprobacion}).
+              No tienes solicitudes pendientes en este momento (rol: {nivelAprobacion}).
             </p>
           );
         })() : null}

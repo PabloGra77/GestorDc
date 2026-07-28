@@ -166,11 +166,17 @@ final class WebPushSender
     {
         if (!$nivel) return;
         try {
-            if ($nivel === 'contabilidad') {
-                $s = $pdo->prepare("SELECT id FROM usuarios WHERE activo = 1 AND nivel_aprobacion = ?");
+            if (strtolower($nivel) === 'contabilidad') {
+                $s = $pdo->prepare(
+                    "SELECT u.id FROM usuarios u INNER JOIN roles r ON r.id = u.rol_id
+                     WHERE u.activo = 1 AND LOWER(r.nombre) = LOWER(?)"
+                );
                 $s->execute([$nivel]);
             } else {
-                $s = $pdo->prepare("SELECT id FROM usuarios WHERE activo = 1 AND nivel_aprobacion = ? AND area_id = ?");
+                $s = $pdo->prepare(
+                    "SELECT u.id FROM usuarios u INNER JOIN roles r ON r.id = u.rol_id
+                     WHERE u.activo = 1 AND LOWER(r.nombre) = LOWER(?) AND u.area_id = ?"
+                );
                 $s->execute([$nivel, $areaId]);
             }
             $ids = array_column($s->fetchAll(), 'id');

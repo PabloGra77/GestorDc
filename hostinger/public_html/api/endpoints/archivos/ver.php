@@ -32,12 +32,13 @@ $id = basename($id);
     );
     $uStmt->execute([':id' => $uid]);
     $uRow     = $uStmt->fetch();
-    $esAdmin  = strtolower(trim($uRow['rol'] ?? '')) === 'administrador';
+    $rolNom   = strtolower(trim($uRow['rol'] ?? ''));
+    $esAdmin  = $rolNom === 'administrador';
 
     if (!$esAdmin) {
         $pat       = '%' . $uuid . '%';
         $userArea  = (int)($uRow['area_id'] ?? 0);
-        $userNivel = (string)($uRow['nivel_aprobacion'] ?? '');
+        $userNivel = $rolNom; // El rol determina qué paso puede ver
         $ok        = false;
 
         // ¿Es el solicitante de alguna solicitud que contiene este archivo?

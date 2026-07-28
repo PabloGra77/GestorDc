@@ -13,8 +13,8 @@ $uStmt->execute([':id' => $usuarioId]);
 $user = $uStmt->fetch();
 if (!$user) Response::error('Usuario no encontrado', 404);
 
-$nivel = strtolower(trim($user['nivel_aprobacion'] ?? ''));
 $rol = strtolower(trim($user['rol'] ?? ''));
+$nivel = $rol; // El nombre del rol determina qué paso del flujo puede ver cada usuario
 $esAdmin = $rol === 'administrador';
 $esGerente = $rol === 'gerente';
 

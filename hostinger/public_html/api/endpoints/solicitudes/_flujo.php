@@ -34,7 +34,7 @@ final class FlujoHelpers
         $esAdmin      = $rolNorm === 'administrador';
         $esGerente    = $rolNorm === 'gerente';
         $pasoActual   = strtolower(trim($sol['paso_actual'] ?? ''));
-        $nivelUsuario = strtolower(trim($user['nivel_aprobacion'] ?? ''));
+        $nivelUsuario = $rolNorm; // El nombre del rol = nivel de aprobación
         $mismaArea    = (int)($user['area_id'] ?? 0) === (int)$sol['area_id'];
 
         // Determinar cuál es el último paso del flujo (el área final)
@@ -154,8 +154,9 @@ final class FlujoHelpers
             $stmt = $pdo->prepare(
                 "SELECT u.correo, u.nombre_completo
                  FROM usuarios u
-                 WHERE u.activo = 1 AND u.nivel_aprobacion = :paso
-                   AND (:paso2 = 'contabilidad' OR u.area_id = :area)"
+                 INNER JOIN roles r ON r.id = u.rol_id
+                 WHERE u.activo = 1 AND LOWER(r.nombre) = LOWER(:paso)
+                   AND (LOWER(:paso2) = 'contabilidad' OR u.area_id = :area)"
             );
             $stmt->execute([':paso' => $paso, ':paso2' => $paso, ':area' => $areaId]);
             $rows = $stmt->fetchAll();
