@@ -65,18 +65,21 @@ $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
 $rows = $stmt->fetchAll();
 
-Response::json(array_map(function ($r) {
-    return [
-        'id'                  => (int)$r['id'],
-        'numeroRadicado'      => $r['numero_radicado'],
-        'tipoNombre'          => $r['tipo_nombre'],
-        'areaNombre'          => $r['area_nombre'],
-        'solicitanteNombre'   => $r['solicitante_nombre'],
-        'solicitanteCorreo'   => $r['solicitante_correo'],
-        'estado'              => $r['estado'],
-        'pasoActual'          => $r['paso_actual'],
-        'pasoOrden'           => (int)$r['paso_orden'],
-        'creadoEn'            => $r['creado_en'],
-        'alertasCount'        => count(json_decode($r['alertas'] ?? '[]', true) ?: []),
-    ];
-}, $rows));
+Response::json([
+    'nivelAprobacion' => $nivel ?: null,
+    'items' => array_map(function ($r) {
+        return [
+            'id'                  => (int)$r['id'],
+            'numeroRadicado'      => $r['numero_radicado'],
+            'tipoNombre'          => $r['tipo_nombre'],
+            'areaNombre'          => $r['area_nombre'],
+            'solicitanteNombre'   => $r['solicitante_nombre'],
+            'solicitanteCorreo'   => $r['solicitante_correo'],
+            'estado'              => $r['estado'],
+            'pasoActual'          => $r['paso_actual'],
+            'pasoOrden'           => (int)$r['paso_orden'],
+            'creadoEn'            => $r['creado_en'],
+            'alertasCount'        => count(json_decode($r['alertas'] ?? '[]', true) ?: []),
+        ];
+    }, $rows),
+]);

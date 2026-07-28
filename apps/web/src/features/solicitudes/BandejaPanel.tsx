@@ -192,6 +192,7 @@ const ESTADOS_ACTIVOS = new Set(['en_validacion', 'por_legalizar', 'en_legalizac
 
 export function BandejaPanel({ initialOpenId }: { initialOpenId?: number } = {}) {
   const [items, setItems] = useState<Item[]>([]);
+  const [nivelAprobacion, setNivelAprobacion] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [showHistorial, setShowHistorial] = useState(false);
   const [err, setErr] = useState('');
@@ -229,8 +230,9 @@ export function BandejaPanel({ initialOpenId }: { initialOpenId?: number } = {})
     setLoading(true);
     setErr('');
     try {
-      const r = await api.get<Item[]>('/solicitudes/bandeja');
-      setItems(r.data);
+      const r = await api.get<{ items: Item[]; nivelAprobacion: string | null }>('/solicitudes/bandeja');
+      setItems(r.data.items);
+      setNivelAprobacion(r.data.nivelAprobacion);
     } catch {
       setErr('No se pudo cargar la bandeja.');
     } finally {
@@ -1186,9 +1188,34 @@ export function BandejaPanel({ initialOpenId }: { initialOpenId?: number } = {})
       {msg ? <div className="admin-success">{msg}</div> : null}
 
       <div className="bandeja-list">
-        {!loading && activos.length === 0 ? (
-          <p className="admin-help-text">No tienes solicitudes pendientes en este momento.</p>
-        ) : null}
+        {!loading && !err && activos.length === 0 ? (() => {
+          const rolNombre = (getAuthSession()?.usuario?.rol?.nombre ?? '').toLowerCase();
+          const esAdminOrGerente = rolNombre === 'administrador' || rolNombre === 'gerente';
+          if (esAdminOrGerente) {
+            return <p className="admin-help-text">No hay solicitudes en validación en este momento.</p>;
+          }
+          if (!nivelAprobacion) {
+            return (
+              <div className="admin-error" style={{ fontSize: '0.9rem' }}>
+                <strong>Tu bandeja está vacía porque no tienes un nivel de aprobación configurado.</strong>
+                <br />
+                Pide al administrador que vaya a <em>Administración → Usuarios</em>, busque tu usuario y asigne el nivel de aprobación correcto (analista, coordinador, director o contabilidad).
+              </div>
+            );
+          }
+          if (nivelAprobacion === 'contabilidad') {
+            return (
+              <p className="admin-help-text">
+                No hay solicitudes pendientes para contabilidad en este momento. Las solicitudes aparecerán aquí cuando los validadores previos (analista, coordinador) hayan completado su revisión.
+              </p>
+            );
+          }
+          return (
+            <p className="admin-help-text">
+              No tienes solicitudes pendientes en este momento (nivel: {nivelAprobacion}).
+            </p>
+          );
+        })() : null}
         {activos.map((it) => renderItem(it))}
       </div>
 
