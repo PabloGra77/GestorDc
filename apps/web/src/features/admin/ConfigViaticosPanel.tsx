@@ -182,8 +182,10 @@ export function ConfigViaticosPanel() {
       const cols = [
         'radicado','fecha','aprobado','solicitante','documento','correo',
         'area','estado','paso',
-        'dato:destino','dato:origen','dato:fechaInicio','dato:fechaFin',
-        'dato:diasViaje','dato:tipoTransporte','dato:totalViaje',
+        'dato:ciudadOrigen','dato:ciudadDestino',
+        'dato:fechaIda','dato:fechaRegreso',
+        'dato:motivoViaje','dato:autorizadorNombre',
+        'monto_total','desglose_items',
       ].join(',');
       const params = new URLSearchParams({ tipo: String(tipoId), columnas: cols });
       if (infDesde)       params.set('desde',       infDesde);

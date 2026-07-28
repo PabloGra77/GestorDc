@@ -102,6 +102,7 @@ export function ConfigLegalizacionPanel() {
       const cols = [
         'radicado','fecha','aprobado','solicitante','documento','correo','area','estado','paso',
         'dato:concepto','dato:fechaPeriodo','dato:autorizadorNombre',
+        'dato:totalGastos','desglose_items','monto_legalizado',
       ].join(',');
       const params = new URLSearchParams({ tipo: String(tipoId), columnas: cols });
       if (infDesde)              params.set('desde',       infDesde);

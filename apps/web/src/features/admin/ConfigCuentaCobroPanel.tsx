@@ -84,7 +84,9 @@ export function ConfigCuentaCobroPanel() {
     try {
       const cols = [
         'radicado','fecha','aprobado','solicitante','documento','correo','area','estado','paso',
-        'dato:profesion','dato:banco','dato:numeroCuenta','dato:periodoInicio','dato:periodoFin','dato:valorCobrar',
+        'dato:profesion','dato:banco','dato:numeroCuenta',
+        'dato:periodoInicio','dato:periodoFin',
+        'monto_total',
       ].join(',');
       const params = new URLSearchParams({ tipo: String(tipoId), columnas: cols });
       if (infDesde)              params.set('desde',       infDesde);
