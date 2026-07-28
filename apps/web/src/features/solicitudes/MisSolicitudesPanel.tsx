@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '../../services/http/api';
-import { generarPdfFormato } from './generarPdfFormato';
+import { generarPdfFormato, generarFormatoBlobUrl } from './generarPdfFormato';
 import { useOcrDocument } from '../../hooks/useOcrDocument';
 import { numeroAPesosEnLetras, formatearMiles } from '../../utils/numeroALetras';
 
@@ -320,6 +320,18 @@ export function MisSolicitudesPanel({ refresco, initialOpenId }: { refresco?: nu
   const [legalizar, setLegalizar] = useState<SolicitudResumen | null>(null);
   const [verDetalle, setVerDetalle] = useState<SolicitudResumen | null>(null);
   const [msg, setMsg] = useState('');
+  const [pdfPreview, setPdfPreview] = useState<{ id: number; url: string | null; cargando: boolean } | null>(null);
+
+  async function verPdf(s: SolicitudResumen) {
+    setPdfPreview({ id: s.id, url: null, cargando: true });
+    try {
+      const r = await api.get(`/solicitudes/${s.id}`);
+      const url = await generarFormatoBlobUrl(r.data);
+      setPdfPreview({ id: s.id, url, cargando: false });
+    } catch {
+      setPdfPreview(null);
+    }
+  }
 
   async function descargarPdf(id: number) {
     setDescargando(id);
@@ -432,25 +444,45 @@ export function MisSolicitudesPanel({ refresco, initialOpenId }: { refresco?: nu
                   </button>
                 ) : null}
                 {s.estado === 'en_validacion' ? (
-                  <button
-                    type="button"
-                    className="admin-ghost-button"
-                    onClick={() => descargarPdf(s.id)}
-                    disabled={descargando === s.id}
-                    style={{ opacity: 0.8 }}
-                  >
-                    {descargando === s.id ? 'Generando…' : '⬇ PDF en trámite'}
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      className="admin-ghost-button"
+                      onClick={() => verPdf(s)}
+                      disabled={pdfPreview?.id === s.id && pdfPreview.cargando}
+                    >
+                      {pdfPreview?.id === s.id && pdfPreview.cargando ? 'Generando…' : '👁 Ver PDF'}
+                    </button>
+                    <button
+                      type="button"
+                      className="admin-ghost-button"
+                      onClick={() => descargarPdf(s.id)}
+                      disabled={descargando === s.id}
+                      style={{ opacity: 0.8 }}
+                    >
+                      {descargando === s.id ? 'Generando…' : '⬇ PDF en trámite'}
+                    </button>
+                  </>
                 ) : null}
                 {(s.estado === 'aprobado' || s.estado === 'legalizado' || s.estado === 'por_legalizar' || s.estado === 'en_legalizacion') ? (
-                  <button
-                    type="button"
-                    className="admin-ghost-button"
-                    onClick={() => descargarPdf(s.id)}
-                    disabled={descargando === s.id}
-                  >
-                    {descargando === s.id ? 'Generando…' : '⬇ PDF'}
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      className="admin-ghost-button"
+                      onClick={() => verPdf(s)}
+                      disabled={pdfPreview?.id === s.id && pdfPreview.cargando}
+                    >
+                      {pdfPreview?.id === s.id && pdfPreview.cargando ? 'Generando…' : '👁 Ver PDF'}
+                    </button>
+                    <button
+                      type="button"
+                      className="admin-ghost-button"
+                      onClick={() => descargarPdf(s.id)}
+                      disabled={descargando === s.id}
+                    >
+                      {descargando === s.id ? 'Generando…' : '⬇ PDF'}
+                    </button>
+                  </>
                 ) : null}
               </div>
             </div>
@@ -472,6 +504,28 @@ export function MisSolicitudesPanel({ refresco, initialOpenId }: { refresco?: nu
           onClose={() => setVerDetalle(null)}
           onRenviada={() => { setVerDetalle(null); setMsg('Solicitud reenviada. Los validadores han sido notificados.'); cargar(); }}
         />
+      ) : null}
+
+      {pdfPreview ? (
+        <div className="admin-permissions-overlay" role="dialog" aria-modal="true" aria-label="Vista previa PDF">
+          <div className="msp-pdf-modal card-surface">
+            <div className="msp-pdf-modal-head">
+              <span>Vista previa del formato</span>
+              <button type="button" className="admin-ghost-button" onClick={() => setPdfPreview(null)}>
+                ✕ Cerrar
+              </button>
+            </div>
+            {pdfPreview.cargando ? (
+              <p className="admin-help-text" style={{ textAlign: 'center', padding: '40px 0' }}>Generando PDF…</p>
+            ) : pdfPreview.url ? (
+              <iframe src={pdfPreview.url} className="msp-pdf-iframe" title="Vista previa del formato" />
+            ) : (
+              <p className="admin-help-text" style={{ textAlign: 'center', padding: '40px 0' }}>
+                No se pudo generar la vista previa.
+              </p>
+            )}
+          </div>
+        </div>
       ) : null}
     </section>
   );

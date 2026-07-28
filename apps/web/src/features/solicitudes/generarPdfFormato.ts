@@ -192,7 +192,7 @@ function valorCampo(s: SolicitudParaPdf, key: string): string {
   return String(raw);
 }
 
-async function generarPdfPlantilla(s: SolicitudParaPdf, pl: PlantillaPdf, filenameOverride?: string, opts?: { bloburl?: boolean }): Promise<string | void> {
+async function generarPdfPlantilla(s: SolicitudParaPdf, pl: PlantillaPdf, filenameOverride?: string, opts?: { bloburl?: boolean; sinMarcaDeAgua?: boolean }): Promise<string | void> {
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
@@ -536,8 +536,8 @@ async function generarPdfPlantilla(s: SolicitudParaPdf, pl: PlantillaPdf, filena
     }
   }
 
-  // Marca de agua repetida para solicitudes en tramite
-  if (s.estado === 'en_validacion' || s.estado === 'en_legalizacion') {
+  // Marca de agua repetida para solicitudes en tramite (solo en descarga, no en vista previa)
+  if (!opts?.sinMarcaDeAgua && (s.estado === 'en_validacion' || s.estado === 'en_legalizacion')) {
     const wPages = doc.getNumberOfPages();
     for (let wi = 1; wi <= wPages; wi++) {
       doc.setPage(wi);
@@ -582,11 +582,11 @@ export async function generarFormatoBlobUrl(s: SolicitudParaPdf): Promise<string
     || typeof s.datosFormulario['items'] === 'string';
   const esCuentaCobroOpsB = s.tipoSlug === 'cuenta-cobro-ops';
   if (esLegalizacion || esViaticos || esAnticipo || esCuentaCobroOpsB) {
-    const url = await _generarPdfEspecial(s, { bloburl: true });
+    const url = await _generarPdfEspecial(s, { bloburl: true, sinMarcaDeAgua: true });
     return typeof url === 'string' ? url : null;
   }
   if (!s.plantillaPdf) return null;
-  const url = await generarPdfPlantilla(s, s.plantillaPdf, undefined, { bloburl: true });
+  const url = await generarPdfPlantilla(s, s.plantillaPdf, undefined, { bloburl: true, sinMarcaDeAgua: true });
   return typeof url === 'string' ? url : null;
 }
 
@@ -724,7 +724,7 @@ function drawInfoGrid(
   return y;
 }
 
-async function _generarPdfEspecial(s: SolicitudParaPdf, opts?: { bloburl?: boolean }): Promise<string | void> {
+async function _generarPdfEspecial(s: SolicitudParaPdf, opts?: { bloburl?: boolean; sinMarcaDeAgua?: boolean }): Promise<string | void> {
   const esLegalizacion = s.tipoSlug === 'legalizacion'
     || typeof s.datosFormulario['gastos'] === 'string';
   const esViaticos = s.tipoSlug === 'viaticos'
@@ -2033,8 +2033,8 @@ async function _generarPdfEspecial(s: SolicitudParaPdf, opts?: { bloburl?: boole
     );
   }
 
-  // Marca de agua repetida para solicitudes en tramite
-  if (s.estado === 'en_validacion' || s.estado === 'en_legalizacion') {
+  // Marca de agua repetida para solicitudes en tramite (solo en descarga, no en vista previa)
+  if (!opts?.sinMarcaDeAgua && (s.estado === 'en_validacion' || s.estado === 'en_legalizacion')) {
     const wH = doc.internal.pageSize.getHeight();
     void wH;
     for (let wi = 1; wi <= totalPages; wi++) {

@@ -84,7 +84,7 @@ export function RadicacionesModule({ vistaInicial, solicitudId }: RadicacionesPr
 
   const TABS = TABS_BASE.map((t) =>
     t.key === 'bandeja' && esContabilidad
-      ? { ...t, label: 'Bandeja de pagos', labelCorta: 'Pagos', desc: 'Solicitudes pendientes de aprobación' }
+      ? { ...t, label: 'Bandeja de solicitudes', labelCorta: 'Solicitudes', desc: 'Solicitudes pendientes de aprobación' }
       : t
   );
 
