@@ -45,20 +45,24 @@ $stmt->execute($args);
 $rows = $stmt->fetchAll();
 
 $FIJAS = [
-    'radicado'    => 'Radicado',
-    'fecha'       => 'Fecha de creación',
-    'aprobado'    => 'Fecha de aprobación',
-    'actualizado' => 'Última actualización',
-    'tipo'        => 'Tipo de solicitud',
-    'area'        => 'Área',
-    'estado'      => 'Estado',
-    'paso'        => 'Paso actual',
-    'solicitante' => 'Nombre del profesional',
-    'documento'   => 'Documento',
-    'correo'      => 'Correo',
-    'firmado'     => 'Firmado por el solicitante',
-    'alertas'     => 'Alertas IA',
-    'adjuntos'    => 'Adjuntos cargados',
+    'radicado'        => 'Radicado',
+    'fecha'           => 'Fecha de creación',
+    'aprobado'        => 'Fecha de aprobación',
+    'actualizado'     => 'Última actualización',
+    'tipo'            => 'Tipo de solicitud',
+    'area'            => 'Área',
+    'estado'          => 'Estado',
+    'paso'            => 'Paso actual',
+    'solicitante'     => 'Nombre del profesional',
+    'documento'       => 'Documento',
+    'correo'          => 'Correo',
+    'monto_total'     => 'Monto total solicitado',
+    'monto_legalizado'=> 'Monto legalizado',
+    'num_items'       => 'N° ítems/gastos',
+    'desglose_items'  => 'Desglose de ítems',
+    'firmado'         => 'Firmado por el solicitante',
+    'alertas'         => 'Alertas IA',
+    'adjuntos'        => 'Adjuntos cargados',
 ];
 
 $cols = array_values(array_filter(array_map('trim', explode(',', $columnasRaw))));
@@ -87,7 +91,20 @@ $nombreDoc = static function ($info): string {
     return is_string($info) ? $info : '';
 };
 
-$valorCol = static function (string $col, array $r, array $datos, array $documentos, array $alertas, array $firmas) use ($nombreDoc): string {
+$fmtPesos = static function (float $v): string {
+    return '$ ' . number_format($v, 0, ',', '.');
+};
+
+$extraerItems = static function (array $datos, string ...$campos): array {
+    foreach ($campos as $c) {
+        if (empty($datos[$c])) continue;
+        $arr = is_string($datos[$c]) ? json_decode($datos[$c], true) : $datos[$c];
+        if (is_array($arr) && count($arr) > 0) return $arr;
+    }
+    return [];
+};
+
+$valorCol = static function (string $col, array $r, array $datos, array $documentos, array $alertas, array $firmas) use ($nombreDoc, $fmtPesos, $extraerItems): string {
     switch ($col) {
         case 'radicado':    return (string)$r['numero_radicado'];
         case 'fecha':       return (string)$r['creado_en'];
@@ -106,6 +123,54 @@ $valorCol = static function (string $col, array $r, array $datos, array $documen
             $nombres = [];
             foreach ($documentos as $info) { $n = $nombreDoc($info); if ($n !== '') $nombres[] = $n; }
             return implode(' | ', $nombres);
+
+        case 'monto_total':
+            // Viáticos: totalGeneral
+            if (isset($datos['totalGeneral']) && (float)$datos['totalGeneral'] > 0)
+                return $fmtPesos((float)$datos['totalGeneral']);
+            // Anticipo / CuentaCobro / formulario genérico: valorPesos
+            if (isset($datos['valorPesos']) && (float)$datos['valorPesos'] > 0)
+                return $fmtPesos((float)$datos['valorPesos']);
+            // Suma de ítems (items = anticipo, gastos = legalizacion)
+            $its = $extraerItems($datos, 'items', 'gastos');
+            if ($its) {
+                $sum = array_sum(array_map(fn($it) => (float)($it['valor'] ?? $it['monto'] ?? 0), $its));
+                if ($sum > 0) return $fmtPesos($sum);
+            }
+            return '';
+
+        case 'monto_legalizado':
+            // Almacenado por el endpoint /legalizar en documentos.__legalizacion._resumen
+            $leg = $documentos['__legalizacion'] ?? [];
+            $ml  = (float)(($leg['_resumen'] ?? [])['montoLegalizado'] ?? 0);
+            return $ml > 0 ? $fmtPesos($ml) : '';
+
+        case 'num_items':
+            $its = $extraerItems($datos, 'items', 'gastos');
+            return $its ? (string)count($its) : '0';
+
+        case 'desglose_items':
+            // Viáticos: mostrar subtotales por categoría
+            $partes = [];
+            if (isset($datos['totalTransporte']) && (float)$datos['totalTransporte'] > 0)
+                $partes[] = 'Transporte: ' . $fmtPesos((float)$datos['totalTransporte']);
+            if (isset($datos['totalHospedaje']) && (float)$datos['totalHospedaje'] > 0)
+                $partes[] = 'Hospedaje: ' . $fmtPesos((float)$datos['totalHospedaje']);
+            if (isset($datos['totalComidas']) && (float)$datos['totalComidas'] > 0)
+                $partes[] = 'Comidas: ' . $fmtPesos((float)$datos['totalComidas']);
+            if ($partes) return implode(' | ', $partes);
+            // Anticipo / legalizacion: lista de ítems con valor
+            $its = $extraerItems($datos, 'items', 'gastos');
+            foreach ($its as $it) {
+                $c = trim((string)($it['concepto'] ?? $it['nombre'] ?? ''));
+                $v = (float)($it['valor'] ?? $it['monto'] ?? 0);
+                $desc = trim((string)($it['descripcion'] ?? ''));
+                $txt = $c;
+                if ($desc) $txt .= ' (' . $desc . ')';
+                if ($v > 0) $txt .= ': ' . $fmtPesos($v);
+                if ($txt) $partes[] = $txt;
+            }
+            return implode(' | ', $partes);
     }
     if (strncmp($col, 'dato:', 5) === 0) {
         $k = substr($col, 5);

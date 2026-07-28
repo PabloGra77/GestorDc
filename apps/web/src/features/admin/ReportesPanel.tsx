@@ -65,6 +65,10 @@ const COLS_FIJAS: Array<{ key: string; label: string }> = [
   { key: 'solicitante', label: 'Nombre del profesional' },
   { key: 'documento', label: 'Documento' },
   { key: 'correo', label: 'Correo' },
+  { key: 'monto_total', label: 'Monto total solicitado' },
+  { key: 'monto_legalizado', label: 'Monto legalizado' },
+  { key: 'num_items', label: 'N° ítems/gastos' },
+  { key: 'desglose_items', label: 'Desglose de ítems' },
   { key: 'firmado', label: 'Firmado' },
   { key: 'alertas', label: 'Alertas IA' },
   { key: 'adjuntos', label: 'Adjuntos cargados' },
@@ -88,7 +92,7 @@ export function ReportesPanel({ onMsg, onErr }: Props) {
   const [desde, setDesde] = useState('');
   const [hasta, setHasta] = useState('');
   const [estado, setEstado] = useState('');
-  const [cols, setCols] = useState<string[]>(['radicado', 'fecha', 'tipo', 'solicitante', 'estado']);
+  const [cols, setCols] = useState<string[]>(['radicado', 'fecha', 'tipo', 'solicitante', 'documento', 'area', 'estado', 'monto_total']);
 
   useEffect(() => {
     api.get<TipoMin[]>('/tipos').then((r) => setTipos(r.data)).catch(() => setTipos([]));
