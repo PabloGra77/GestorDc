@@ -537,7 +537,7 @@ async function generarPdfPlantilla(s: SolicitudParaPdf, pl: PlantillaPdf, filena
   }
 
   // Marca de agua repetida para solicitudes en tramite
-  if (s.estado === 'en_validacion') {
+  if (s.estado === 'en_validacion' || s.estado === 'en_legalizacion') {
     const wPages = doc.getNumberOfPages();
     for (let wi = 1; wi <= wPages; wi++) {
       doc.setPage(wi);
@@ -2034,7 +2034,7 @@ async function _generarPdfEspecial(s: SolicitudParaPdf, opts?: { bloburl?: boole
   }
 
   // Marca de agua repetida para solicitudes en tramite
-  if (s.estado === 'en_validacion') {
+  if (s.estado === 'en_validacion' || s.estado === 'en_legalizacion') {
     const wH = doc.internal.pageSize.getHeight();
     void wH;
     for (let wi = 1; wi <= totalPages; wi++) {

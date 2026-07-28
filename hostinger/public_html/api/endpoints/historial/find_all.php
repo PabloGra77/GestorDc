@@ -37,21 +37,25 @@ if ($usuarioId) {
     $params[':usuario_id'] = $usuarioId;
 }
 if ($busqueda) {
-    $where[]            = '(al.correo LIKE :q OR al.nombre_completo LIKE :q OR al.ip LIKE :q OR al.detalle LIKE :q)';
+    $where[]            = '(al.correo LIKE :q OR al.nombre_completo LIKE :q OR al.ip LIKE :q OR al.detalle LIKE :q OR u.numero_documento LIKE :q)';
     $params[':q']       = '%' . $busqueda . '%';
 }
 
 $whereClause = $where ? ('WHERE ' . implode(' AND ', $where)) : '';
 
-// Total
-$stmtTotal = $pdo->prepare("SELECT COUNT(*) FROM auditoria_logs al $whereClause");
+// Total (incluye el JOIN para que los filtros por numero_documento funcionen)
+$stmtTotal = $pdo->prepare(
+    "SELECT COUNT(*) FROM auditoria_logs al LEFT JOIN usuarios u ON u.id = al.usuario_id $whereClause"
+);
 $stmtTotal->execute($params);
 $total = (int)$stmtTotal->fetchColumn();
 
-// Registros paginados
+// Registros paginados — JOIN para obtener numero_documento aunque no esté almacenado en el log
 $sql = "SELECT al.id, al.usuario_id, al.correo, al.nombre_completo, al.accion,
-               al.detalle, al.ip, al.user_agent, al.exitoso, al.created_at
+               al.detalle, al.ip, al.user_agent, al.exitoso, al.created_at,
+               u.numero_documento
         FROM auditoria_logs al
+        LEFT JOIN usuarios u ON u.id = al.usuario_id
         $whereClause
         ORDER BY al.created_at DESC
         LIMIT :limit OFFSET :offset";
@@ -64,16 +68,17 @@ $stmt->execute();
 $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 $logs = array_map(fn($r) => [
-    'id'            => (int)$r['id'],
-    'usuarioId'     => $r['usuario_id'] ? (int)$r['usuario_id'] : null,
-    'correo'        => $r['correo'],
-    'nombreCompleto'=> $r['nombre_completo'],
-    'accion'        => $r['accion'],
-    'detalle'       => $r['detalle'],
-    'ip'            => $r['ip'],
-    'userAgent'     => $r['user_agent'],
-    'exitoso'       => (bool)$r['exitoso'],
-    'creadoEn'      => $r['created_at'],
+    'id'              => (int)$r['id'],
+    'usuarioId'       => $r['usuario_id'] ? (int)$r['usuario_id'] : null,
+    'correo'          => $r['correo'],
+    'nombreCompleto'  => $r['nombre_completo'],
+    'numeroDocumento' => $r['numero_documento'] ?? null,
+    'accion'          => $r['accion'],
+    'detalle'         => $r['detalle'],
+    'ip'              => $r['ip'],
+    'userAgent'       => $r['user_agent'],
+    'exitoso'         => (bool)$r['exitoso'],
+    'creadoEn'        => $r['created_at'],
 ], $rows);
 
 Response::json([

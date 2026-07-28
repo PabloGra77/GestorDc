@@ -12099,6 +12099,7 @@ body[data-weather="tormenta"]::after {
 }
 .historial-usuario strong { display: block; font-size: 13px; }
 .historial-usuario span   { font-size: 11px; color: var(--text-muted, #7A82A0); }
+.historial-doc            { font-size: 10px; color: var(--text-muted, #7A82A0); font-variant-numeric: tabular-nums; }
 
 .historial-accion-badge {
   display: inline-block;

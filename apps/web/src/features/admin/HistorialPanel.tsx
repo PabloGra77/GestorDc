@@ -7,6 +7,7 @@ interface LogEntry {
   usuarioId: number | null;
   correo: string | null;
   nombreCompleto: string | null;
+  numeroDocumento: string | null;
   accion: string;
   detalle: string | null;
   ip: string | null;
@@ -74,11 +75,12 @@ function acortarUA(ua: string | null): string {
 }
 
 function generarCsvBlob(logs: LogEntry[]): Blob {
-  const headers = ['ID','Fecha','Usuario','Correo','Acción','Detalle','IP','Navegador','Resultado'];
+  const headers = ['ID','Fecha','Usuario','No. Identificación','Correo','Acción','Detalle','IP','Navegador','Resultado'];
   const rows = logs.map(l => [
     l.id,
     formatFecha(l.creadoEn),
     l.nombreCompleto ?? '—',
+    l.numeroDocumento ?? '—',
     l.correo ?? '—',
     ACCION_LABEL[l.accion] ?? l.accion,
     (l.detalle ?? '').replace(/,/g, ';'),
@@ -131,7 +133,9 @@ export function HistorialPanel() {
       setPagina(p);
     } catch (err: unknown) {
       if (axios.isCancel(err)) return;
-      setError('No se pudo cargar el historial. Verifica que la tabla auditoria_logs exista en la base de datos.');
+      setLogs([]);
+      setTotal(0);
+      setError('No se pudo cargar el historial. Verifica tu conexión o intenta de nuevo.');
     } finally {
       setLoading(false);
     }
@@ -257,6 +261,9 @@ export function HistorialPanel() {
                     <div className="historial-usuario">
                       <strong>{log.nombreCompleto ?? '—'}</strong>
                       <span>{log.correo ?? '—'}</span>
+                      {log.numeroDocumento && (
+                        <span className="historial-doc">CC {log.numeroDocumento}</span>
+                      )}
                     </div>
                   </td>
                   <td>
