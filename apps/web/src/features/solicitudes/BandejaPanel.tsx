@@ -1105,7 +1105,7 @@ export function BandejaPanel({ initialOpenId }: { initialOpenId?: number } = {})
                           disabled={accionando !== null}
                           onClick={() => ejecutar('validar', it.id)}
                         >
-                          Validar y avanzar
+                          {it.pasoActual === 'contabilidad' ? 'Aprobar solicitud' : 'Validar y avanzar'}
                         </button>
                         <button
                           type="button"
