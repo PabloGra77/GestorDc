@@ -31,11 +31,11 @@ const ETIQUETAS_ESTADO: Record<string, string> = {
   devuelto: 'Devuelto',
 };
 
-const TABS: { key: Vista; label: string; labelCorta: string; desc: string; icon: string }[] = [
-  { key: 'nueva',          label: 'Nueva solicitud', labelCorta: 'Nueva',   desc: 'Crea un nuevo radicado', icon: 'plus' },
-  { key: 'misSolicitudes', label: 'Mis solicitudes',  labelCorta: 'Mis sol.', desc: 'Consulta tus radicados', icon: 'doc' },
-  { key: 'bandeja',        label: 'Bandeja',           labelCorta: 'Bandeja',  desc: 'Validación documental',  icon: 'inbox' },
-  { key: 'tablero',        label: 'Tablero',           labelCorta: 'Tablero',  desc: 'Indicadores generales',  icon: 'chart' },
+const TABS_BASE: { key: Vista; label: string; labelCorta: string; desc: string; icon: string }[] = [
+  { key: 'nueva',          label: 'Nueva solicitud',     labelCorta: 'Nueva',   desc: 'Crea un nuevo radicado',          icon: 'plus'  },
+  { key: 'misSolicitudes', label: 'Mis solicitudes',     labelCorta: 'Mis sol.', desc: 'Consulta tus radicados',         icon: 'doc'   },
+  { key: 'bandeja',        label: 'Bandeja',             labelCorta: 'Bandeja',  desc: 'Validación documental',           icon: 'inbox' },
+  { key: 'tablero',        label: 'Tablero',             labelCorta: 'Tablero',  desc: 'Indicadores generales',           icon: 'chart' },
 ];
 
 function TabIcon({ name, size = 19 }: { name: string; size?: number }) {
@@ -77,7 +77,16 @@ export function RadicacionesModule({ vistaInicial, solicitudId }: RadicacionesPr
   const [items, setItems]         = useState<SolicitudResumen[]>([]);
   const [loading, setLoading]     = useState(false);
   const [borrando, setBorrando]   = useState<number | null>(null);
-  const isAdmin = (getAuthSession()?.usuario?.rol?.nombre ?? '').toLowerCase() === 'administrador';
+  const rolActual = (getAuthSession()?.usuario?.rol?.nombre ?? '').toLowerCase();
+  const isAdmin = rolActual === 'administrador';
+  const esContabilidad = rolActual === 'contabilidad'
+    || (getAuthSession()?.usuario as { nivelAprobacion?: string | null })?.nivelAprobacion === 'contabilidad';
+
+  const TABS = TABS_BASE.map((t) =>
+    t.key === 'bandeja' && esContabilidad
+      ? { ...t, label: 'Bandeja de pagos', labelCorta: 'Pagos', desc: 'Solicitudes pendientes de aprobación' }
+      : t
+  );
 
   const tabs = isAdmin ? TABS : TABS.filter((t) => t.key !== 'tablero');
 

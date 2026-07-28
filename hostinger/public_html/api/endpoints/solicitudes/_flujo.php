@@ -34,7 +34,11 @@ final class FlujoHelpers
         $esAdmin      = $rolNorm === 'administrador';
         $esGerente    = $rolNorm === 'gerente';
         $pasoActual   = strtolower(trim($sol['paso_actual'] ?? ''));
-        $nivelUsuario = $rolNorm; // El nombre del rol = nivel de aprobación
+        // Nivel: rol si corresponde a un nivel de validación; si no, usar nivel_aprobacion
+        $nivelesConocidos = ['analista', 'coordinador', 'director', 'contabilidad', 'tesoreria', 'gerencia'];
+        $nivelUsuario = in_array($rolNorm, $nivelesConocidos, true)
+            ? $rolNorm
+            : strtolower(trim($user['nivel_aprobacion'] ?? ''));
         $mismaArea    = (int)($user['area_id'] ?? 0) === (int)$sol['area_id'];
 
         // Determinar cuál es el último paso del flujo (el área final)
@@ -122,6 +126,15 @@ final class FlujoHelpers
             if (($p['rol'] ?? '') === $pasoActual) { $idx = $i; break; }
         }
         if ($idx < 0) return null;
+
+        $ultimoIdx = count($flujo) - 1;
+        // Si no estamos en el penúltimo paso, saltar directamente al ÚLTIMO paso.
+        // Esto garantiza una sola validación del área (por analista, coordinador o director)
+        // antes de pasar al paso final (contabilidad u otro).
+        if ($idx < $ultimoIdx - 1) {
+            return $flujo[$ultimoIdx];
+        }
+
         return $flujo[$idx + 1] ?? null;
     }
 

@@ -14,9 +14,14 @@ $user = $uStmt->fetch();
 if (!$user) Response::error('Usuario no encontrado', 404);
 
 $rol = strtolower(trim($user['rol'] ?? ''));
-$nivel = $rol; // El nombre del rol determina qué paso del flujo puede ver cada usuario
 $esAdmin = $rol === 'administrador';
 $esGerente = $rol === 'gerente';
+// Determinar nivel: primero por nombre del rol; si el rol no corresponde a un nivel de
+// validación conocido, usar el campo nivel_aprobacion como respaldo.
+$nivelesConocidos = ['analista', 'coordinador', 'director', 'contabilidad', 'tesoreria', 'gerencia'];
+$nivel = in_array($rol, $nivelesConocidos, true)
+    ? $rol
+    : strtolower(trim($user['nivel_aprobacion'] ?? ''));
 
 $params = [];
 if ($esAdmin || $esGerente) {
