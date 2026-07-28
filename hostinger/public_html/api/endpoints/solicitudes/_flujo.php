@@ -31,6 +31,7 @@ final class FlujoHelpers
         if (!$user) Response::error('Usuario no encontrado', 404);
 
         $rolNorm      = strtolower(trim($user['rol'] ?? ''));
+        $nivelDb      = strtolower(trim($user['nivel_aprobacion'] ?? ''));
         $esAdmin      = $rolNorm === 'administrador';
         $esGerente    = $rolNorm === 'gerente';
         $pasoActual   = strtolower(trim($sol['paso_actual'] ?? ''));
@@ -38,7 +39,7 @@ final class FlujoHelpers
         $nivelesConocidos = ['analista', 'coordinador', 'director', 'contabilidad', 'tesoreria', 'gerencia'];
         $nivelUsuario = in_array($rolNorm, $nivelesConocidos, true)
             ? $rolNorm
-            : strtolower(trim($user['nivel_aprobacion'] ?? ''));
+            : $nivelDb;
         $mismaArea    = (int)($user['area_id'] ?? 0) === (int)$sol['area_id'];
 
         // Determinar cuál es el último paso del flujo (el área final)
@@ -50,6 +51,10 @@ final class FlujoHelpers
             : '';
 
         $puede = false;
+        // nivel_aprobacion en BD actúa como permiso adicional sobre el paso final
+        $nivelEfectivo = ($pasoActual === $ultimoRol && $nivelDb === $ultimoRol)
+            ? $ultimoRol
+            : $nivelUsuario;
         if ($esAdmin || $esGerente) {
             $puede = true;
         } elseif ($pasoActual === 'autorizador_visto_bueno') {
@@ -58,12 +63,12 @@ final class FlujoHelpers
             if ((int)($datos['autorizadorId'] ?? 0) === $usuarioId) {
                 $puede = true;
             }
-        } elseif ($nivelUsuario !== '' && $pasoActual !== '') {
+        } elseif ($nivelEfectivo !== '' && $pasoActual !== '') {
             if ($pasoActual === $ultimoRol) {
-                // Último paso (área final): solo el nivel exacto puede actuar.
+                // Último paso (área final): nivel exacto o nivel_aprobacion coincide.
                 // Contabilidad no requiere misma área (atiende todas las áreas).
-                if ($nivelUsuario === $pasoActual) {
-                    $puede = $nivelUsuario === 'contabilidad' ? true : $mismaArea;
+                if ($nivelEfectivo === $pasoActual) {
+                    $puede = $nivelEfectivo === 'contabilidad' ? true : $mismaArea;
                 }
             } else {
                 // Pasos intermedios: cualquier miembro del área con nivel puede actuar,
@@ -165,13 +170,14 @@ final class FlujoHelpers
         if (!$paso) return;
         try {
             $stmt = $pdo->prepare(
-                "SELECT u.correo, u.nombre_completo
+                "SELECT DISTINCT u.correo, u.nombre_completo
                  FROM usuarios u
                  INNER JOIN roles r ON r.id = u.rol_id
-                 WHERE u.activo = 1 AND LOWER(r.nombre) = LOWER(:paso)
-                   AND (LOWER(:paso2) = 'contabilidad' OR u.area_id = :area)"
+                 WHERE u.activo = 1
+                   AND (LOWER(r.nombre) = LOWER(:paso) OR LOWER(u.nivel_aprobacion) = LOWER(:paso2))
+                   AND (LOWER(:paso3) = 'contabilidad' OR u.area_id = :area)"
             );
-            $stmt->execute([':paso' => $paso, ':paso2' => $paso, ':area' => $areaId]);
+            $stmt->execute([':paso' => $paso, ':paso2' => $paso, ':paso3' => $paso, ':area' => $areaId]);
             $rows = $stmt->fetchAll();
         } catch (Throwable $e) {
             error_log('[notif validadores] ' . $e->getMessage());

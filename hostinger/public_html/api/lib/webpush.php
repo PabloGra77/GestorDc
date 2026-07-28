@@ -167,17 +167,21 @@ final class WebPushSender
         if (!$nivel) return;
         try {
             if (strtolower($nivel) === 'contabilidad') {
+                // Notificar por rol = contabilidad O nivel_aprobacion = contabilidad (sin filtro de área)
                 $s = $pdo->prepare(
-                    "SELECT u.id FROM usuarios u INNER JOIN roles r ON r.id = u.rol_id
-                     WHERE u.activo = 1 AND LOWER(r.nombre) = LOWER(?)"
+                    "SELECT DISTINCT u.id FROM usuarios u INNER JOIN roles r ON r.id = u.rol_id
+                     WHERE u.activo = 1
+                       AND (LOWER(r.nombre) = LOWER(?) OR LOWER(u.nivel_aprobacion) = LOWER(?))"
                 );
-                $s->execute([$nivel]);
+                $s->execute([$nivel, $nivel]);
             } else {
                 $s = $pdo->prepare(
-                    "SELECT u.id FROM usuarios u INNER JOIN roles r ON r.id = u.rol_id
-                     WHERE u.activo = 1 AND LOWER(r.nombre) = LOWER(?) AND u.area_id = ?"
+                    "SELECT DISTINCT u.id FROM usuarios u INNER JOIN roles r ON r.id = u.rol_id
+                     WHERE u.activo = 1
+                       AND (LOWER(r.nombre) = LOWER(?) OR LOWER(u.nivel_aprobacion) = LOWER(?))
+                       AND u.area_id = ?"
                 );
-                $s->execute([$nivel, $areaId]);
+                $s->execute([$nivel, $nivel, $areaId]);
             }
             $ids = array_column($s->fetchAll(), 'id');
             if ($ids) self::notificar($pdo, array_map('intval', $ids));
