@@ -54,7 +54,7 @@ if (($sol['tipo_slug'] ?? '') === 'cuenta-cobro-ops') {
                          WHERE d.informe_id=:inf AND d.cc_profesional=:cc AND d.cc_paciente=:cp AND UPPER(TRIM(d.servicio))=:sv"
                     );
                     $stOps->execute([':inf'=>$infIdOps,':cc'=>$ccOps,':cp'=>$ccPac,':sv'=>$sv]);
-                    if ((int)$stOps->fetchColumn() !== $sesDecl) { $hayDiscOps = true; break; }
+                    if ((int)$stOps->fetchColumn() < $sesDecl) { $hayDiscOps = true; break; }
                 }
             } else {
                 $filasOps = json_decode((string)($datosOps['atencionesJson'] ?? '[]'), true) ?: [];
@@ -76,7 +76,7 @@ if (($sol['tipo_slug'] ?? '') === 'cuenta-cobro-ops') {
                         );
                         $stOps->execute([':inf'=>$infIdOps,':cc'=>$ccOps,':f'=>$fecha]);
                     }
-                    if ((int)$stOps->fetchColumn() !== $hcDecl) { $hayDiscOps = true; break; }
+                    if ((int)$stOps->fetchColumn() < $hcDecl) { $hayDiscOps = true; break; }
                 }
             }
             if ($hayDiscOps) {

@@ -65,7 +65,8 @@ if ($tipo === 'servicio') {
         $registradas = (int)$stmt->fetchColumn();
         $totalRegistradas += $registradas;
 
-        if ($sesiones !== $registradas) {
+        if ($registradas < $sesiones) {
+            // Solo es discrepancia cuando el informe tiene MENOS de lo declarado
             $nombre = trim(($row['nombres'] ?? '') . ' ' . ($row['apellidos'] ?? ''));
             $discrepancias[] = [
                 'descripcion' => $servicio . ' — ' . ($nombre ?: 'paciente CC ' . $ccPaciente),
@@ -113,7 +114,8 @@ if ($tipo === 'servicio') {
         $registradas = (int)$stmt->fetchColumn();
         $totalRegistradas += $registradas;
 
-        if ($hc !== $registradas) {
+        if ($registradas < $hc) {
+            // Solo es discrepancia cuando el informe tiene MENOS de lo declarado
             $discrepancias[] = [
                 'descripcion' => ($servicio ? $servicio . ' · ' : '') . $fecha . ($sede ? ' en ' . $sede : ''),
                 'declaradas'  => $hc,

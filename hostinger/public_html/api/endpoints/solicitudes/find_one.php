@@ -190,7 +190,7 @@ if (($r['tipo_slug'] ?? '') === 'cuenta-cobro-ops') {
                         );
                         $st->execute([':inf' => $infId, ':cc' => $cc, ':cp' => $ccPac, ':sv' => $sv]);
                         $sesReg = (int)$st->fetchColumn();
-                        if ($sesDecl !== $sesReg) {
+                        if ($sesReg < $sesDecl) {
                             $nombre = trim(($fd['nombres'] ?? '') . ' ' . ($fd['apellidos'] ?? ''));
                             $discrepancias[] = [
                                 'descripcion' => $sv . ' — ' . ($nombre ?: 'paciente CC ' . $ccPac),
@@ -224,7 +224,7 @@ if (($r['tipo_slug'] ?? '') === 'cuenta-cobro-ops') {
                             $st->execute([':inf' => $infId, ':cc' => $cc, ':fecha' => $fecha]);
                         }
                         $hcReg = (int)$st->fetchColumn();
-                        if ($hcDecl !== $hcReg) {
+                        if ($hcReg < $hcDecl) {
                             $discrepancias[] = [
                                 'descripcion' => ($servicio ? $servicio . ' · ' : '') . $fecha . ($sede ? ' en ' . $sede : ''),
                                 'declaradas'  => $hcDecl,
