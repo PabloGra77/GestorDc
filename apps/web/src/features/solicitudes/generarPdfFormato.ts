@@ -145,7 +145,7 @@ function aplicarPlaceholders(texto: string, s: SolicitudParaPdf): string {
     out = out.split(k).join(v);
   }
   // Fallback: cualquier {{campoKey}} restante se reemplaza por el dato diligenciado
-  out = out.replace(/\{\{(\w+)\}\}/g, (m, k) => {
+  out = out.replace(/\{\{(\w+)\}\}/g, (_m, k) => {
     const raw = d[k];
     if (raw == null || typeof raw === 'object') return '';
     return String(raw);
@@ -2138,14 +2138,19 @@ async function _generarPdfEspecial(s: SolicitudParaPdf, opts?: { bloburl?: boole
 
   // PDFs adjuntos → fusionar con pdf-lib después del footer/watermark
   if (_pdfAdjuntos.length > 0) {
-    const { PDFDocument } = await import('pdf-lib');
+    const { PDFDocument, StandardFonts, rgb } = await import('pdf-lib');
     const mainBytes = doc.output('arraybuffer') as ArrayBuffer;
     const mainPdf = await PDFDocument.load(mainBytes);
     for (const { id, label } of _pdfAdjuntos) {
       try {
-        const resp = await fetch(`/api/index.php/archivos/ver?id=${encodeURIComponent(id)}`);
+        const resp = await fetch(`/api/index.php/archivos/ver?id=${encodeURIComponent(id)}`, { credentials: 'include' });
         if (!resp.ok) {
           console.error(`[pdf-adjunto] fetch falló ${resp.status} para "${label}" (id: ${id})`);
+          // Página placeholder indicando que el adjunto no pudo cargarse
+          const ph = mainPdf.addPage([595, 842]);
+          const font = await mainPdf.embedFont(StandardFonts.Helvetica);
+          ph.drawText(label, { x: 50, y: 750, size: 14, font, color: rgb(0.1, 0.1, 0.1) });
+          ph.drawText(`(Adjunto no disponible — codigo ${resp.status})`, { x: 50, y: 720, size: 11, font, color: rgb(0.6, 0.1, 0.1) });
           continue;
         }
         const attachBytes = await resp.arrayBuffer();

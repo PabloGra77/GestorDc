@@ -227,7 +227,8 @@ export function BandejaPanel({ initialOpenId }: { initialOpenId?: number } = {})
     setPdfUrl(null);
     if (!detalle) return;
     const esLeg = typeof detalle.datosFormulario['gastos'] === 'string';
-    if (!esLeg && !detalle.plantillaPdf?.bloques?.length) return;
+    const esCCO = detalle.tipoSlug === 'cuenta-cobro-ops';
+    if (!esLeg && !esCCO && !detalle.plantillaPdf?.bloques?.length) return;
     setGenerandoPdf(true);
     generarFormatoBlobUrl(detalle as unknown as Parameters<typeof generarFormatoBlobUrl>[0])
       .then((url) => { if (!cancel) setPdfUrl(url); })
