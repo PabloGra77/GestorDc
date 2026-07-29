@@ -1563,6 +1563,29 @@ async function _generarPdfEspecial(s: SolicitudParaPdf, opts?: { bloburl?: boole
       } catch { /* skip */ } }
     }
 
+    // Certificación OPS al día (checkbox)
+    { const opsAlDia = get('opsAlDia');
+      if (opsAlDia === 'si') {
+        if (y > 255) { doc.addPage(); y = margin; }
+        y += 2;
+        // Caja del checkbox
+        doc.setDrawColor(15, 23, 42); doc.setLineWidth(0.4);
+        doc.rect(margin, y - 3.5, 4.5, 4.5);
+        // Marca de verificación
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(22, 163, 74);
+        doc.text('✓', margin + 0.5, y + 0.2);
+        // Texto de la declaración
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5); doc.setTextColor(15, 23, 42);
+        doc.text('Certificación de OPS al día', margin + 6.5, y);
+        y += 4.5;
+        doc.setFont('helvetica', 'italic'); doc.setFontSize(8); doc.setTextColor(60, 60, 80);
+        const opsText = 'Declaro bajo la gravedad de juramento que no tengo cuentas de cobro de períodos anteriores pendientes por radicar.';
+        const opsLines = doc.splitTextToSize(opsText, pageWidth - margin * 2 - 6.5);
+        doc.text(opsLines, margin + 6.5, y);
+        y += opsLines.length * 4.2 + 6;
+      }
+    }
+
     // Declaración art. 383
     if (y > 252) { doc.addPage(); y = margin; }
     const art383 = `Yo, ${nombreProf}${tipoDocP && numDocP ? `, identificado(a) con ${tipoDocP} N° ${numDocP}` : ''},` +
