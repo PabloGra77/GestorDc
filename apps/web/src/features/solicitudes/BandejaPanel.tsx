@@ -210,6 +210,7 @@ export function BandejaPanel({ initialOpenId }: { initialOpenId?: number } = {})
   const [openId, setOpenId] = useState<number | null>(null);
   const [detalle, setDetalle] = useState<Detalle | null>(null);
   const [loadingDetalle, setLoadingDetalle] = useState(false);
+  const [reVerificando, setReVerificando] = useState(false);
   const [comentario, setComentario] = useState('');
   const [firmaValidador, setFirmaValidador] = useState('');
   const [firmaVistoBueno, setFirmaVistoBueno] = useState('');
@@ -263,6 +264,16 @@ export function BandejaPanel({ initialOpenId }: { initialOpenId?: number } = {})
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialOpenId, items, loading]);
+
+  async function reVerificar() {
+    if (!openId) return;
+    setReVerificando(true);
+    try {
+      const r = await api.get<Detalle>(`/solicitudes/${openId}`);
+      setDetalle(r.data);
+    } catch { /* silent */ }
+    finally { setReVerificando(false); }
+  }
 
   async function abrir(id: number) {
     if (openId === id) {
@@ -528,7 +539,12 @@ export function BandejaPanel({ initialOpenId }: { initialOpenId?: number } = {})
                       const hayTarifas   = (cmp.desglose ?? []).some((d) => d.tarifa > 0);
                       return (
                         <div className="bandeja-leg-gastos">
-                          <h4>Validación de atenciones OPS</h4>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
+                            <h4 style={{ margin: 0 }}>Validación de atenciones OPS</h4>
+                            <button type="button" className="admin-ghost-button" style={{ fontSize: 13 }} onClick={reVerificar} disabled={reVerificando}>
+                              {reVerificando ? 'Verificando…' : '↻ Re-verificar contra informe'}
+                            </button>
+                          </div>
 
                           {/* Resumen de atenciones */}
                           <div className="bandeja-alertas" style={{ background: hayDiff ? '#FEF3C7' : undefined, marginBottom: 10 }}>
@@ -1113,6 +1129,18 @@ export function BandejaPanel({ initialOpenId }: { initialOpenId?: number } = {})
                     )}
                     {detalle.estado === 'en_validacion' && detalle.pasoActual !== 'autorizador_visto_bueno' && (
                     <div className="bandeja-actions">
+                      {detalle.comparacionOps?.hayDiscrepancias && !detalle.comparacionOps.sinInforme && (
+                        <div style={{ marginBottom: 14, padding: '10px 14px', borderRadius: 8, background: 'rgba(220,38,38,.08)', border: '1px solid rgba(220,38,38,.3)' }}>
+                          <strong style={{ color: 'var(--danger, #dc2626)' }}>⛔ No puedes aprobar: hay discrepancias con el informe</strong>
+                          <p style={{ margin: '6px 0 8px', fontSize: 13 }}>
+                            Las atenciones declaradas no coinciden con el informe cargado. Pide al administrador que suba el informe correcto
+                            y luego usa <strong>Re-verificar</strong> para actualizar la comparación.
+                          </p>
+                          <button type="button" className="admin-ghost-button" onClick={reVerificar} disabled={reVerificando}>
+                            {reVerificando ? 'Verificando…' : '↻ Re-verificar contra informe'}
+                          </button>
+                        </div>
+                      )}
                       <label className="admin-help-text" htmlFor={`motivo-${it.id}`}>Motivo (para devolver o rechazar)</label>
                       <select
                         id={`motivo-${it.id}`}
@@ -1144,7 +1172,8 @@ export function BandejaPanel({ initialOpenId }: { initialOpenId?: number } = {})
                         <button
                           type="button"
                           className="admin-primary-button"
-                          disabled={accionando !== null}
+                          disabled={accionando !== null || !!(detalle?.comparacionOps?.hayDiscrepancias && !detalle.comparacionOps.sinInforme)}
+                          title={detalle?.comparacionOps?.hayDiscrepancias && !detalle.comparacionOps.sinInforme ? 'Resuelve las discrepancias antes de aprobar' : undefined}
                           onClick={() => ejecutar('validar', it.id)}
                         >
                           {it.pasoActual === 'contabilidad' ? 'Aprobar solicitud' : 'Validar y avanzar'}
