@@ -1,5 +1,5 @@
-// Payops Service Worker v14 — network-first para HTML, cache-first para assets + Web Push
-const CACHE_NAME = 'payops-v26';
+// Payops Service Worker v15 — network-first para HTML, cache-first para assets + Web Push
+const CACHE_NAME = 'payops-v27';
 
 // Pre-cachear solo assets estáticos inmutables (imágenes, manifest)
 const STATIC_ASSETS = [
@@ -18,9 +18,10 @@ self.addEventListener('install', (event) => {
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k))),
-    ),
+    caches.keys()
+      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k))))
+      .then(() => self.clients.matchAll({ includeUncontrolled: true, type: 'window' }))
+      .then((clients) => clients.forEach((c) => c.postMessage({ type: 'SW_UPDATED' }))),
   );
   self.clients.claim();
 });

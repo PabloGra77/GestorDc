@@ -13,8 +13,12 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
 // Registro del Service Worker para PWA
 if ('serviceWorker' in navigator && window.location.protocol === 'https:') {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch(() => {
-      // silencioso: si falla, la app sigue como web normal
-    });
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  });
+  // Recargar automáticamente cuando el SW activa una nueva versión
+  navigator.serviceWorker.addEventListener('message', (event) => {
+    if (event.data?.type === 'SW_UPDATED') {
+      window.location.reload();
+    }
   });
 }
