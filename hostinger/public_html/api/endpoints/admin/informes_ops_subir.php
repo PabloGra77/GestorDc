@@ -33,8 +33,17 @@ $lineas    = array_values(array_filter(array_map('trim', $lineas), fn($l) => $l 
 
 if (count($lineas) < 2) Response::error('El archivo está vacío o solo tiene encabezado', 400);
 
+// Auto-detectar delimitador (;  ,  o tab)
+$headerLine = $lineas[0];
+$cSemi  = substr_count($headerLine, ';');
+$cComma = substr_count($headerLine, ',');
+$cTab   = substr_count($headerLine, "\t");
+$delim  = ';';
+if ($cComma > $cSemi && $cComma > $cTab)      $delim = ',';
+elseif ($cTab > $cSemi && $cTab > $cComma)    $delim = "\t";
+
 // Parsear encabezado
-$enc = array_map(fn($h) => mb_strtolower(trim(str_replace(['"', "'"], '', $h))), str_getcsv($lineas[0]));
+$enc = array_map(fn($h) => mb_strtolower(trim(str_replace(['"', "'"], '', $h))), str_getcsv($headerLine, $delim));
 
 // Alias de columnas del formato unificado
 $alias = [
@@ -127,7 +136,7 @@ $flush = function() use (&$batch, &$total, $pdo, $insSQL, $informeId) {
 };
 
 for ($i = 1, $n = count($lineas); $i < $n; $i++) {
-    $f  = str_getcsv($lineas[$i]);
+    $f  = str_getcsv($lineas[$i], $delim);
     $cc = $normCC((string)($f[$cols['cc_profesional']] ?? ''));
     if (!$cc) continue;
 
