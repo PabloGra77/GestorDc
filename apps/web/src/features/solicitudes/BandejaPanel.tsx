@@ -56,6 +56,13 @@ interface DesgloseServicio {
   subtotal: number;
 }
 
+interface DiscrepanciaOps {
+  descripcion: string;
+  declaradas: number;
+  registradas: number;
+  diferencia: number;
+}
+
 interface ComparacionOps {
   atencionesDeclaradas: number;
   valorDeclarado: number;
@@ -67,6 +74,8 @@ interface ComparacionOps {
   atencionesEnInforme: number | null;
   valorCalculado: number | null;
   desglose: DesgloseServicio[];
+  discrepancias: DiscrepanciaOps[];
+  hayDiscrepancias: boolean;
 }
 
 interface Detalle {
@@ -562,6 +571,39 @@ export function BandejaPanel({ initialOpenId }: { initialOpenId?: number } = {})
                               )}
                             </ul>
                           </div>
+
+                          {/* Discrepancias por fila */}
+                          {cmp.hayDiscrepancias && (cmp.discrepancias ?? []).length > 0 && (
+                            <div style={{ marginBottom: 12, padding: '10px 14px', borderRadius: 8, background: 'rgba(220,38,38,.08)', border: '1px solid rgba(220,38,38,.25)' }}>
+                              <strong style={{ color: 'var(--danger, #dc2626)' }}>⚠ Atenciones con diferencias</strong>
+                              <p style={{ fontSize: 13, margin: '4px 0 8px', color: 'var(--text-secondary)' }}>
+                                El profesional declaró atenciones que no coinciden con lo registrado en el informe. Si hay atenciones faltantes, se debe cargar el informe correcto antes de aprobar.
+                              </p>
+                              <table className="bandeja-items-table" style={{ width: '100%', marginTop: 4 }}>
+                                <thead>
+                                  <tr>
+                                    <th style={{ textAlign: 'left' }}>Descripción</th>
+                                    <th>Declaradas</th>
+                                    <th>En informe</th>
+                                    <th>Diferencia</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {(cmp.discrepancias ?? []).map((d, i) => (
+                                    <tr key={i}>
+                                      <td>{d.descripcion}</td>
+                                      <td style={{ textAlign: 'center' }}>{d.declaradas}</td>
+                                      <td style={{ textAlign: 'center' }}>{d.registradas}</td>
+                                      <td style={{ textAlign: 'center', color: d.diferencia < 0 ? 'var(--danger, #dc2626)' : 'var(--success, #16a34a)', fontWeight: 600 }}>
+                                        {d.diferencia > 0 ? `+${d.diferencia}` : d.diferencia}
+                                        {d.diferencia < 0 && <span style={{ fontSize: 11, display: 'block', fontWeight: 400 }}>faltantes en informe</span>}
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
 
                           {/* Desglose por servicio */}
                           {!cmp.sinInforme && (cmp.desglose ?? []).length > 0 && (

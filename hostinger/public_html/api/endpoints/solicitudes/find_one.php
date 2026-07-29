@@ -81,17 +81,30 @@ $comparacionOps = null;
 if (($r['tipo_slug'] ?? '') === 'cuenta-cobro-ops') {
     $datos = json_decode($r['datos_formulario'] ?? '{}', true) ?: [];
 
-    // CC del profesional (solo dígitos)
     $ccRaw = (string)($datos['numeroDocumento'] ?? $datos['numero_documento'] ?? '');
     $cc    = preg_replace('/[^0-9]/', '', $ccRaw);
 
-    // Atenciones declaradas: sumar campo hc de cada fila de atencionesJson
+    // Período de la solicitud para filtrar informes
+    $pini = trim((string)($datos['periodoInicio'] ?? ''));
+    $pfin = trim((string)($datos['periodoFin']    ?? ''));
+    $piniSql = $pini ?: '1900-01-01';
+    $pfinSql = $pfin ?: '2999-12-31';
+
+    $tipoPlan = trim((string)($datos['tipoPlantillaAtenciones'] ?? 'ppl'));
+
+    // Atenciones declaradas
     $atencionesDeclaradas = 0;
-    $atJson = $datos['atencionesJson'] ?? null;
-    if ($atJson && is_string($atJson)) {
-        $filas = json_decode($atJson, true) ?: [];
-        foreach ($filas as $fila) {
-            $atencionesDeclaradas += (int)($fila['hc'] ?? 0);
+    if ($tipoPlan === 'servicio') {
+        $servJson = $datos['atencionesServicioJson'] ?? null;
+        if ($servJson && is_string($servJson)) {
+            $filas = json_decode($servJson, true) ?: [];
+            foreach ($filas as $f) { $atencionesDeclaradas += max(1, (int)($f['sesiones'] ?? 1)); }
+        }
+    } else {
+        $atJson = $datos['atencionesJson'] ?? null;
+        if ($atJson && is_string($atJson)) {
+            $filas = json_decode($atJson, true) ?: [];
+            foreach ($filas as $f) { $atencionesDeclaradas += (int)($f['hc'] ?? 0); }
         }
     }
 
@@ -106,15 +119,23 @@ if (($r['tipo_slug'] ?? '') === 'cuenta-cobro-ops') {
         'atencionesEnInforme'  => null,
         'valorCalculado'       => null,
         'desglose'             => [],
+        'discrepancias'        => [],
+        'hayDiscrepancias'     => false,
     ];
 
     if ($cc) {
         try {
-            $infStmt = $pdo->query(
+            // Buscar el informe cuyo período cubre el de la solicitud
+            $infStmt = $pdo->prepare(
                 "SELECT id, nombre, periodo_inicio, periodo_fin
-                 FROM informes_ops ORDER BY subido_en DESC LIMIT 1"
+                 FROM informes_ops
+                 WHERE (periodo_inicio IS NULL OR periodo_fin IS NULL
+                        OR (periodo_inicio <= :pfin AND periodo_fin >= :pini))
+                 ORDER BY subido_en DESC LIMIT 1"
             );
+            $infStmt->execute([':pini' => $piniSql, ':pfin' => $pfinSql]);
             $inf = $infStmt->fetch();
+
             if ($inf) {
                 $infId = (int)$inf['id'];
 
@@ -152,6 +173,58 @@ if (($r['tipo_slug'] ?? '') === 'cuenta-cobro-ops') {
                     ];
                 }
 
+                // Calcular discrepancias por fila declarada
+                $discrepancias = [];
+                if ($tipoPlan === 'servicio') {
+                    $servJson = $datos['atencionesServicioJson'] ?? null;
+                    $filasDecl = ($servJson && is_string($servJson)) ? (json_decode($servJson, true) ?: []) : [];
+                    foreach ($filasDecl as $fd) {
+                        $ccPac  = preg_replace('/[^0-9]/', '', (string)($fd['numId'] ?? ''));
+                        $sv     = mb_strtoupper(trim((string)($fd['servicio'] ?? '')));
+                        $sesDecl= max(1, (int)($fd['sesiones'] ?? 1));
+                        if (!$ccPac || !$sv) continue;
+                        $st = $pdo->prepare(
+                            "SELECT COALESCE(SUM(d.numero_sesiones),0)
+                             FROM informe_atenciones_detalle d
+                             WHERE d.informe_id = :inf AND d.cc_profesional = :cc AND d.cc_paciente = :cp AND UPPER(TRIM(d.servicio)) = :sv"
+                        );
+                        $st->execute([':inf' => $infId, ':cc' => $cc, ':cp' => $ccPac, ':sv' => $sv]);
+                        $sesReg = (int)$st->fetchColumn();
+                        if ($sesDecl !== $sesReg) {
+                            $nombre = trim(($fd['nombres'] ?? '') . ' ' . ($fd['apellidos'] ?? ''));
+                            $discrepancias[] = [
+                                'descripcion' => $sv . ' — ' . ($nombre ?: 'paciente CC ' . $ccPac),
+                                'declaradas'  => $sesDecl,
+                                'registradas' => $sesReg,
+                                'diferencia'  => $sesReg - $sesDecl,
+                            ];
+                        }
+                    }
+                } else {
+                    $atJson = $datos['atencionesJson'] ?? null;
+                    $filasDecl = ($atJson && is_string($atJson)) ? (json_decode($atJson, true) ?: []) : [];
+                    foreach ($filasDecl as $fd) {
+                        $fecha = trim((string)($fd['fecha'] ?? ''));
+                        $hcDecl = (int)($fd['hc'] ?? 0);
+                        if (!$fecha || $hcDecl <= 0) continue;
+                        $st = $pdo->prepare(
+                            "SELECT COUNT(*) FROM informe_atenciones_detalle d
+                             WHERE d.informe_id = :inf AND d.cc_profesional = :cc AND d.fecha_atencion = :fecha"
+                        );
+                        $st->execute([':inf' => $infId, ':cc' => $cc, ':fecha' => $fecha]);
+                        $hcReg = (int)$st->fetchColumn();
+                        if ($hcDecl !== $hcReg) {
+                            $sede = (string)($fd['sede'] ?? '');
+                            $discrepancias[] = [
+                                'descripcion' => 'Fecha ' . $fecha . ($sede ? ' en ' . $sede : ''),
+                                'declaradas'  => $hcDecl,
+                                'registradas' => $hcReg,
+                                'diferencia'  => $hcReg - $hcDecl,
+                            ];
+                        }
+                    }
+                }
+
                 $comparacionOps['sinInforme']          = false;
                 $comparacionOps['informeId']           = $infId;
                 $comparacionOps['informeNombre']       = $inf['nombre'];
@@ -159,6 +232,8 @@ if (($r['tipo_slug'] ?? '') === 'cuenta-cobro-ops') {
                 $comparacionOps['atencionesEnInforme'] = $atencionesEnInforme;
                 $comparacionOps['valorCalculado']      = $valorCalculado;
                 $comparacionOps['desglose']            = $desgloseArr;
+                $comparacionOps['discrepancias']       = $discrepancias;
+                $comparacionOps['hayDiscrepancias']    = count($discrepancias) > 0;
             }
         } catch (Throwable) {}
     }

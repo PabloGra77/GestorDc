@@ -250,6 +250,8 @@ export function CuentaCobroOpsPanel({ onCreada, tipoSolicitudId, areaId }: Cuent
   const [err, setErr] = useState('');
   const [msg, setMsg] = useState('');
   const [enviando, setEnviando] = useState(false);
+  const [modalDiscrepancia, setModalDiscrepancia] = useState(false);
+  const [discrepancias, setDiscrepancias] = useState<Array<{ descripcion: string; declaradas: number; registradas: number; diferencia: number }>>([]);
   const [tipoId, setTipoId] = useState<number | null>(tipoSolicitudId ?? null);
   const [areaSolId, setAreaSolId] = useState<number | null>(areaId ?? null);
 
@@ -446,10 +448,28 @@ export function CuentaCobroOpsPanel({ onCreada, tipoSolicitudId, areaId }: Cuent
   }
   function anterior() { setErr(''); setPaso((p) => Math.max(1, p - 1) as typeof paso); }
 
-  // ── Envío ────────────────────────────────────────────────────────────────────
-  async function enviar() {
-    const e = validarPaso();
-    if (e) { setErr(e); return; }
+  // ── Verificación de atenciones contra informe ────────────────────────────────
+  async function verificarAtenciones() {
+    try {
+      const cc = formNumDoc.trim();
+      if (!cc) return null;
+      const res = await api.post<{ hayDiscrepancias: boolean; sinInforme: boolean; discrepancias: Array<{ descripcion: string; declaradas: number; registradas: number; diferencia: number }> }>(
+        '/solicitudes/comparar-ops',
+        {
+          cc,
+          periodoInicio,
+          periodoFin,
+          tipo: tipoPlantillaAten,
+          atencionesJson: tipoPlantillaAten === 'ppl' ? JSON.stringify(atenciones) : '[]',
+          atencionesServicioJson: tipoPlantillaAten === 'servicio' ? JSON.stringify(atencionesServicio) : '[]',
+        }
+      );
+      return res.data;
+    } catch { return null; }
+  }
+
+  // ── Envío real ───────────────────────────────────────────────────────────────
+  async function doEnviar() {
     if (!tipoId) { setErr('No se encontró el tipo de solicitud. Recarga la página.'); return; }
     setErr(''); setEnviando(true);
     try {
@@ -499,6 +519,23 @@ export function CuentaCobroOpsPanel({ onCreada, tipoSolicitudId, areaId }: Cuent
       const m = (ex as { response?: { data?: { message?: string } } })?.response?.data?.message;
       setErr(m || 'Error al enviar. Intenta de nuevo.');
     } finally { setEnviando(false); }
+  }
+
+  // ── Envío con verificación previa ────────────────────────────────────────────
+  async function enviar() {
+    const e = validarPaso();
+    if (e) { setErr(e); return; }
+    setErr('');
+
+    // Verificar discrepancias contra el informe cargado
+    const resultado = await verificarAtenciones();
+    if (resultado && !resultado.sinInforme && resultado.hayDiscrepancias) {
+      setDiscrepancias(resultado.discrepancias);
+      setModalDiscrepancia(true);
+      return;
+    }
+
+    await doEnviar();
   }
 
   if (msg) {
@@ -1052,6 +1089,44 @@ export function CuentaCobroOpsPanel({ onCreada, tipoSolicitudId, areaId }: Cuent
             <button type="button" className="admin-primary-button" onClick={enviar} disabled={enviando}>
               {enviando ? 'Enviando…' : 'Radicar cuenta de cobro'}
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal de discrepancias ── */}
+      {modalDiscrepancia && (
+        <div className="admin-permissions-overlay" onClick={() => setModalDiscrepancia(false)}>
+          <div className="admin-permissions-modal" style={{ maxWidth: 520 }} onClick={(e) => e.stopPropagation()}>
+            <h3 style={{ marginTop: 0, color: 'var(--danger, #dc2626)' }}>⚠ Las atenciones no coinciden</h3>
+            <p style={{ marginBottom: 12 }}>
+              Las atenciones que declaras no coinciden con lo registrado en el informe de atenciones cargado para el período:
+            </p>
+            <ul style={{ margin: '0 0 14px', paddingLeft: 18, lineHeight: 1.7 }}>
+              {discrepancias.map((d, i) => (
+                <li key={i}>
+                  <strong>{d.descripcion}</strong>:{' '}
+                  declaraste <strong>{d.declaradas}</strong>,
+                  registradas en informe <strong>{d.registradas}</strong>
+                  {d.diferencia < 0 && <span style={{ color: 'var(--danger, #dc2626)' }}> ({Math.abs(d.diferencia)} menos)</span>}
+                  {d.diferencia > 0 && <span style={{ color: 'var(--success, #16a34a)' }}> ({d.diferencia} más en informe)</span>}
+                </li>
+              ))}
+            </ul>
+            <p style={{ marginBottom: 18, fontSize: 14 }}>
+              ¿Deseas <strong>continuar y enviar</strong> para que el analista, coordinador o director revise las diferencias,
+              o prefieres <strong>revisar tus datos</strong> antes de radicar?
+            </p>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              <button type="button" className="admin-primary-button"
+                disabled={enviando}
+                onClick={async () => { setModalDiscrepancia(false); await doEnviar(); }}>
+                {enviando ? 'Enviando…' : 'Continuar y enviar para validación'}
+              </button>
+              <button type="button" className="admin-ghost-button"
+                onClick={() => setModalDiscrepancia(false)}>
+                Revisar mis datos
+              </button>
+            </div>
           </div>
         </div>
       )}
