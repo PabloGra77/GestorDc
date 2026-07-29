@@ -78,6 +78,7 @@ $routes = [
     ['DELETE', '#^/personal/(?P<id>\d+)$#',                      'personal/delete'],
 
     // Solicitudes (instancias)
+    ['GET',    '#^/solicitudes/mis-atenciones-ops$#',              'solicitudes/mis_atenciones_ops'],
     ['POST',   '#^/solicitudes/comparar-ops$#',                   'solicitudes/comparar_ops'],
     ['POST',   '#^/solicitudes$#',                               'solicitudes/create'],
     ['GET',    '#^/solicitudes$#',                               'solicitudes/find_all'],

@@ -213,6 +213,7 @@ interface AtencionSede {
   sede: string;
   fecha: string;
   hc: string;
+  servicio: string;
 }
 
 interface AtencionServicio {
@@ -236,7 +237,7 @@ interface NotaAclaratoria {
 function uid() { return Math.random().toString(36).slice(2, 10); }
 
 function defaultAtencion(): AtencionSede {
-  return { id: uid(), regional: 'Central', sede: REGIONALES_PPL['Central'][0], fecha: '', hc: '' };
+  return { id: uid(), regional: 'Central', sede: REGIONALES_PPL['Central'][0], fecha: '', hc: '', servicio: '' };
 }
 function defaultAtencionServicio(): AtencionServicio {
   return { id: uid(), nombres: '', apellidos: '', numId: '', servicio: '', sesiones: '1' };
@@ -264,6 +265,8 @@ export function CuentaCobroOpsPanel({ onCreada, tipoSolicitudId, areaId }: Cuent
   // ── Paso 2: Atenciones ───────────────────────────────────────────────────────
   const [tipoPlantillaAten, setTipoPlantillaAten] = useState<'ppl' | 'servicio'>('ppl');
   const [atenciones, setAtenciones] = useState<AtencionSede[]>([defaultAtencion()]);
+  const [cargandoAten, setCargandoAten] = useState(false);
+  const [atenAutoload, setAtenAutoload] = useState(false);
   const [atencionesServicio, setAtencionesServicio] = useState<AtencionServicio[]>([defaultAtencionServicio()]);
   const [tarifasOps, setTarifasOps] = useState<string[]>([]);
   const [conNotasAcl, setConNotasAcl] = useState(false);
@@ -349,7 +352,7 @@ export function CuentaCobroOpsPanel({ onCreada, tipoSolicitudId, areaId }: Cuent
       if (r.data.numeroCuenta) setNumeroCuenta(r.data.numeroCuenta);
       if (r.data.titularCuenta) setTitularCuenta(r.data.titularCuenta);
       if (r.data.eps) setEps(r.data.eps);
-      if (r.data.profesion) setProfesion(r.data.profesion);
+      if (r.data.cargo) setProfesion(r.data.cargo);
       if (r.data.archivoCartaEpsId) { setDocCartaEpsId(r.data.archivoCartaEpsId); setDocCartaEpsNombre(r.data.archivoCartaEpsNombre || 'Cert. EPS (perfil)'); }
       if (r.data.archivoCuentaId) { setDocCuentaId(r.data.archivoCuentaId); setDocCuentaNombre(r.data.archivoCuentaNombre || 'Cert. bancario (perfil)'); }
       if (r.data.archivoDocumentoId) { setDocDocumentoId(r.data.archivoDocumentoId); setDocDocumentoNombre(r.data.archivoDocumentoNombre || 'Doc. identidad (perfil)'); }
@@ -402,6 +405,7 @@ export function CuentaCobroOpsPanel({ onCreada, tipoSolicitudId, areaId }: Cuent
         for (const a of atenciones) {
           if (!a.fecha) return 'Cada fila de atenciones debe tener una fecha.';
           if (!a.hc.trim()) return 'Indica el número de HC cargadas en cada fecha.';
+          if (!a.servicio.trim()) return 'Selecciona el servicio realizado en cada fila.';
         }
         if (conNotasAcl) {
           for (const n of notasAcl) {
@@ -440,10 +444,42 @@ export function CuentaCobroOpsPanel({ onCreada, tipoSolicitudId, areaId }: Cuent
     return '';
   }
 
-  function siguiente() {
+  async function siguiente() {
     const e = validarPaso();
     if (e) { setErr(e); return; }
     setErr('');
+
+    if (paso === 1 && formNumDoc.trim()) {
+      setCargandoAten(true);
+      try {
+        const res = await api.get<{
+          encontrado: boolean;
+          atencionesPpl: Array<{ fecha: string; servicio: string; hc: number }>;
+          atencionesServicio: Array<{ ccPaciente: string; nombres: string; apellidos: string; servicio: string; sesiones: number }>;
+        }>('/solicitudes/mis-atenciones-ops', {
+          params: { cc: formNumDoc.trim(), periodoInicio, periodoFin },
+        });
+        if (res.data.encontrado) {
+          if (res.data.atencionesPpl.length > 0) {
+            setAtenciones(res.data.atencionesPpl.map((a) => ({
+              id: uid(), regional: 'Central', sede: REGIONALES_PPL['Central'][0],
+              fecha: a.fecha, hc: String(a.hc), servicio: a.servicio,
+            })));
+          }
+          if (res.data.atencionesServicio.length > 0) {
+            setAtencionesServicio(res.data.atencionesServicio.map((a) => ({
+              id: uid(), nombres: a.nombres, apellidos: a.apellidos,
+              numId: a.ccPaciente, servicio: a.servicio, sesiones: String(a.sesiones),
+            })));
+          }
+          setAtenAutoload(res.data.atencionesPpl.length > 0 || res.data.atencionesServicio.length > 0);
+        } else {
+          setAtenAutoload(false);
+        }
+      } catch { /* sin informe: llenar manualmente */ }
+      finally { setCargandoAten(false); }
+    }
+
     setPaso((p) => Math.min(5, p + 1) as typeof paso);
   }
   function anterior() { setErr(''); setPaso((p) => Math.max(1, p - 1) as typeof paso); }
@@ -599,8 +635,8 @@ export function CuentaCobroOpsPanel({ onCreada, tipoSolicitudId, areaId }: Cuent
           </div>
 
           <div className="leg-actions">
-            <button type="button" className="admin-primary-button" onClick={siguiente}>
-              Continuar → Atenciones
+            <button type="button" className="admin-primary-button" disabled={cargandoAten} onClick={siguiente}>
+              {cargandoAten ? 'Consultando informe…' : 'Continuar → Atenciones'}
             </button>
           </div>
         </div>
@@ -639,6 +675,12 @@ export function CuentaCobroOpsPanel({ onCreada, tipoSolicitudId, areaId }: Cuent
                   Registra cada día de atención indicando la sede, la fecha y el número de HC cargadas.
                 </p>
 
+                {atenAutoload && (
+                  <p style={{ margin: '0 0 10px', padding: '8px 12px', borderRadius: 6, background: 'rgba(22,163,74,.1)', border: '1px solid rgba(22,163,74,.3)', fontSize: 13 }}>
+                    Atenciones pre-cargadas desde el informe. Verifica la regional, el establecimiento y los datos antes de continuar.
+                  </p>
+                )}
+
                 {atenciones.map((a, idx) => (
                   <div key={a.id} className="ops-atencion-row">
                     <span className="ops-atencion-num">{idx + 1}</span>
@@ -649,18 +691,26 @@ export function CuentaCobroOpsPanel({ onCreada, tipoSolicitudId, areaId }: Cuent
                           {NOMBRES_REGIONALES.map(r => <option key={r} value={r}>{r}</option>)}
                         </select>
                       </div>
-                      <div className="leg-field" style={{ flex: '1 1 200px' }}>
+                      <div className="leg-field" style={{ flex: '1 1 180px' }}>
                         <label>Establecimiento</label>
                         <select value={a.sede} onChange={(e) => setAtencionField(a.id, 'sede', e.target.value)}>
                           {(REGIONALES_PPL[a.regional] || []).map(s => <option key={s} value={s}>{s}</option>)}
                         </select>
                       </div>
-                      <div className="leg-field" style={{ flex: '0 0 145px' }}>
-                        <label>Fecha</label>
+                      <div className="leg-field" style={{ flex: '1 1 170px' }}>
+                        <label>Servicio <span className="req">*</span></label>
+                        <select value={a.servicio} disabled={tarifasOps.length === 0}
+                          onChange={(e) => setAtencionField(a.id, 'servicio', e.target.value)}>
+                          <option value="">{tarifasOps.length === 0 ? 'Cargando…' : '— Selecciona —'}</option>
+                          {tarifasOps.map(s => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                      </div>
+                      <div className="leg-field" style={{ flex: '0 0 140px' }}>
+                        <label>Fecha <span className="req">*</span></label>
                         <input type="date" value={a.fecha} onChange={(e) => setAtencionField(a.id, 'fecha', e.target.value)} />
                       </div>
-                      <div className="leg-field" style={{ flex: '0 0 90px' }}>
-                        <label>N° HC</label>
+                      <div className="leg-field" style={{ flex: '0 0 85px' }}>
+                        <label>N° HC <span className="req">*</span></label>
                         <input type="number" min="0" placeholder="0" value={a.hc}
                           onChange={(e) => setAtencionField(a.id, 'hc', e.target.value)} />
                       </div>
