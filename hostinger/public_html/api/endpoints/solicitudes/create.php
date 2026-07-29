@@ -25,7 +25,10 @@ $stmt->execute([':id' => $tipoId]);
 $tipo = $stmt->fetch();
 if (!$tipo) Response::error('Tipo de solicitud no encontrado', 404);
 if ((int)$tipo['activo'] !== 1) Response::error('Tipo de solicitud inactivo', 400);
-if ((int)$tipo['area_activo'] !== 1) Response::error('El area esta inactiva', 400);
+// Las cuentas de cobro OPS son transversales y no dependen del estado del área
+if ((int)$tipo['area_activo'] !== 1 && ($tipo['slug'] ?? '') !== 'cuenta-cobro-ops') {
+    Response::error('El area esta inactiva', 400);
+}
 
 // Determinar tipo de solicitud antes de validar (afecta qué campos se revisan)
 $esAnticipo     = (($tipo['slug'] ?? '') === 'anticipo');

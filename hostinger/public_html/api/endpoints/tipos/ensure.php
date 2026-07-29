@@ -26,8 +26,9 @@ if ($existing) {
     Response::json(['id' => (int)$existing['id'], 'areaId' => (int)$existing['area_id']]);
 }
 
-// No existe → crear. Requiere al menos un área en la BD.
-$areaRow = $pdo->query("SELECT id FROM areas ORDER BY id ASC LIMIT 1")->fetch();
+// No existe → crear. Preferir área activa; si no hay ninguna, usar cualquiera.
+$areaRow = $pdo->query("SELECT id FROM areas WHERE activo = 1 ORDER BY id ASC LIMIT 1")->fetch();
+if (!$areaRow) $areaRow = $pdo->query("SELECT id FROM areas ORDER BY id ASC LIMIT 1")->fetch();
 if (!$areaRow) Response::error('No hay áreas configuradas. Crea al menos un área antes de usar este módulo.', 422);
 
 $areaId = (int)$areaRow['id'];
