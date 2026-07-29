@@ -83,6 +83,7 @@ interface SolicitudParaPdf {
   firmas?: Record<string, string> | null;
   plantillaPdf?: PlantillaPdf | null;
   tipoSlug?: string;
+  comparacionOps?: { hayDiscrepancias: boolean; sinInforme: boolean } | null;
 }
 
 // Fecha de la solicitud (creación) en formato largo; cae a hoy solo si no hay dato.
@@ -1455,6 +1456,18 @@ async function _generarPdfEspecial(s: SolicitudParaPdf, opts?: { bloburl?: boole
     // ════════════════════════════════════════════════════════
     y += 4;
 
+    // Banner de discrepancias de atenciones
+    if (s.comparacionOps?.hayDiscrepancias && !s.comparacionOps.sinInforme) {
+      const bannerH = 14;
+      doc.setFillColor(220, 38, 38);
+      doc.rect(margin, y, pageWidth - margin * 2, bannerH, 'F');
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(255, 255, 255);
+      doc.text('⚠  VALOR PARCIAL — REVISIÓN DE ATENCIONES EN PLATAFORMA', pageWidth / 2, y + 5.5, { align: 'center' });
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
+      doc.text('Este valor está sujeto a cambios. El personal administrativo debe verificar las atenciones registradas.', pageWidth / 2, y + 10.5, { align: 'center' });
+      y += bannerH + 5;
+    }
+
     // Sede y fecha (alineado a la derecha)
     if (sedePrincipal || fechaDocFmt) {
       doc.setFont('helvetica', 'bold');
@@ -1568,12 +1581,13 @@ async function _generarPdfEspecial(s: SolicitudParaPdf, opts?: { bloburl?: boole
       if (opsAlDia === 'si') {
         if (y > 255) { doc.addPage(); y = margin; }
         y += 2;
-        // Caja del checkbox
-        doc.setDrawColor(15, 23, 42); doc.setLineWidth(0.4);
-        doc.rect(margin, y - 3.5, 4.5, 4.5);
-        // Marca de verificación
-        doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(22, 163, 74);
-        doc.text('✓', margin + 0.5, y + 0.2);
+        // Caja del checkbox con relleno verde suave
+        doc.setFillColor(240, 253, 244); doc.setDrawColor(22, 163, 74); doc.setLineWidth(0.5);
+        doc.rect(margin, y - 3.5, 4.5, 4.5, 'FD');
+        // Visto bueno dibujado con dos líneas (evita problema de unicode en jsPDF)
+        doc.setDrawColor(22, 163, 74); doc.setLineWidth(0.9);
+        doc.line(margin + 0.8, y - 0.8, margin + 1.8, y + 0.6);
+        doc.line(margin + 1.8, y + 0.6, margin + 3.8, y - 2.5);
         // Texto de la declaración
         doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5); doc.setTextColor(15, 23, 42);
         doc.text('Certificación de OPS al día', margin + 6.5, y);
