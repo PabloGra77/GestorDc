@@ -268,7 +268,7 @@ export function CuentaCobroOpsPanel({ onCreada, tipoSolicitudId, areaId }: Cuent
   const [cargandoAten, setCargandoAten] = useState(false);
   const [atenAutoload, setAtenAutoload] = useState(false);
   const [atencionesServicio, setAtencionesServicio] = useState<AtencionServicio[]>([defaultAtencionServicio()]);
-  const [tarifasOps, setTarifasOps] = useState<string[]>([]);
+  const [tarifasOps, setTarifasOps] = useState<Array<{ servicio: string; valorUnitario: number }>>([]);
   const [conNotasAcl, setConNotasAcl] = useState(false);
   const [notasAcl, setNotasAcl] = useState<NotaAclaratoria[]>([defaultNota()]);
   const [comentariosAdicionales, setComentariosAdicionales] = useState('');
@@ -313,8 +313,8 @@ export function CuentaCobroOpsPanel({ onCreada, tipoSolicitudId, areaId }: Cuent
 
   // ── Cargar tarifas OPS ──────────────────────────────────────────────────────
   useEffect(() => {
-    api.get<{ servicio: string }[]>('/tarifas-ops')
-      .then((r) => setTarifasOps(r.data.map((t) => t.servicio)))
+    api.get<Array<{ servicio: string; valorUnitario: number }>>('/tarifas-ops')
+      .then((r) => setTarifasOps(r.data))
       .catch(() => {});
   }, []);
 
@@ -504,17 +504,51 @@ export function CuentaCobroOpsPanel({ onCreada, tipoSolicitudId, areaId }: Cuent
     } catch { return null; }
   }
 
+  // ── Calcular valor a cobrar desde tarifas configuradas ───────────────────────
+  function calcularValor(): { total: number; desglose: Array<{ servicio: string; cantidad: number; tarifa: number; subtotal: number }> } {
+    const tMap = new Map(tarifasOps.map(t => [t.servicio, t.valorUnitario]));
+    const grupos = new Map<string, { cantidad: number; tarifa: number }>();
+    if (tipoPlantillaAten === 'ppl') {
+      atenciones.forEach(a => {
+        const hc = parseInt(a.hc) || 0;
+        if (hc > 0 && a.servicio) {
+          const g = grupos.get(a.servicio) ?? { cantidad: 0, tarifa: tMap.get(a.servicio) ?? 0 };
+          grupos.set(a.servicio, { cantidad: g.cantidad + hc, tarifa: g.tarifa });
+        }
+      });
+    } else {
+      atencionesServicio.forEach(a => {
+        const ses = parseInt(a.sesiones) || 1;
+        if (a.servicio) {
+          const g = grupos.get(a.servicio) ?? { cantidad: 0, tarifa: tMap.get(a.servicio) ?? 0 };
+          grupos.set(a.servicio, { cantidad: g.cantidad + ses, tarifa: g.tarifa });
+        }
+      });
+    }
+    let total = 0;
+    const desglose: Array<{ servicio: string; cantidad: number; tarifa: number; subtotal: number }> = [];
+    grupos.forEach((v, k) => {
+      const sub = v.cantidad * v.tarifa;
+      total += sub;
+      desglose.push({ servicio: k, cantidad: v.cantidad, tarifa: v.tarifa, subtotal: sub });
+    });
+    return { total, desglose };
+  }
+
   // ── Envío real ───────────────────────────────────────────────────────────────
   async function doEnviar() {
     if (!tipoId) { setErr('No se encontró el tipo de solicitud. Recarga la página.'); return; }
     setErr(''); setEnviando(true);
     try {
       const usr = getAuthSession()?.usuario;
+      const { total: valorCalcTotal, desglose: desglosePago } = calcularValor();
       const payload = {
         tipoSolicitudId: tipoId,
         ...(areaSolId ? { areaId: areaSolId } : {}),
         datos: {
           periodoInicio, periodoFin,
+          valorCobrar: String(valorCalcTotal),
+          desglosePago: JSON.stringify(desglosePago),
           fechaInicioContrato, fechaFinContrato,
           tipoPlantillaAtenciones: tipoPlantillaAten,
           atencionesJson: tipoPlantillaAten === 'ppl' ? JSON.stringify(atenciones) : '[]',
@@ -702,7 +736,7 @@ export function CuentaCobroOpsPanel({ onCreada, tipoSolicitudId, areaId }: Cuent
                         <select value={a.servicio} disabled={tarifasOps.length === 0}
                           onChange={(e) => setAtencionField(a.id, 'servicio', e.target.value)}>
                           <option value="">{tarifasOps.length === 0 ? 'Cargando…' : '— Selecciona —'}</option>
-                          {tarifasOps.map(s => <option key={s} value={s}>{s}</option>)}
+                          {tarifasOps.map(t => <option key={t.servicio} value={t.servicio}>{t.servicio}</option>)}
                         </select>
                       </div>
                       <div className="leg-field" style={{ flex: '0 0 140px' }}>
@@ -823,7 +857,7 @@ export function CuentaCobroOpsPanel({ onCreada, tipoSolicitudId, areaId }: Cuent
                       <select value={a.servicio} disabled={tarifasOps.length === 0}
                         onChange={(e) => setAtencionesServicio(p => p.map(x => x.id === a.id ? { ...x, servicio: e.target.value } : x))}>
                         <option value="">{tarifasOps.length === 0 ? 'Cargando servicios…' : '— Selecciona —'}</option>
-                        {tarifasOps.map(s => <option key={s} value={s}>{s}</option>)}
+                        {tarifasOps.map(t => <option key={t.servicio} value={t.servicio}>{t.servicio}</option>)}
                       </select>
                     </div>
                     <div className="leg-field" style={{ flex: '0 0 100px' }}>
@@ -1126,6 +1160,7 @@ export function CuentaCobroOpsPanel({ onCreada, tipoSolicitudId, areaId }: Cuent
                 {atenciones.filter(a => a.fecha && a.hc).map(a => `${a.fecha} ${a.sede} (${a.hc} HC)`).join(', ') || '—'}
               </strong>
               <span>Banco:</span><strong>{banco} · {tipoCuenta} · {numeroCuenta}</strong>
+              {(() => { const { total } = calcularValor(); return total > 0 ? (<><span>Valor total a cobrar:</span><strong style={{ color: 'var(--success, #16a34a)' }}>$ {total.toLocaleString('es-CO')}</strong></>) : null; })()}
             </div>
           </div>
 
@@ -1145,32 +1180,56 @@ export function CuentaCobroOpsPanel({ onCreada, tipoSolicitudId, areaId }: Cuent
 
       {/* ── Modal de discrepancias ── */}
       {modalDiscrepancia && (
-        <div className="admin-permissions-overlay" onClick={() => setModalDiscrepancia(false)}>
-          <div className="admin-permissions-modal" style={{ maxWidth: 520 }} onClick={(e) => e.stopPropagation()}>
-            <h3 style={{ marginTop: 0, color: 'var(--danger, #dc2626)' }}>⚠ Las atenciones no coinciden</h3>
-            <p style={{ marginBottom: 12 }}>
-              Las atenciones que declaras no coinciden con lo registrado en el informe de atenciones cargado para el período:
+        <div className="admin-permissions-overlay" style={{ zIndex: 9999 }} onClick={() => setModalDiscrepancia(false)}>
+          <div className="admin-permissions-modal card-surface" style={{ maxWidth: 580 }} onClick={(e) => e.stopPropagation()}>
+            <h3 style={{ marginTop: 0, marginBottom: 8, color: 'var(--danger, #dc2626)', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span>⚠</span> Diferencias con el informe cargado
+            </h3>
+            <p style={{ marginBottom: 14, fontSize: 14, color: 'var(--muted, #6b7280)' }}>
+              Lo que declaras no coincide con el informe de atenciones del período. Revisa antes de radicar:
             </p>
-            <ul style={{ margin: '0 0 14px', paddingLeft: 18, lineHeight: 1.7 }}>
-              {discrepancias.map((d, i) => (
-                <li key={i}>
-                  <strong>{d.descripcion}</strong>:{' '}
-                  declaraste <strong>{d.declaradas}</strong>,
-                  registradas en informe <strong>{d.registradas}</strong>
-                  {d.diferencia < 0 && <span style={{ color: 'var(--danger, #dc2626)' }}> ({Math.abs(d.diferencia)} menos)</span>}
-                  {d.diferencia > 0 && <span style={{ color: 'var(--success, #16a34a)' }}> ({d.diferencia} más en informe)</span>}
-                </li>
-              ))}
-            </ul>
-            <p style={{ marginBottom: 18, fontSize: 14 }}>
-              ¿Deseas <strong>continuar y enviar</strong> para que el analista, coordinador o director revise las diferencias,
-              o prefieres <strong>revisar tus datos</strong> antes de radicar?
+            <div style={{ overflowX: 'auto', marginBottom: 16 }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                <thead>
+                  <tr style={{ background: 'rgba(220,38,38,.1)' }}>
+                    <th style={{ padding: '7px 10px', textAlign: 'left', fontWeight: 600, borderBottom: '2px solid rgba(220,38,38,.2)' }}>Atención</th>
+                    <th style={{ padding: '7px 8px', textAlign: 'center', fontWeight: 600, borderBottom: '2px solid rgba(220,38,38,.2)', whiteSpace: 'nowrap' }}>Declaradas</th>
+                    <th style={{ padding: '7px 8px', textAlign: 'center', fontWeight: 600, borderBottom: '2px solid rgba(220,38,38,.2)', whiteSpace: 'nowrap' }}>En informe</th>
+                    <th style={{ padding: '7px 8px', textAlign: 'center', fontWeight: 600, borderBottom: '2px solid rgba(220,38,38,.2)' }}>Dif.</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {discrepancias.map((d, i) => {
+                    const desc = d.descripcion.replace(/\b(\d{4}-\d{2}-\d{2})\b/, (raw) => {
+                      const dt = new Date(raw + 'T00:00:00');
+                      if (isNaN(dt.getTime())) return raw;
+                      const M = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+                      return `${dt.getDate()} ${M[dt.getMonth()]} ${dt.getFullYear()}`;
+                    });
+                    return (
+                      <tr key={i} style={{ borderTop: '1px solid rgba(0,0,0,.07)', background: i % 2 === 1 ? 'rgba(0,0,0,.025)' : undefined }}>
+                        <td style={{ padding: '6px 10px' }}>{desc}</td>
+                        <td style={{ padding: '6px 8px', textAlign: 'center' }}>{d.declaradas}</td>
+                        <td style={{ padding: '6px 8px', textAlign: 'center' }}>{d.registradas}</td>
+                        <td style={{ padding: '6px 8px', textAlign: 'center', fontWeight: 700,
+                          color: d.diferencia < 0 ? 'var(--danger, #dc2626)' : 'var(--success, #16a34a)' }}>
+                          {d.diferencia > 0 ? `+${d.diferencia}` : d.diferencia}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <p style={{ marginBottom: 18, fontSize: 13 }}>
+              Puedes <strong>enviar de todas formas</strong> y el analista revisará las diferencias,
+              o <strong>revisar tus datos</strong> antes de radicar.
             </p>
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
               <button type="button" className="admin-primary-button"
                 disabled={enviando}
                 onClick={async () => { setModalDiscrepancia(false); await doEnviar(); }}>
-                {enviando ? 'Enviando…' : 'Continuar y enviar para validación'}
+                {enviando ? 'Enviando…' : 'Enviar para revisión'}
               </button>
               <button type="button" className="admin-ghost-button"
                 onClick={() => setModalDiscrepancia(false)}>

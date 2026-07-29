@@ -1522,6 +1522,47 @@ async function _generarPdfEspecial(s: SolicitudParaPdf, opts?: { bloburl?: boole
     });
     y += 6;
 
+    // Desglose de valor cobrado
+    { const rawDes = get('desglosePago');
+      if (rawDes) { try {
+        const des = JSON.parse(rawDes) as Array<{ servicio: string; cantidad: number; tarifa: number; subtotal: number }>;
+        if (des.length > 0) {
+          if (y > 248) { doc.addPage(); y = margin; }
+          doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(15, 23, 42);
+          doc.text('DETALLE DEL VALOR A COBRAR:', margin, y); y += 5;
+          // Header
+          doc.setFillColor(7, 11, 29);
+          doc.rect(margin, y, pageWidth - margin * 2, 6, 'F');
+          doc.setFont('helvetica', 'bold'); doc.setTextColor(212, 175, 55); doc.setFontSize(8);
+          doc.text('Servicio', margin + 2, y + 4.2);
+          doc.text('Cant.', margin + 110, y + 4.2, { align: 'center' });
+          doc.text('Valor unit.', margin + 135, y + 4.2, { align: 'center' });
+          doc.text('Subtotal', pageWidth - margin - 2, y + 4.2, { align: 'right' });
+          y += 6;
+          let grandTotal = 0;
+          doc.setFont('helvetica', 'normal'); doc.setTextColor(15, 23, 42); doc.setFontSize(8);
+          des.forEach((d, idx) => {
+            if (y > 270) { doc.addPage(); y = margin; }
+            if (idx % 2 === 0) { doc.setFillColor(245, 247, 250); doc.rect(margin, y, pageWidth - margin * 2, 5.5, 'F'); }
+            const svLabel = doc.splitTextToSize(d.servicio, 88);
+            doc.text(svLabel[0] || '', margin + 2, y + 3.8);
+            doc.text(String(d.cantidad), margin + 110, y + 3.8, { align: 'center' });
+            doc.text(`$ ${d.tarifa.toLocaleString('es-CO')}`, margin + 135, y + 3.8, { align: 'center' });
+            doc.text(`$ ${d.subtotal.toLocaleString('es-CO')}`, pageWidth - margin - 2, y + 3.8, { align: 'right' });
+            grandTotal += d.subtotal;
+            y += 5.5;
+          });
+          // Total row
+          doc.setFillColor(7, 11, 29);
+          doc.rect(margin, y, pageWidth - margin * 2, 6.5, 'F');
+          doc.setFont('helvetica', 'bold'); doc.setTextColor(212, 175, 55); doc.setFontSize(8.5);
+          doc.text('TOTAL A COBRAR', margin + 2, y + 4.5);
+          doc.text(`$ ${grandTotal.toLocaleString('es-CO')}`, pageWidth - margin - 2, y + 4.5, { align: 'right' });
+          y += 6.5 + 6;
+        }
+      } catch { /* skip */ } }
+    }
+
     // Declaración art. 383
     if (y > 252) { doc.addPage(); y = margin; }
     const art383 = `Yo, ${nombreProf}${tipoDocP && numDocP ? `, identificado(a) con ${tipoDocP} N° ${numDocP}` : ''},` +
@@ -1532,7 +1573,9 @@ async function _generarPdfEspecial(s: SolicitudParaPdf, opts?: { bloburl?: boole
     doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(15, 23, 42);
     doc.text(art383Lines, margin, y);
     y += art383Lines.length * 4.8 + 5;
-    doc.text('Atentamente,', margin, y); y += 18;
+    doc.text('Atentamente,', margin, y);
+    { const fp = (s.firmas || {}).profesional || ''; if (fp.startsWith('data:image')) { try { doc.addImage(fp, 'PNG', margin, y + 2, 65, 14); } catch { /* ok */ } } }
+    y += 18;
 
     // Línea de firma del profesional
     doc.setDrawColor(15, 23, 42); doc.setLineWidth(0.3);
@@ -1684,6 +1727,7 @@ async function _generarPdfEspecial(s: SolicitudParaPdf, opts?: { bloburl?: boole
     doc.text(emisionLines, margin, y); y += emisionLines.length * 5.2 + 12;
 
     doc.text(`Fecha: ${diaDoc ? `${diaDoc} de ${mesDocMin} de ${anioDoc}` : formatFechaBullet(new Date().toISOString().slice(0, 10))}`, margin, y);
+    { const fp3 = (s.firmas || {}).profesional || ''; if (fp3.startsWith('data:image')) { try { doc.addImage(fp3, 'PNG', margin, y + 2, 65, 14); } catch { /* ok */ } } }
     y += 22;
 
     doc.setDrawColor(15, 23, 42); doc.setLineWidth(0.3);

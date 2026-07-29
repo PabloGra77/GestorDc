@@ -76,32 +76,46 @@ if ($tipo === 'servicio') {
         }
     }
 } else {
-    // PPL mode: compare by fecha + hc count
+    // PPL mode: compare by fecha + servicio (si disponible)
     $filas = json_decode($atJson, true) ?: [];
 
     foreach ($filas as $row) {
-        $fecha = trim((string)($row['fecha'] ?? ''));
-        $hc    = (int)($row['hc'] ?? 0);
+        $fecha    = trim((string)($row['fecha'] ?? ''));
+        $hc       = (int)($row['hc'] ?? 0);
+        $servicio = mb_strtoupper(trim((string)($row['servicio'] ?? '')));
+        $sede     = trim((string)($row['sede'] ?? ''));
         if (!$fecha || $hc <= 0) continue;
 
         $totalDeclaradas += $hc;
 
-        $stmt = $pdo->prepare(
-            "SELECT COUNT(*)
-             FROM informe_atenciones_detalle d
-             JOIN informes_ops i ON i.id = d.informe_id
-             WHERE d.cc_profesional = :cc AND d.fecha_atencion = :fecha
-               AND (i.periodo_inicio IS NULL OR i.periodo_fin IS NULL
-                    OR (i.periodo_inicio <= :pfin AND i.periodo_fin >= :pini))"
-        );
-        $stmt->execute([':cc' => $cc, ':fecha' => $fecha, ':pini' => $piniSql, ':pfin' => $pfinSql]);
+        if ($servicio) {
+            $stmt = $pdo->prepare(
+                "SELECT COUNT(*)
+                 FROM informe_atenciones_detalle d
+                 JOIN informes_ops i ON i.id = d.informe_id
+                 WHERE d.cc_profesional = :cc AND d.fecha_atencion = :fecha
+                   AND UPPER(TRIM(COALESCE(d.servicio,''))) = :sv
+                   AND (i.periodo_inicio IS NULL OR i.periodo_fin IS NULL
+                        OR (i.periodo_inicio <= :pfin AND i.periodo_fin >= :pini))"
+            );
+            $stmt->execute([':cc' => $cc, ':fecha' => $fecha, ':sv' => $servicio, ':pini' => $piniSql, ':pfin' => $pfinSql]);
+        } else {
+            $stmt = $pdo->prepare(
+                "SELECT COUNT(*)
+                 FROM informe_atenciones_detalle d
+                 JOIN informes_ops i ON i.id = d.informe_id
+                 WHERE d.cc_profesional = :cc AND d.fecha_atencion = :fecha
+                   AND (i.periodo_inicio IS NULL OR i.periodo_fin IS NULL
+                        OR (i.periodo_inicio <= :pfin AND i.periodo_fin >= :pini))"
+            );
+            $stmt->execute([':cc' => $cc, ':fecha' => $fecha, ':pini' => $piniSql, ':pfin' => $pfinSql]);
+        }
         $registradas = (int)$stmt->fetchColumn();
         $totalRegistradas += $registradas;
 
         if ($hc !== $registradas) {
-            $sede = (string)($row['sede'] ?? '');
             $discrepancias[] = [
-                'descripcion' => 'Fecha ' . $fecha . ($sede ? ' en ' . $sede : ''),
+                'descripcion' => ($servicio ? $servicio . ' · ' : '') . $fecha . ($sede ? ' en ' . $sede : ''),
                 'declaradas'  => $hc,
                 'registradas' => $registradas,
                 'diferencia'  => $registradas - $hc,

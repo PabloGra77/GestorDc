@@ -204,19 +204,29 @@ if (($r['tipo_slug'] ?? '') === 'cuenta-cobro-ops') {
                     $atJson = $datos['atencionesJson'] ?? null;
                     $filasDecl = ($atJson && is_string($atJson)) ? (json_decode($atJson, true) ?: []) : [];
                     foreach ($filasDecl as $fd) {
-                        $fecha = trim((string)($fd['fecha'] ?? ''));
-                        $hcDecl = (int)($fd['hc'] ?? 0);
+                        $fecha    = trim((string)($fd['fecha'] ?? ''));
+                        $hcDecl   = (int)($fd['hc'] ?? 0);
+                        $servicio = mb_strtoupper(trim((string)($fd['servicio'] ?? '')));
+                        $sede     = trim((string)($fd['sede'] ?? ''));
                         if (!$fecha || $hcDecl <= 0) continue;
-                        $st = $pdo->prepare(
-                            "SELECT COUNT(*) FROM informe_atenciones_detalle d
-                             WHERE d.informe_id = :inf AND d.cc_profesional = :cc AND d.fecha_atencion = :fecha"
-                        );
-                        $st->execute([':inf' => $infId, ':cc' => $cc, ':fecha' => $fecha]);
+                        if ($servicio) {
+                            $st = $pdo->prepare(
+                                "SELECT COUNT(*) FROM informe_atenciones_detalle d
+                                 WHERE d.informe_id = :inf AND d.cc_profesional = :cc
+                                   AND d.fecha_atencion = :fecha AND UPPER(TRIM(COALESCE(d.servicio,''))) = :sv"
+                            );
+                            $st->execute([':inf' => $infId, ':cc' => $cc, ':fecha' => $fecha, ':sv' => $servicio]);
+                        } else {
+                            $st = $pdo->prepare(
+                                "SELECT COUNT(*) FROM informe_atenciones_detalle d
+                                 WHERE d.informe_id = :inf AND d.cc_profesional = :cc AND d.fecha_atencion = :fecha"
+                            );
+                            $st->execute([':inf' => $infId, ':cc' => $cc, ':fecha' => $fecha]);
+                        }
                         $hcReg = (int)$st->fetchColumn();
                         if ($hcDecl !== $hcReg) {
-                            $sede = (string)($fd['sede'] ?? '');
                             $discrepancias[] = [
-                                'descripcion' => 'Fecha ' . $fecha . ($sede ? ' en ' . $sede : ''),
+                                'descripcion' => ($servicio ? $servicio . ' · ' : '') . $fecha . ($sede ? ' en ' . $sede : ''),
                                 'declaradas'  => $hcDecl,
                                 'registradas' => $hcReg,
                                 'diferencia'  => $hcReg - $hcDecl,
