@@ -1458,16 +1458,23 @@ async function _generarPdfEspecial(s: SolicitudParaPdf, opts?: { bloburl?: boole
 
     // Banner de discrepancias de atenciones
     if (s.comparacionOps?.hayDiscrepancias && !s.comparacionOps.sinInforme) {
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(10);
-      const bannerSub = 'Este valor esta sujeto a cambios. El personal administrativo debe verificar las atenciones registradas en plataforma antes de aprobar.';
-      const bannerSubLines = doc.splitTextToSize(bannerSub, pageWidth - margin * 2 - 6);
-      const bannerH = 9 + bannerSubLines.length * 4.5 + 3;
-      doc.setFillColor(220, 38, 38);
-      doc.rect(margin, y, pageWidth - margin * 2, bannerH, 'F');
-      doc.setTextColor(255, 255, 255);
-      doc.text('[ ! ] VALOR PARCIAL - REVISION DE ATENCIONES EN PLATAFORMA', pageWidth / 2, y + 6, { align: 'center' });
+      const bW = pageWidth - margin * 2;
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
+      const bannerTit = '[ ! ] VALOR PARCIAL — REVISION DE ATENCIONES EN PLATAFORMA';
+      const bannerTitLines = doc.splitTextToSize(bannerTit, bW - 6);
       doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
-      doc.text(bannerSubLines, pageWidth / 2, y + 11.5, { align: 'center' });
+      const bannerSub = 'Este valor esta sujeto a cambios. El personal administrativo debe verificar las atenciones registradas en plataforma antes de aprobar.';
+      const bannerSubLines = doc.splitTextToSize(bannerSub, bW - 6);
+      const titH  = bannerTitLines.length * 5;
+      const subH  = bannerSubLines.length * 4.2;
+      const bannerH = 5 + titH + 3 + subH + 4;
+      doc.setFillColor(220, 38, 38);
+      doc.rect(margin, y, bW, bannerH, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
+      doc.text(bannerTitLines, pageWidth / 2, y + 7, { align: 'center' });
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
+      doc.text(bannerSubLines, pageWidth / 2, y + 7 + titH + 3, { align: 'center' });
       y += bannerH + 5;
     }
 
@@ -2085,22 +2092,8 @@ async function _generarPdfEspecial(s: SolicitudParaPdf, opts?: { bloburl?: boole
     }
   }
 
-  // Imágenes → embeber directamente con jsPDF
-  for (const { id, label } of _imgAdjuntos) {
-    const dataUrl = await cargarImagenDataUrl(`/api/index.php/archivos/ver?id=${encodeURIComponent(id)}`);
-    if (!dataUrl) continue;
-    const ext = (id.split('.').pop() || 'jpg').toLowerCase();
-    const fmt = ext === 'png' ? 'PNG' : 'JPEG';
-    doc.addPage();
-    const ph = doc.internal.pageSize.getHeight();
-    try {
-      doc.addImage(dataUrl, fmt, margin, 8, pageWidth - margin * 2, ph - 20, undefined, 'FAST');
-    } catch { /* formato no soportado por jsPDF */ }
-    doc.setFontSize(7);
-    doc.setTextColor(120, 120, 120);
-    doc.text(`Adjunto: ${label}`, pageWidth / 2, ph - 4, { align: 'center' });
-  }
-  // Los _pdfAdjuntos se fusionan al final con pdf-lib, después del footer y watermark
+  // Todos los adjuntos (imágenes + PDFs) se fusionan con pdf-lib después del footer/watermark
+  // _imgAdjuntos se reserva para la lista, no se embeben aquí con jsPDF
 
   // Footer en cada pagina
   const totalPages = doc.getNumberOfPages();
@@ -2136,34 +2129,49 @@ async function _generarPdfEspecial(s: SolicitudParaPdf, opts?: { bloburl?: boole
     }
   }
 
-  // PDFs adjuntos → fusionar con pdf-lib después del footer/watermark
-  if (_pdfAdjuntos.length > 0) {
+  // Adjuntos (imágenes + PDFs) → todos fusionados con pdf-lib después del footer/watermark
+  const _todosAdjuntos = [
+    ..._imgAdjuntos.map(a => ({ ...a, esPdf: false })),
+    ..._pdfAdjuntos.map(a => ({ ...a, esPdf: true  })),
+  ];
+  if (_todosAdjuntos.length > 0) {
     const { PDFDocument, StandardFonts, rgb } = await import('pdf-lib');
     const mainBytes = doc.output('arraybuffer') as ArrayBuffer;
     const mainPdf = await PDFDocument.load(mainBytes);
-    for (const { id, label } of _pdfAdjuntos) {
+    for (const { id, label, esPdf } of _todosAdjuntos) {
       try {
         const resp = await fetch(`/api/index.php/archivos/ver?id=${encodeURIComponent(id)}`, { credentials: 'include' });
         if (!resp.ok) {
-          console.error(`[pdf-adjunto] fetch falló ${resp.status} para "${label}" (id: ${id})`);
-          // Página placeholder indicando que el adjunto no pudo cargarse
+          console.error(`[pdf-adjunto] ${resp.status} para "${label}" (id: ${id})`);
           const ph = mainPdf.addPage([595, 842]);
           const font = await mainPdf.embedFont(StandardFonts.Helvetica);
-          ph.drawText(label, { x: 50, y: 750, size: 14, font, color: rgb(0.1, 0.1, 0.1) });
-          ph.drawText(`(Adjunto no disponible — codigo ${resp.status})`, { x: 50, y: 720, size: 11, font, color: rgb(0.6, 0.1, 0.1) });
+          ph.drawText(label, { x: 50, y: 750, size: 13, font, color: rgb(0.1, 0.1, 0.1) });
+          ph.drawText(`Adjunto no disponible (codigo ${resp.status})`, { x: 50, y: 720, size: 10, font, color: rgb(0.65, 0.1, 0.1) });
           continue;
         }
-        const attachBytes = await resp.arrayBuffer();
-        // ignoreEncryption: true permite embeber PDFs protegidos/encriptados (ej. certificados bancarios)
-        const attachPdf = await PDFDocument.load(attachBytes, { ignoreEncryption: true });
-        const copied = await mainPdf.copyPages(attachPdf, attachPdf.getPageIndices());
-        copied.forEach(p => mainPdf.addPage(p));
+        const bytes = new Uint8Array(await resp.arrayBuffer());
+        if (esPdf) {
+          const attachPdf = await PDFDocument.load(bytes, { ignoreEncryption: true });
+          const copied = await mainPdf.copyPages(attachPdf, attachPdf.getPageIndices());
+          copied.forEach(p => mainPdf.addPage(p));
+        } else {
+          // Imagen (JPG o PNG) embebida como página en pdf-lib
+          const isPng = /\.png$/i.test(id);
+          const img = isPng ? await mainPdf.embedPng(bytes) : await mainPdf.embedJpg(bytes);
+          const ph  = mainPdf.addPage([595, 842]);
+          const maxW = 495; const maxH = 742;
+          const scale = Math.min(maxW / img.width, maxH / img.height, 1);
+          const iW = img.width * scale;
+          const iH = img.height * scale;
+          ph.drawImage(img, { x: (595 - iW) / 2, y: (842 - iH) / 2, width: iW, height: iH });
+          const font = await mainPdf.embedFont(StandardFonts.Helvetica);
+          ph.drawText(label, { x: 50, y: 22, size: 8, font, color: rgb(0.5, 0.5, 0.5) });
+        }
       } catch (err) {
-        console.error(`[pdf-adjunto] no se pudo embeber "${label}" (id: ${id}):`, err);
+        console.error(`[pdf-adjunto] error embebiendo "${label}" (id: ${id}):`, err);
       }
     }
     const finalBytes = await mainPdf.save();
-    // new Uint8Array(typedArray) copia al buffer plano requerido por Blob
     const blob = new Blob([new Uint8Array(finalBytes)], { type: 'application/pdf' });
     if (opts?.bloburl) return URL.createObjectURL(blob) as string;
     const dlUrl = URL.createObjectURL(blob);
