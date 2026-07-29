@@ -34,6 +34,10 @@ export function ConfigCuentaCobroPanel() {
   /* ── Tarifas OPS ── */
   const [tarifas, setTarifas] = useState<TarifaOps[]>([]);
   const [valores, setValores] = useState<Record<string, string>>({});
+  const [newSv, setNewSv]     = useState('');
+  const [newTs, setNewTs]     = useState<'sm' | 'pad'>('sm');
+  const [newVal, setNewVal]   = useState('');
+  const [agregando, setAgregando] = useState(false);
 
   /* ── Visibilidad ── */
   const [areasVisibles, setAreasVisibles] = useState<'todas' | number[]>('todas');
@@ -72,6 +76,38 @@ export function ConfigCuentaCobroPanel() {
       setValores(vals);
     }).catch(() => setErr('Error al cargar la configuración.')).finally(() => setCargando(false));
   }, []);
+
+  const fmtPesos = (raw: string) => {
+    const n = parseInt(raw.replace(/\./g, ''), 10);
+    return isNaN(n) || raw === '' ? '' : n.toLocaleString('es-CO');
+  };
+
+  async function recargarTarifas() {
+    const r = await api.get<TarifaOps[]>('/admin/tarifas-ops');
+    const ts = Array.isArray(r.data) ? r.data : [];
+    setTarifas(ts);
+    setValores((prev) => {
+      const vals = { ...prev };
+      ts.forEach((t) => { if (!(t.servicio in vals)) vals[t.servicio] = t.valorUnitario > 0 ? String(t.valorUnitario) : ''; });
+      return vals;
+    });
+  }
+
+  async function agregarServicio() {
+    const sv = newSv.trim().toUpperCase();
+    if (!sv) { setErr('Escribe el nombre del servicio.'); return; }
+    setAgregando(true); setErr(''); setOk('');
+    try {
+      const vu = parseFloat(newVal.replace(/\./g, '').replace(/[^0-9]/g, '')) || 0;
+      await api.post('/admin/tarifas-ops', {
+        tarifas: [{ servicio: sv, tipoServicio: newTs, valorUnitario: vu, activo: true }],
+      });
+      setNewSv(''); setNewVal('');
+      await recargarTarifas();
+      setOk(`Servicio "${sv}" agregado correctamente.`);
+    } catch { setErr('Error al agregar el servicio.'); }
+    finally { setAgregando(false); }
+  }
 
   function cambiarPaso(i: number, rol: string) {
     const info = ROLES.find((r) => r.value === rol);
@@ -198,8 +234,9 @@ export function ConfigCuentaCobroPanel() {
         <h3>Tarifas por servicio OPS</h3>
         <p className="leg-config-hint">
           Los servicios <strong>SM</strong> cobran por atención (paciente); los demás por sesión.
-          El sistema usa estas tarifas para calcular el valor esperado al revisar la solicitud.
+          Solo los servicios configurados aquí serán aceptados al cargar un informe de atenciones.
         </p>
+
         {tarifas.length === 0 ? (
           <p className="leg-config-hint">No hay servicios configurados. Ejecuta la migración SQL 013 y 014.</p>
         ) : (
@@ -208,7 +245,7 @@ export function ConfigCuentaCobroPanel() {
               <tr>
                 <th style={{ textAlign: 'left' }}>Servicio</th>
                 <th style={{ textAlign: 'left' }}>Tipo</th>
-                <th style={{ width: 200 }}>Valor unitario (COP)</th>
+                <th style={{ width: 220 }}>Valor unitario (COP)</th>
               </tr>
             </thead>
             <tbody>
@@ -220,9 +257,12 @@ export function ConfigCuentaCobroPanel() {
                     <div className="leg-monto-row" style={{ margin: 0 }}>
                       <span className="leg-monto-prefix">$</span>
                       <input type="text" inputMode="numeric"
-                        value={valores[t.servicio] ?? ''}
+                        value={fmtPesos(valores[t.servicio] ?? '')}
                         placeholder="0"
-                        onChange={(e) => setValores((v) => ({ ...v, [t.servicio]: e.target.value.replace(/[^0-9.]/g, '') }))}
+                        onChange={(e) => {
+                          const raw = e.target.value.replace(/\./g, '').replace(/[^0-9]/g, '');
+                          setValores((v) => ({ ...v, [t.servicio]: raw }));
+                        }}
                         style={{ margin: 0 }} />
                     </div>
                   </td>
@@ -231,6 +271,41 @@ export function ConfigCuentaCobroPanel() {
             </tbody>
           </table>
         )}
+
+        {/* Agregar nuevo servicio */}
+        <div style={{ marginTop: 16, padding: '14px 16px', border: '1px dashed var(--gold-line, rgba(212,175,55,.4))', borderRadius: 8 }}>
+          <strong style={{ display: 'block', marginBottom: 10, fontSize: 13 }}>Agregar servicio</strong>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+            <label className="admin-label" style={{ flex: '2 1 180px', margin: 0 }}>
+              Nombre del servicio
+              <input className="admin-input" type="text" value={newSv}
+                onChange={(e) => setNewSv(e.target.value.toUpperCase())}
+                placeholder="Ej: PSICOLOGÍA CONTROL SM" style={{ margin: '4px 0 0' }} />
+            </label>
+            <label className="admin-label" style={{ flex: '1 1 140px', margin: 0 }}>
+              Tipo
+              <select className="admin-input" value={newTs} onChange={(e) => setNewTs(e.target.value as 'sm' | 'pad')}
+                style={{ margin: '4px 0 0' }}>
+                <option value="sm">SM — por paciente</option>
+                <option value="pad">PAD — por sesión</option>
+              </select>
+            </label>
+            <label className="admin-label" style={{ flex: '1 1 140px', margin: 0 }}>
+              Valor unitario (COP)
+              <div className="leg-monto-row" style={{ margin: '4px 0 0' }}>
+                <span className="leg-monto-prefix">$</span>
+                <input type="text" inputMode="numeric" value={fmtPesos(newVal)} placeholder="0"
+                  onChange={(e) => setNewVal(e.target.value.replace(/\./g, '').replace(/[^0-9]/g, ''))}
+                  style={{ margin: 0 }} />
+              </div>
+            </label>
+            <button type="button" className="admin-primary-button"
+              onClick={agregarServicio} disabled={agregando || !newSv.trim()}
+              style={{ alignSelf: 'flex-end', marginBottom: 0 }}>
+              {agregando ? 'Agregando…' : '+ Agregar'}
+            </button>
+          </div>
+        </div>
       </section>
 
       {/* Visibilidad */}

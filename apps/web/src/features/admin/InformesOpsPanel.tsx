@@ -101,10 +101,11 @@ export function InformesOpsPanel({ onMsg, onErr }: Props) {
 
     setSubiendo(true);
     try {
-      const { data } = await api.post<{ totalFilas: number; nombre: string }>(
+      const { data } = await api.post<{ totalFilas: number; totalSkipped: number; nombre: string }>(
         '/admin/informes-ops', fd, { headers: { 'Content-Type': undefined } }
       );
-      onMsg(`Informe "${data.nombre}" cargado — ${data.totalFilas.toLocaleString('es-CO')} atenciones registradas.`);
+      const skipMsg = data.totalSkipped ? ` · ${data.totalSkipped.toLocaleString('es-CO')} omitidas (servicio no configurado)` : '';
+      onMsg(`Informe "${data.nombre}" cargado — ${data.totalFilas.toLocaleString('es-CO')} atenciones registradas${skipMsg}.`);
       setNombreEditado(false);
       if (fileRef.current) fileRef.current.value = '';
       await cargar();

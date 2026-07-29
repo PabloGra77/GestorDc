@@ -89,6 +89,12 @@ $parseDate = function(string $v): ?string {
 
 $pdo = Db::pdo();
 
+// Cargar servicios configurados en tarifas_ops (solo los activos)
+$serviciosActivos = $pdo->query(
+    "SELECT UPPER(TRIM(servicio)) FROM tarifas_ops WHERE activo = 1"
+)->fetchAll(PDO::FETCH_COLUMN);
+$serviciosSet = !empty($serviciosActivos) ? array_flip($serviciosActivos) : null;
+
 // Detectar columnas disponibles (migración 017 puede estar pendiente)
 $colsOps = array_column($pdo->query("SHOW COLUMNS FROM informes_ops")->fetchAll(), 'Field');
 $tienePlataforma = in_array('plataforma', $colsOps, true);
@@ -108,8 +114,9 @@ $informeId = (int)$pdo->lastInsertId();
 
 // Insertar filas en lotes de 500 — cada fila = 1 atención
 // INSERT IGNORE evita duplicados por numero_historia único (si la columna existe)
-$total = 0;
-$batch = [];
+$total   = 0;
+$skipped = 0;
+$batch   = [];
 
 $insSQL = $tieneHistoria
     ? "INSERT IGNORE INTO informe_atenciones_detalle (informe_id, cc_profesional, fecha_atencion, nombres_paciente, apellidos_paciente, cc_paciente, servicio, numero_historia, numero_sesiones) VALUES "
@@ -146,6 +153,12 @@ for ($i = 1, $n = count($lineas); $i < $n; $i++) {
     $nh = isset($cols['numero_historia']) ? $normStr((string)($f[$cols['numero_historia']] ?? ''), 50) : null;
     if ($nh === '') $nh = null;
 
+    // Filtrar: solo aceptar servicios configurados en tarifas_ops
+    if ($serviciosSet !== null && $sv && !isset($serviciosSet[$sv])) {
+        $skipped++;
+        continue;
+    }
+
     $batch[] = [
         'cc' => $cc,
         'fa' => isset($cols['fecha_atencion'])     ? $parseDate((string)($f[$cols['fecha_atencion']]     ?? '')) : null,
@@ -167,6 +180,7 @@ Response::json([
     'id'            => $informeId,
     'nombre'        => $nombre,
     'totalFilas'    => $total,
+    'totalSkipped'  => $skipped,
     'periodoInicio' => $periodoInicio ?: null,
     'periodoFin'    => $periodoFin    ?: null,
 ], 201);
