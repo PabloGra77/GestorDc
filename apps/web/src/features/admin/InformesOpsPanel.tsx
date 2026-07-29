@@ -9,7 +9,6 @@ interface InformeOps {
   totalFilas: number;
   subidoEn: string;
   subidoPor: string | null;
-  tipoPlantilla: 'ppl' | 'servicio';
 }
 
 interface Props {
@@ -22,31 +21,18 @@ const fmtFecha = (s: string | null) =>
 const fmtDt = (s: string) =>
   new Date(s).toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' });
 
-function descargarPlantillaCSV(tipo: 'ppl' | 'servicio') {
+function descargarPlantilla() {
   const BOM = '﻿';
-  let contenido: string;
-  let nombre: string;
-
-  if (tipo === 'ppl') {
-    contenido = BOM + [
-      'cc_profesional;fecha_atencion;regional;establecimiento;cc_paciente;servicio',
-      '1016018747;28/07/2026;Bogotá;IPS Goleman;1234567;MEDICINA GENERAL',
-      '1016018747;29/07/2026;Bogotá;IPS Goleman;7654321;ENFERMERIA',
-    ].join('\n');
-    nombre = 'Plantilla_InformeOPS_PPL.csv';
-  } else {
-    contenido = BOM + [
-      'cc_profesional;nombres_paciente;apellidos_paciente;cc_paciente;servicio;numero_sesiones',
-      '1016018747;JUAN;PÉREZ GARCÍA;1234567;PSICOLOGÍA;4',
-      '1016018747;MARÍA;LÓPEZ TORRES;7654321;FISIOTERAPIA;8',
-    ].join('\n');
-    nombre = 'Plantilla_InformeOPS_Servicio.csv';
-  }
+  const contenido = BOM + [
+    'cc_profesional;fecha_atencion;nombres_paciente;apellidos_paciente;cc_paciente;servicio',
+    '1016018747;28/07/2026;JUAN;PÉREZ GARCÍA;1234567;PSICOLOGÍA',
+    '1016018747;29/07/2026;MARÍA;LÓPEZ TORRES;7654321;FISIOTERAPIA PAD',
+  ].join('\n');
 
   const blob = new Blob([contenido], { type: 'text/csv;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = url; a.download = nombre;
+  a.href = url; a.download = 'Plantilla_InformeOPS.csv';
   document.body.appendChild(a); a.click();
   document.body.removeChild(a); URL.revokeObjectURL(url);
 }
@@ -114,34 +100,22 @@ export function InformesOpsPanel({ onMsg, onErr }: Props) {
 
   return (
     <div>
-      {/* Plantillas descargables */}
+      {/* Plantilla descargable */}
       <div className="card-surface" style={{ marginBottom: 20, padding: '16px 20px' }}>
-        <h4 style={{ margin: '0 0 6px' }}>Plantillas de carga</h4>
+        <h4 style={{ margin: '0 0 6px' }}>Plantilla de carga</h4>
         <p className="admin-help-text" style={{ margin: '0 0 12px' }}>
-          Descarga la plantilla según el tipo de informe, diligénciala en Excel y súbela aquí.
-          El sistema detecta automáticamente el tipo por las columnas del archivo.
+          Descarga la plantilla, diligénciala en Excel y súbela aquí. El sistema calcula
+          automáticamente los servicios por profesional y por paciente, y los valida contra
+          las cuentas de cobro OPS.
         </p>
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          <div style={{ flex: '1 1 auto', minWidth: 220, border: '1px solid var(--gold-line, rgba(212,175,55,.35))', borderRadius: 8, padding: '12px 14px' }}>
-            <strong style={{ display: 'block', marginBottom: 4 }}>Plantilla PPL</strong>
-            <p className="admin-help-text" style={{ margin: '0 0 10px', fontSize: 12 }}>
-              Para atenciones en Personas Privadas de la Libertad.<br/>
-              Columnas: <code>cc_profesional · fecha_atencion · regional · establecimiento · cc_paciente · servicio</code>
-            </p>
-            <button type="button" className="admin-ghost-button" onClick={() => descargarPlantillaCSV('ppl')}>
-              ⬇ Descargar plantilla PPL
-            </button>
-          </div>
-          <div style={{ flex: '1 1 auto', minWidth: 220, border: '1px solid var(--gold-line, rgba(212,175,55,.35))', borderRadius: 8, padding: '12px 14px' }}>
-            <strong style={{ display: 'block', marginBottom: 4 }}>Plantilla Por servicio</strong>
-            <p className="admin-help-text" style={{ margin: '0 0 10px', fontSize: 12 }}>
-              Para atenciones agrupadas por paciente y servicio.<br/>
-              Columnas: <code>cc_profesional · nombres_paciente · apellidos_paciente · cc_paciente · servicio · numero_sesiones</code>
-            </p>
-            <button type="button" className="admin-ghost-button" onClick={() => descargarPlantillaCSV('servicio')}>
-              ⬇ Descargar plantilla Por servicio
-            </button>
-          </div>
+        <div style={{ border: '1px solid var(--gold-line, rgba(212,175,55,.35))', borderRadius: 8, padding: '12px 14px' }}>
+          <p className="admin-help-text" style={{ margin: '0 0 10px', fontSize: 12 }}>
+            Columnas requeridas: <code>cc_profesional · fecha_atencion · nombres_paciente · apellidos_paciente · cc_paciente · servicio</code><br/>
+            Cada fila representa una atención. La plataforma cuenta los servicios por profesional y por paciente internamente.
+          </p>
+          <button type="button" className="admin-ghost-button" onClick={descargarPlantilla}>
+            ⬇ Descargar plantilla
+          </button>
         </div>
       </div>
 
@@ -198,9 +172,8 @@ export function InformesOpsPanel({ onMsg, onErr }: Props) {
             <thead>
               <tr>
                 <th style={{ textAlign: 'left' }}>Nombre</th>
-                <th>Tipo</th>
                 <th>Período</th>
-                <th>Atenciones/sesiones</th>
+                <th>Atenciones</th>
                 <th>Subido por</th>
                 <th>Fecha carga</th>
                 <th></th>
@@ -210,9 +183,6 @@ export function InformesOpsPanel({ onMsg, onErr }: Props) {
               {informes.map((inf) => (
                 <tr key={inf.id}>
                   <td><strong>{inf.nombre}</strong></td>
-                  <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
-                    {inf.tipoPlantilla === 'servicio' ? 'Por servicio' : 'PPL'}
-                  </td>
                   <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
                     {fmtFecha(inf.periodoInicio)} — {fmtFecha(inf.periodoFin)}
                   </td>

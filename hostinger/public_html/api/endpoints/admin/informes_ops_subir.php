@@ -6,9 +6,9 @@ require_once __DIR__ . '/../../bootstrap.php';
 $admin = Auth::requireAdmin();
 $uid   = (int)($admin['jwt']['sub'] ?? 0);
 
-$nombre         = trim((string)($_POST['nombre']         ?? ''));
-$periodoInicio  = trim((string)($_POST['periodoInicio']  ?? ''));
-$periodoFin     = trim((string)($_POST['periodoFin']     ?? ''));
+$nombre        = trim((string)($_POST['nombre']        ?? ''));
+$periodoInicio = trim((string)($_POST['periodoInicio'] ?? ''));
+$periodoFin    = trim((string)($_POST['periodoFin']    ?? ''));
 
 if (!$nombre) Response::error('El nombre del informe es obligatorio', 400);
 
@@ -32,35 +32,18 @@ if (count($lineas) < 2) Response::error('El archivo está vacío o solo tiene en
 // Parsear encabezado
 $enc = array_map(fn($h) => mb_strtolower(trim(str_replace(['"', "'"], '', $h))), str_getcsv($lineas[0]));
 
-// ── Auto-detectar tipo de plantilla por columnas ───────────────────────────
-$tipoPlantilla = (in_array('nombres_paciente', $enc, true) || in_array('apellidos_paciente', $enc, true))
-    ? 'servicio'
-    : 'ppl';
-
-// ── Alias de columnas según tipo de plantilla ──────────────────────────────
-$aliasComun = [
-    'cc_profesional' => ['cc_profesional','cc profesional','cedula profesional','cedula_profesional','cc','numero_cc','numero cc'],
-    'servicio'       => ['servicio','tipo_servicio','tipo servicio','nombre_servicio','nombre servicio'],
-];
-
-$aliasPpl = [
-    'fecha_atencion'  => ['fecha_atencion','fecha atencion','fecha','dia','fecha de la atencion','fecha_de_atencion'],
-    'regional'        => ['regional'],
-    'establecimiento' => ['establecimiento','sede','ips','institucion'],
-    'cc_paciente'     => ['cc_paciente','cc paciente','cedula paciente','cedula_paciente','id_paciente','documento_paciente','numero_identificacion'],
-];
-
-$aliasServicio = [
+// Alias de columnas del formato unificado
+$alias = [
+    'cc_profesional'     => ['cc_profesional','cc profesional','cedula profesional','cedula_profesional','cc','numero_cc'],
+    'fecha_atencion'     => ['fecha_atencion','fecha atencion','fecha','dia','fecha_de_atencion'],
     'nombres_paciente'   => ['nombres_paciente','nombres paciente','nombres','primer_nombre','nombre_paciente'],
     'apellidos_paciente' => ['apellidos_paciente','apellidos paciente','apellidos','primer_apellido','apellido_paciente'],
-    'cc_paciente'        => ['cc_paciente','cc paciente','cedula paciente','cedula_paciente','numero_identificacion','documento_paciente','identificacion','id_paciente'],
-    'numero_sesiones'    => ['numero_sesiones','numero sesiones','sesiones','num_sesiones','num sesiones','cantidad','cantidad_sesiones'],
+    'cc_paciente'        => ['cc_paciente','cc paciente','cedula paciente','cedula_paciente','id_paciente','documento_paciente','identificacion'],
+    'servicio'           => ['servicio','tipo_servicio','tipo servicio','nombre_servicio'],
 ];
 
-$allAlias = $aliasComun + ($tipoPlantilla === 'ppl' ? $aliasPpl : $aliasServicio);
-
 $cols = [];
-foreach ($allAlias as $campo => $nombres) {
+foreach ($alias as $campo => $nombres) {
     foreach ($nombres as $n) {
         $idx = array_search($n, $enc, true);
         if ($idx !== false) { $cols[$campo] = (int)$idx; break; }
@@ -74,7 +57,7 @@ if (!isset($cols['cc_profesional'])) {
     );
 }
 
-// ── Helpers ────────────────────────────────────────────────────────────────
+// Helpers
 $normCC   = fn(string $v): string => preg_replace('/[^0-9]/', '', $v);
 $normStr  = fn(string $v, int $max = 200): string => mb_substr(trim($v), 0, $max);
 $normServ = fn(string $v): string => mb_strtoupper(trim($v));
@@ -92,53 +75,45 @@ $parseDate = function(string $v): ?string {
 
 $pdo = Db::pdo();
 
-// ── Insertar registro padre ────────────────────────────────────────────────
+// Insertar registro padre
 $stmt = $pdo->prepare(
     "INSERT INTO informes_ops (nombre, periodo_inicio, periodo_fin, total_filas, subido_por_id, tipo_plantilla)
-     VALUES (:nom, :pi, :pf, 0, :uid, :tp)"
+     VALUES (:nom, :pi, :pf, 0, :uid, 'servicio')"
 );
 $stmt->execute([
     ':nom' => $nombre,
     ':pi'  => $periodoInicio ?: null,
     ':pf'  => $periodoFin    ?: null,
     ':uid' => $uid           ?: null,
-    ':tp'  => $tipoPlantilla,
 ]);
 $informeId = (int)$pdo->lastInsertId();
 
-// ── Insertar filas en lotes de 500 ────────────────────────────────────────
-$total  = 0;
-$batch  = [];
+// Insertar filas en lotes de 500 — cada fila = 1 atención
+$total = 0;
+$batch = [];
 
-$insSQLppl = "INSERT INTO informe_atenciones_detalle
-    (informe_id, cc_profesional, fecha_atencion, regional, establecimiento, cc_paciente, servicio, numero_sesiones)
+$insSQL = "INSERT INTO informe_atenciones_detalle
+    (informe_id, cc_profesional, fecha_atencion, nombres_paciente, apellidos_paciente, cc_paciente, servicio, numero_sesiones)
     VALUES ";
 
-$insSQLserv = "INSERT INTO informe_atenciones_detalle
-    (informe_id, cc_profesional, nombres_paciente, apellidos_paciente, cc_paciente, servicio, numero_sesiones)
-    VALUES ";
-
-$insSQL = $tipoPlantilla === 'ppl' ? $insSQLppl : $insSQLserv;
-
-$flush = function() use (&$batch, &$total, $pdo, $insSQL, $informeId, $tipoPlantilla) {
+$flush = function() use (&$batch, &$total, $pdo, $insSQL, $informeId) {
     if (!$batch) return;
     $ph = [];
     $pm = [];
     foreach ($batch as $i => $r) {
-        if ($tipoPlantilla === 'ppl') {
-            $ph[] = "(:inf{$i},:cc{$i},:fa{$i},:reg{$i},:est{$i},:cp{$i},:sv{$i},:ns{$i})";
-            $pm  += [":inf{$i}"=>$informeId,":cc{$i}"=>$r['cc'],":fa{$i}"=>$r['fa'],
-                     ":reg{$i}"=>$r['reg'],":est{$i}"=>$r['est'],":cp{$i}"=>$r['cp'],
-                     ":sv{$i}"=>$r['sv'],":ns{$i}"=>$r['ns']];
-        } else {
-            $ph[] = "(:inf{$i},:cc{$i},:np{$i},:ap{$i},:cp{$i},:sv{$i},:ns{$i})";
-            $pm  += [":inf{$i}"=>$informeId,":cc{$i}"=>$r['cc'],":np{$i}"=>$r['np'],
-                     ":ap{$i}"=>$r['ap'],":cp{$i}"=>$r['cp'],
-                     ":sv{$i}"=>$r['sv'],":ns{$i}"=>$r['ns']];
-        }
+        $ph[] = "(:inf{$i},:cc{$i},:fa{$i},:np{$i},:ap{$i},:cp{$i},:sv{$i},1)";
+        $pm  += [
+            ":inf{$i}" => $informeId,
+            ":cc{$i}"  => $r['cc'],
+            ":fa{$i}"  => $r['fa'],
+            ":np{$i}"  => $r['np'],
+            ":ap{$i}"  => $r['ap'],
+            ":cp{$i}"  => $r['cp'],
+            ":sv{$i}"  => $r['sv'],
+        ];
     }
     $pdo->prepare($insSQL . implode(',', $ph))->execute($pm);
-    $total += array_sum(array_column($batch, 'ns'));
+    $total += count($batch);
     $batch  = [];
 };
 
@@ -147,47 +122,26 @@ for ($i = 1, $n = count($lineas); $i < $n; $i++) {
     $cc = $normCC((string)($f[$cols['cc_profesional']] ?? ''));
     if (!$cc) continue;
 
-    $sv = isset($cols['servicio']) ? $normServ((string)($f[$cols['servicio']] ?? '')) : '';
-    $ns = max(1, (int)($f[$cols['numero_sesiones'] ?? -1] ?? 1));
-
-    if ($tipoPlantilla === 'ppl') {
-        // PPL: cada fila = 1 atención (ns siempre 1, regional/sede/fecha/cc_paciente)
-        $batch[] = [
-            'cc'  => $cc,
-            'fa'  => isset($cols['fecha_atencion'])  ? $parseDate((string)($f[$cols['fecha_atencion']]  ?? '')) : null,
-            'reg' => isset($cols['regional'])         ? $normStr((string)($f[$cols['regional']]    ?? '')) : null,
-            'est' => isset($cols['establecimiento'])  ? $normStr((string)($f[$cols['establecimiento']] ?? '')) : null,
-            'cp'  => isset($cols['cc_paciente'])      ? $normCC((string)($f[$cols['cc_paciente']]   ?? '')) : null,
-            'sv'  => $sv ?: null,
-            'ns'  => 1,
-        ];
-    } else {
-        // Por servicio: nombres/apellidos + cc_paciente + servicio + numero_sesiones
-        $batch[] = [
-            'cc'  => $cc,
-            'np'  => isset($cols['nombres_paciente'])   ? $normStr((string)($f[$cols['nombres_paciente']]   ?? '')) : null,
-            'ap'  => isset($cols['apellidos_paciente'])  ? $normStr((string)($f[$cols['apellidos_paciente']]  ?? '')) : null,
-            'cp'  => isset($cols['cc_paciente'])         ? $normCC((string)($f[$cols['cc_paciente']]          ?? '')) : null,
-            'sv'  => $sv ?: null,
-            'ns'  => $ns,
-        ];
-    }
+    $batch[] = [
+        'cc' => $cc,
+        'fa' => isset($cols['fecha_atencion'])     ? $parseDate((string)($f[$cols['fecha_atencion']]     ?? '')) : null,
+        'np' => isset($cols['nombres_paciente'])   ? $normStr((string)($f[$cols['nombres_paciente']]   ?? '')) : null,
+        'ap' => isset($cols['apellidos_paciente']) ? $normStr((string)($f[$cols['apellidos_paciente']] ?? '')) : null,
+        'cp' => isset($cols['cc_paciente'])        ? $normCC((string)($f[$cols['cc_paciente']]         ?? '')) : null,
+        'sv' => isset($cols['servicio'])           ? $normServ((string)($f[$cols['servicio']]           ?? '')) : null,
+    ];
 
     if (count($batch) >= 500) $flush();
 }
 $flush();
 
-// ── Actualizar total_filas (suma de sesiones) ──────────────────────────────
-$sumStmt = $pdo->prepare("SELECT COALESCE(SUM(numero_sesiones),0) FROM informe_atenciones_detalle WHERE informe_id = :id");
-$sumStmt->execute([':id' => $informeId]);
-$totalSesiones = (int)$sumStmt->fetchColumn();
-$pdo->prepare("UPDATE informes_ops SET total_filas = :t WHERE id = :id")->execute([':t' => $totalSesiones, ':id' => $informeId]);
+// Actualizar total_filas con el conteo real de filas insertadas
+$pdo->prepare("UPDATE informes_ops SET total_filas = :t WHERE id = :id")->execute([':t' => $total, ':id' => $informeId]);
 
 Response::json([
     'id'            => $informeId,
     'nombre'        => $nombre,
-    'totalFilas'    => $totalSesiones,
-    'tipoPlantilla' => $tipoPlantilla,
+    'totalFilas'    => $total,
     'periodoInicio' => $periodoInicio ?: null,
     'periodoFin'    => $periodoFin    ?: null,
 ], 201);
