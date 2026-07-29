@@ -9,6 +9,7 @@ interface InformeOps {
   totalFilas: number;
   subidoEn: string;
   subidoPor: string | null;
+  plataforma: string | null;
 }
 
 interface Props {
@@ -16,17 +17,31 @@ interface Props {
   onErr: (e: string) => void;
 }
 
-const fmtFecha = (s: string | null) =>
-  s ? new Date(s + 'T00:00:00').toLocaleDateString('es-CO') : '—';
+const MESES = [
+  { v: '01', l: 'Enero' },     { v: '02', l: 'Febrero' },   { v: '03', l: 'Marzo' },
+  { v: '04', l: 'Abril' },     { v: '05', l: 'Mayo' },      { v: '06', l: 'Junio' },
+  { v: '07', l: 'Julio' },     { v: '08', l: 'Agosto' },    { v: '09', l: 'Septiembre' },
+  { v: '10', l: 'Octubre' },   { v: '11', l: 'Noviembre' }, { v: '12', l: 'Diciembre' },
+];
+
+const hoyAnio = new Date().getFullYear();
+const ANIOS: string[] = [];
+for (let y = 2023; y <= hoyAnio + 1; y++) ANIOS.push(String(y));
+
+const PLATF_LABEL: Record<string, string> = { '360': 'Plataforma 360', 'panacea': 'Panacea' };
+
+const fmtPeriodo = (s: string | null) =>
+  s ? new Date(s + 'T00:00:00').toLocaleDateString('es-CO', { month: 'long', year: 'numeric' }) : '—';
+
 const fmtDt = (s: string) =>
   new Date(s).toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' });
 
 function descargarPlantilla() {
   const BOM = '﻿';
   const contenido = BOM + [
-    'cc_profesional;fecha_atencion;nombres_paciente;apellidos_paciente;cc_paciente;servicio',
-    '1016018747;28/07/2026;JUAN;PÉREZ GARCÍA;1234567;PSICOLOGÍA',
-    '1016018747;29/07/2026;MARÍA;LÓPEZ TORRES;7654321;FISIOTERAPIA PAD',
+    'cc_profesional;fecha_atencion;nombres_paciente;apellidos_paciente;cc_paciente;servicio;numero_historia',
+    '1016018747;28/07/2026;JUAN;PÉREZ GARCÍA;1234567;PSICOLOGÍA;HC-000123',
+    '1016018747;29/07/2026;MARÍA;LÓPEZ TORRES;7654321;FISIOTERAPIA PAD;HC-000456',
   ].join('\n');
 
   const blob = new Blob([contenido], { type: 'text/csv;charset=utf-8' });
@@ -38,14 +53,24 @@ function descargarPlantilla() {
 }
 
 export function InformesOpsPanel({ onMsg, onErr }: Props) {
+  const hoy = new Date();
   const [informes, setInformes]   = useState<InformeOps[]>([]);
   const [loading, setLoading]     = useState(false);
   const [subiendo, setSubiendo]   = useState(false);
   const [borrando, setBorrando]   = useState<number | null>(null);
+  const [mes, setMes]             = useState(String(hoy.getMonth() + 1).padStart(2, '0'));
+  const [anio, setAnio]           = useState(String(hoy.getFullYear()));
+  const [plataforma, setPlatf]    = useState<'360' | 'panacea'>('360');
   const [nombre, setNombre]       = useState('');
-  const [periodoInicio, setPi]    = useState('');
-  const [periodoFin, setPf]       = useState('');
+  const [nombreEditado, setNombreEditado] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!nombreEditado) {
+      const mesNom = MESES.find((m) => m.v === mes)?.l ?? mes;
+      setNombre(`${mesNom} ${anio} — ${PLATF_LABEL[plataforma]}`);
+    }
+  }, [mes, anio, plataforma, nombreEditado]);
 
   async function cargar() {
     setLoading(true);
@@ -62,22 +87,25 @@ export function InformesOpsPanel({ onMsg, onErr }: Props) {
     e.preventDefault();
     onMsg(''); onErr('');
     const file = fileRef.current?.files?.[0];
-    if (!file)          { onErr('Selecciona un archivo CSV.'); return; }
-    if (!nombre.trim()) { onErr('Escribe un nombre para el informe.'); return; }
+    if (!file) { onErr('Selecciona un archivo CSV.'); return; }
+
+    const primerDia = `${anio}-${mes}-01`;
+    const ultimoDia = new Date(+anio, +mes, 0).toISOString().slice(0, 10);
 
     const fd = new FormData();
     fd.append('archivo', file);
-    fd.append('nombre', nombre.trim());
-    if (periodoInicio) fd.append('periodoInicio', periodoInicio);
-    if (periodoFin)    fd.append('periodoFin', periodoFin);
+    fd.append('nombre', nombre.trim() || `${MESES.find((m) => m.v === mes)?.l} ${anio} — ${PLATF_LABEL[plataforma]}`);
+    fd.append('periodoInicio', primerDia);
+    fd.append('periodoFin', ultimoDia);
+    fd.append('plataforma', plataforma);
 
     setSubiendo(true);
     try {
       const { data } = await api.post<{ totalFilas: number; nombre: string }>(
         '/admin/informes-ops', fd, { headers: { 'Content-Type': undefined } }
       );
-      onMsg(`Informe "${data.nombre}" cargado — ${data.totalFilas.toLocaleString('es-CO')} atenciones/sesiones.`);
-      setNombre(''); setPi(''); setPf('');
+      onMsg(`Informe "${data.nombre}" cargado — ${data.totalFilas.toLocaleString('es-CO')} atenciones registradas.`);
+      setNombreEditado(false);
       if (fileRef.current) fileRef.current.value = '';
       await cargar();
     } catch (err: unknown) {
@@ -110,8 +138,8 @@ export function InformesOpsPanel({ onMsg, onErr }: Props) {
         </p>
         <div style={{ border: '1px solid var(--gold-line, rgba(212,175,55,.35))', borderRadius: 8, padding: '12px 14px' }}>
           <p className="admin-help-text" style={{ margin: '0 0 10px', fontSize: 12 }}>
-            Columnas requeridas: <code>cc_profesional · fecha_atencion · nombres_paciente · apellidos_paciente · cc_paciente · servicio</code><br/>
-            Cada fila representa una atención. La plataforma cuenta los servicios por profesional y por paciente internamente.
+            Columnas requeridas: <code>cc_profesional · fecha_atencion · nombres_paciente · apellidos_paciente · cc_paciente · servicio · numero_historia</code><br/>
+            El <strong>número de historia</strong> identifica cada atención de forma única — el sistema lo usa para evitar duplicados. Cada fila = 1 atención.
           </p>
           <button type="button" className="admin-ghost-button" onClick={descargarPlantilla}>
             ⬇ Descargar plantilla
@@ -125,19 +153,33 @@ export function InformesOpsPanel({ onMsg, onErr }: Props) {
 
         <div className="admin-form-row">
           <label className="admin-label">
-            Nombre del informe *
+            Mes *
+            <select className="admin-input" value={mes} onChange={(e) => setMes(e.target.value)}>
+              {MESES.map((m) => <option key={m.v} value={m.v}>{m.l}</option>)}
+            </select>
+          </label>
+          <label className="admin-label">
+            Año *
+            <select className="admin-input" value={anio} onChange={(e) => setAnio(e.target.value)}>
+              {ANIOS.map((a) => <option key={a} value={a}>{a}</option>)}
+            </select>
+          </label>
+          <label className="admin-label">
+            Plataforma *
+            <select className="admin-input" value={plataforma} onChange={(e) => setPlatf(e.target.value as '360' | 'panacea')}>
+              <option value="360">Plataforma 360</option>
+              <option value="panacea">Panacea</option>
+            </select>
+          </label>
+        </div>
+
+        <div className="admin-form-row" style={{ marginTop: 8 }}>
+          <label className="admin-label" style={{ flex: '1 1 auto' }}>
+            Nombre del informe
             <input className="admin-input" type="text" value={nombre}
-              onChange={(e) => setNombre(e.target.value)} placeholder="Ej: Agosto 2025" required />
-          </label>
-          <label className="admin-label">
-            Período inicio
-            <input className="admin-input" type="date" value={periodoInicio}
-              onChange={(e) => setPi(e.target.value)} />
-          </label>
-          <label className="admin-label">
-            Período fin
-            <input className="admin-input" type="date" value={periodoFin}
-              onChange={(e) => setPf(e.target.value)} />
+              onChange={(e) => { setNombre(e.target.value); setNombreEditado(true); }}
+              onFocus={() => setNombreEditado(true)}
+              placeholder="Se genera automáticamente" />
           </label>
         </div>
 
@@ -172,10 +214,11 @@ export function InformesOpsPanel({ onMsg, onErr }: Props) {
             <thead>
               <tr>
                 <th style={{ textAlign: 'left' }}>Nombre</th>
+                <th>Plataforma</th>
                 <th>Período</th>
                 <th>Atenciones</th>
                 <th>Subido por</th>
-                <th>Fecha carga</th>
+                <th>Fecha y hora de carga</th>
                 <th></th>
               </tr>
             </thead>
@@ -184,7 +227,10 @@ export function InformesOpsPanel({ onMsg, onErr }: Props) {
                 <tr key={inf.id}>
                   <td><strong>{inf.nombre}</strong></td>
                   <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
-                    {fmtFecha(inf.periodoInicio)} — {fmtFecha(inf.periodoFin)}
+                    {inf.plataforma ? (PLATF_LABEL[inf.plataforma] ?? inf.plataforma) : '—'}
+                  </td>
+                  <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
+                    {fmtPeriodo(inf.periodoInicio)}
                   </td>
                   <td style={{ textAlign: 'center' }}>{inf.totalFilas.toLocaleString('es-CO')}</td>
                   <td style={{ textAlign: 'center' }}>{inf.subidoPor || '—'}</td>

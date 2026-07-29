@@ -9,8 +9,12 @@ $uid   = (int)($admin['jwt']['sub'] ?? 0);
 $nombre        = trim((string)($_POST['nombre']        ?? ''));
 $periodoInicio = trim((string)($_POST['periodoInicio'] ?? ''));
 $periodoFin    = trim((string)($_POST['periodoFin']    ?? ''));
+$plataforma    = trim((string)($_POST['plataforma']    ?? ''));
 
 if (!$nombre) Response::error('El nombre del informe es obligatorio', 400);
+
+$plataformasValidas = ['360', 'panacea'];
+if (!in_array($plataforma, $plataformasValidas, true)) $plataforma = null;
 
 if (empty($_FILES['archivo']) || ($_FILES['archivo']['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
     Response::error('Debes adjuntar el archivo CSV del informe', 400);
@@ -40,6 +44,7 @@ $alias = [
     'apellidos_paciente' => ['apellidos_paciente','apellidos paciente','apellidos','primer_apellido','apellido_paciente'],
     'cc_paciente'        => ['cc_paciente','cc paciente','cedula paciente','cedula_paciente','id_paciente','documento_paciente','identificacion'],
     'servicio'           => ['servicio','tipo_servicio','tipo servicio','nombre_servicio'],
+    'numero_historia'    => ['numero_historia','numero historia','num_historia','historia','n_historia','historia_clinica','hc','num_hc'],
 ];
 
 $cols = [];
@@ -77,23 +82,25 @@ $pdo = Db::pdo();
 
 // Insertar registro padre
 $stmt = $pdo->prepare(
-    "INSERT INTO informes_ops (nombre, periodo_inicio, periodo_fin, total_filas, subido_por_id, tipo_plantilla)
-     VALUES (:nom, :pi, :pf, 0, :uid, 'servicio')"
+    "INSERT INTO informes_ops (nombre, periodo_inicio, periodo_fin, total_filas, subido_por_id, tipo_plantilla, plataforma)
+     VALUES (:nom, :pi, :pf, 0, :uid, 'servicio', :pl)"
 );
 $stmt->execute([
     ':nom' => $nombre,
     ':pi'  => $periodoInicio ?: null,
     ':pf'  => $periodoFin    ?: null,
     ':uid' => $uid           ?: null,
+    ':pl'  => $plataforma,
 ]);
 $informeId = (int)$pdo->lastInsertId();
 
 // Insertar filas en lotes de 500 — cada fila = 1 atención
+// INSERT IGNORE evita duplicados por numero_historia único
 $total = 0;
 $batch = [];
 
-$insSQL = "INSERT INTO informe_atenciones_detalle
-    (informe_id, cc_profesional, fecha_atencion, nombres_paciente, apellidos_paciente, cc_paciente, servicio, numero_sesiones)
+$insSQL = "INSERT IGNORE INTO informe_atenciones_detalle
+    (informe_id, cc_profesional, fecha_atencion, nombres_paciente, apellidos_paciente, cc_paciente, servicio, numero_historia, numero_sesiones)
     VALUES ";
 
 $flush = function() use (&$batch, &$total, $pdo, $insSQL, $informeId) {
@@ -101,7 +108,7 @@ $flush = function() use (&$batch, &$total, $pdo, $insSQL, $informeId) {
     $ph = [];
     $pm = [];
     foreach ($batch as $i => $r) {
-        $ph[] = "(:inf{$i},:cc{$i},:fa{$i},:np{$i},:ap{$i},:cp{$i},:sv{$i},1)";
+        $ph[] = "(:inf{$i},:cc{$i},:fa{$i},:np{$i},:ap{$i},:cp{$i},:sv{$i},:nh{$i},1)";
         $pm  += [
             ":inf{$i}" => $informeId,
             ":cc{$i}"  => $r['cc'],
@@ -110,10 +117,12 @@ $flush = function() use (&$batch, &$total, $pdo, $insSQL, $informeId) {
             ":ap{$i}"  => $r['ap'],
             ":cp{$i}"  => $r['cp'],
             ":sv{$i}"  => $r['sv'],
+            ":nh{$i}"  => $r['nh'],
         ];
     }
-    $pdo->prepare($insSQL . implode(',', $ph))->execute($pm);
-    $total += count($batch);
+    $stmt = $pdo->prepare($insSQL . implode(',', $ph));
+    $stmt->execute($pm);
+    $total += $stmt->rowCount(); // solo cuenta filas realmente insertadas (no duplicados)
     $batch  = [];
 };
 
@@ -122,6 +131,9 @@ for ($i = 1, $n = count($lineas); $i < $n; $i++) {
     $cc = $normCC((string)($f[$cols['cc_profesional']] ?? ''));
     if (!$cc) continue;
 
+    $nh = isset($cols['numero_historia']) ? $normStr((string)($f[$cols['numero_historia']] ?? ''), 50) : null;
+    if ($nh === '') $nh = null;
+
     $batch[] = [
         'cc' => $cc,
         'fa' => isset($cols['fecha_atencion'])     ? $parseDate((string)($f[$cols['fecha_atencion']]     ?? '')) : null,
@@ -129,6 +141,7 @@ for ($i = 1, $n = count($lineas); $i < $n; $i++) {
         'ap' => isset($cols['apellidos_paciente']) ? $normStr((string)($f[$cols['apellidos_paciente']] ?? '')) : null,
         'cp' => isset($cols['cc_paciente'])        ? $normCC((string)($f[$cols['cc_paciente']]         ?? '')) : null,
         'sv' => isset($cols['servicio'])           ? $normServ((string)($f[$cols['servicio']]           ?? '')) : null,
+        'nh' => $nh,
     ];
 
     if (count($batch) >= 500) $flush();
