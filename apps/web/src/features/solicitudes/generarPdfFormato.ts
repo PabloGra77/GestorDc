@@ -1458,13 +1458,16 @@ async function _generarPdfEspecial(s: SolicitudParaPdf, opts?: { bloburl?: boole
 
     // Banner de discrepancias de atenciones
     if (s.comparacionOps?.hayDiscrepancias && !s.comparacionOps.sinInforme) {
-      const bannerH = 14;
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(10);
+      const bannerSub = 'Este valor esta sujeto a cambios. El personal administrativo debe verificar las atenciones registradas en plataforma antes de aprobar.';
+      const bannerSubLines = doc.splitTextToSize(bannerSub, pageWidth - margin * 2 - 6);
+      const bannerH = 9 + bannerSubLines.length * 4.5 + 3;
       doc.setFillColor(220, 38, 38);
       doc.rect(margin, y, pageWidth - margin * 2, bannerH, 'F');
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(255, 255, 255);
-      doc.text('⚠  VALOR PARCIAL — REVISIÓN DE ATENCIONES EN PLATAFORMA', pageWidth / 2, y + 5.5, { align: 'center' });
+      doc.setTextColor(255, 255, 255);
+      doc.text('[ ! ] VALOR PARCIAL - REVISION DE ATENCIONES EN PLATAFORMA', pageWidth / 2, y + 6, { align: 'center' });
       doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
-      doc.text('Este valor está sujeto a cambios. El personal administrativo debe verificar las atenciones registradas.', pageWidth / 2, y + 10.5, { align: 'center' });
+      doc.text(bannerSubLines, pageWidth / 2, y + 11.5, { align: 'center' });
       y += bannerH + 5;
     }
 
@@ -1716,8 +1719,7 @@ async function _generarPdfEspecial(s: SolicitudParaPdf, opts?: { bloburl?: boole
     doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
     doc.text('I.P.S Goleman Servicio Integral S.A.S', margin, y); y += 4;
     doc.text('Coordinadora Nacional', margin, y); y += 3.5;
-    doc.text('Elaborado: Coordinación Área PPL', margin, y); y += 3.5;
-    doc.text('Aprobado: Coordinadora de Oficina Jurídica', margin, y); y += 8;
+    doc.text('Aprobado: Coordinadora de Oficina Juridica', margin, y); y += 8;
 
     // Datos bancarios — al final del doc 2
     if (y > 255) { doc.addPage(); y = margin; }
@@ -1846,7 +1848,7 @@ async function _generarPdfEspecial(s: SolicitudParaPdf, opts?: { bloburl?: boole
 
     // Pie de página del documento 4
     doc.setFont('helvetica', 'italic'); doc.setFontSize(8); doc.setTextColor(150, 150, 150);
-    doc.text('I.P.S Goleman Servicio Integral S.A.S  ·  NIT 900.231.829  ·  Área PPL', pageWidth / 2, y, { align: 'center' });
+    doc.text('I.P.S Goleman Servicio Integral S.A.S  ·  NIT 900.231.829', pageWidth / 2, y, { align: 'center' });
     y += 4;
   }
 
@@ -2116,18 +2118,19 @@ async function _generarPdfEspecial(s: SolicitudParaPdf, opts?: { bloburl?: boole
 
   // Marca de agua repetida para solicitudes en tramite (solo en descarga, no en vista previa)
   if (!opts?.sinMarcaDeAgua && (s.estado === 'en_validacion' || s.estado === 'en_legalizacion')) {
-    const wH = doc.internal.pageSize.getHeight();
-    void wH;
+    const hayDiscrepanciasAgua = !!(s.comparacionOps?.hayDiscrepancias && !s.comparacionOps.sinInforme);
+    const marcaTexto = hayDiscrepanciasAgua ? 'VALOR PARCIAL' : 'EN PROCESO';
+    const marcaColor: [number, number, number] = hayDiscrepanciasAgua ? [200, 60, 60] : [155, 155, 155];
     for (let wi = 1; wi <= totalPages; wi++) {
       doc.setPage(wi);
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(14);
-      doc.setTextColor(155, 155, 155);
+      doc.setTextColor(...marcaColor);
       for (let row = 0; row <= 8; row++) {
         for (let col = 0; col <= 5; col++) {
           const wx = col * 42 - 10 + (row % 2 === 0 ? 0 : 21);
           const wy = row * 36 - 15;
-          doc.text('EN PROCESO', wx, wy, { angle: 45 });
+          doc.text(marcaTexto, wx, wy, { angle: 45 });
         }
       }
     }
