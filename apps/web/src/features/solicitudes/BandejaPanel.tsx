@@ -1129,82 +1129,124 @@ export function BandejaPanel({ initialOpenId }: { initialOpenId?: number } = {})
                     )}
                     {detalle.estado === 'en_validacion' && detalle.pasoActual !== 'autorizador_visto_bueno' && (
                     <div className="bandeja-actions">
-                      {detalle.comparacionOps?.hayDiscrepancias && !detalle.comparacionOps.sinInforme && (
-                        <div style={{ marginBottom: 14, padding: '10px 14px', borderRadius: 8, background: 'rgba(220,38,38,.08)', border: '1px solid rgba(220,38,38,.3)' }}>
-                          <strong style={{ color: 'var(--danger, #dc2626)' }}>⛔ No puedes aprobar: hay discrepancias con el informe</strong>
-                          <p style={{ margin: '6px 0 8px', fontSize: 13 }}>
-                            Las atenciones declaradas no coinciden con el informe cargado. Pide al administrador que suba el informe correcto
-                            y luego usa <strong>Re-verificar</strong> para actualizar la comparación.
-                          </p>
-                          <button type="button" className="admin-ghost-button" onClick={reVerificar} disabled={reVerificando}>
-                            {reVerificando ? 'Verificando…' : '↻ Re-verificar contra informe'}
-                          </button>
-                        </div>
-                      )}
-                      <label className="admin-help-text" htmlFor={`motivo-${it.id}`}>Motivo (para devolver o rechazar)</label>
-                      <select
-                        id={`motivo-${it.id}`}
-                        value={motivoSel}
-                        onChange={(e) => setMotivoSel(e.target.value)}
-                      >
-                        <option value="">selecciona un motivo</option>
-                        <option value="Adjunto faltante">Adjunto faltante</option>
-                        <option value="Adjunto ilegible o de baja calidad">Adjunto ilegible o de baja calidad</option>
-                        <option value="Adjunto no corresponde">Adjunto no corresponde al documento pedido</option>
-                        <option value="Valor no coincide con el soporte">Valor no coincide con el soporte</option>
-                        <option value="Datos del formulario incorrectos">Datos del formulario incorrectos</option>
-                        <option value="Falta firma">Falta firma</option>
-                        <option value="Documento vencido">Documento vencido</option>
-                        <option value="Otro">Otro (especificar abajo)</option>
-                      </select>
-                      <textarea
-                        placeholder="Detalle del motivo (opcional si ya elegiste uno arriba)"
-                        value={comentario}
-                        onChange={(e) => setComentario(e.target.value)}
-                        rows={3}
-                      />
-                      <SignaturePad
-                        value={firmaValidador}
-                        onChange={setFirmaValidador}
-                        label="Firma del validador (obligatoria para validar)"
-                      />
-                      <div className="bandeja-actions-row">
-                        <button
-                          type="button"
-                          className="admin-primary-button"
-                          disabled={accionando !== null || !!(detalle?.comparacionOps?.hayDiscrepancias && !detalle.comparacionOps.sinInforme)}
-                          title={detalle?.comparacionOps?.hayDiscrepancias && !detalle.comparacionOps.sinInforme ? 'Resuelve las discrepancias antes de aprobar' : undefined}
-                          onClick={() => ejecutar('validar', it.id)}
-                        >
-                          {it.pasoActual === 'contabilidad' ? 'Aprobar solicitud' : 'Validar y avanzar'}
-                        </button>
-                        <button
-                          type="button"
-                          className="admin-ghost-button"
-                          disabled={accionando !== null}
-                          onClick={() => ejecutar('devolver', it.id)}
-                        >
-                          Devolver al solicitante
-                        </button>
-                        <button
-                          type="button"
-                          className="admin-ghost-button bandeja-rechazar"
-                          disabled={accionando !== null}
-                          onClick={() => ejecutar('rechazar', it.id)}
-                        >
-                          Rechazar
-                        </button>
-                        {isAdmin ? (
-                          <button
-                            type="button"
-                            className="admin-ghost-button bandeja-rechazar"
-                            title="Eliminar definitivamente (solo administradores)"
-                            onClick={() => eliminarSolicitud(it)}
-                          >
-                            Eliminar
-                          </button>
-                        ) : null}
-                      </div>
+                      {(() => {
+                        const tieneDiscrepancias = !!(detalle.comparacionOps?.hayDiscrepancias && !detalle.comparacionOps.sinInforme);
+                        if (tieneDiscrepancias) {
+                          return (
+                            <>
+                              {/* Bloqueo total por discrepancias OPS */}
+                              <div style={{ marginBottom: 16, padding: '16px 18px', borderRadius: 10, background: 'rgba(220,38,38,.1)', border: '2px solid rgba(220,38,38,.5)' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                                  <span style={{ fontSize: 22 }}>⛔</span>
+                                  <strong style={{ color: '#dc2626', fontSize: 15 }}>SOLICITUD BLOQUEADA — Discrepancias de atenciones OPS</strong>
+                                </div>
+                                <p style={{ margin: '0 0 6px', fontSize: 13, color: '#7f1d1d' }}>
+                                  Las atenciones declaradas por el profesional <strong>no coinciden</strong> con las registradas en el informe de atenciones cargado en plataforma.
+                                  Esta solicitud <strong>no puede avanzar a contabilidad ni recibir visto bueno</strong> hasta que las atenciones estén correctamente registradas en el sistema.
+                                </p>
+                                <p style={{ margin: '0 0 10px', fontSize: 13, color: '#7f1d1d' }}>
+                                  El administrador debe cargar el informe correcto. Una vez corregido, usa Re-verificar para actualizar la comparación.
+                                </p>
+                                <button type="button" className="admin-ghost-button" onClick={reVerificar} disabled={reVerificando}>
+                                  {reVerificando ? 'Verificando…' : '↻ Re-verificar contra informe'}
+                                </button>
+                              </div>
+                              {/* Solo se permiten devolver y rechazar */}
+                              <label className="admin-help-text" htmlFor={`motivo-${it.id}`}>Motivo (obligatorio para devolver o rechazar)</label>
+                              <select
+                                id={`motivo-${it.id}`}
+                                value={motivoSel || 'Discrepancias con el informe de atenciones OPS'}
+                                onChange={(e) => setMotivoSel(e.target.value)}
+                              >
+                                <option value="Discrepancias con el informe de atenciones OPS">Discrepancias con el informe de atenciones OPS</option>
+                                <option value="Adjunto faltante">Adjunto faltante</option>
+                                <option value="Adjunto no corresponde">Adjunto no corresponde al documento pedido</option>
+                                <option value="Datos del formulario incorrectos">Datos del formulario incorrectos</option>
+                                <option value="Otro">Otro (especificar abajo)</option>
+                              </select>
+                              <textarea
+                                placeholder="Detalle adicional (opcional)"
+                                value={comentario}
+                                onChange={(e) => setComentario(e.target.value)}
+                                rows={2}
+                              />
+                              <div className="bandeja-actions-row">
+                                <button type="button" className="admin-ghost-button" disabled={accionando !== null}
+                                  onClick={() => ejecutar('devolver', it.id)}>
+                                  Devolver al solicitante
+                                </button>
+                                <button type="button" className="admin-ghost-button bandeja-rechazar" disabled={accionando !== null}
+                                  onClick={() => ejecutar('rechazar', it.id)}>
+                                  Rechazar
+                                </button>
+                                {isAdmin ? (
+                                  <button type="button" className="admin-ghost-button bandeja-rechazar"
+                                    title="Eliminar definitivamente (solo administradores)"
+                                    onClick={() => eliminarSolicitud(it)}>
+                                    Eliminar
+                                  </button>
+                                ) : null}
+                              </div>
+                            </>
+                          );
+                        }
+                        return (
+                          <>
+                            <label className="admin-help-text" htmlFor={`motivo-${it.id}`}>Motivo (para devolver o rechazar)</label>
+                            <select
+                              id={`motivo-${it.id}`}
+                              value={motivoSel}
+                              onChange={(e) => setMotivoSel(e.target.value)}
+                            >
+                              <option value="">selecciona un motivo</option>
+                              <option value="Adjunto faltante">Adjunto faltante</option>
+                              <option value="Adjunto ilegible o de baja calidad">Adjunto ilegible o de baja calidad</option>
+                              <option value="Adjunto no corresponde">Adjunto no corresponde al documento pedido</option>
+                              <option value="Valor no coincide con el soporte">Valor no coincide con el soporte</option>
+                              <option value="Datos del formulario incorrectos">Datos del formulario incorrectos</option>
+                              <option value="Falta firma">Falta firma</option>
+                              <option value="Documento vencido">Documento vencido</option>
+                              <option value="Otro">Otro (especificar abajo)</option>
+                            </select>
+                            <textarea
+                              placeholder="Detalle del motivo (opcional si ya elegiste uno arriba)"
+                              value={comentario}
+                              onChange={(e) => setComentario(e.target.value)}
+                              rows={3}
+                            />
+                            <SignaturePad
+                              value={firmaValidador}
+                              onChange={setFirmaValidador}
+                              label="Firma del validador (obligatoria para validar)"
+                            />
+                            <div className="bandeja-actions-row">
+                              <button
+                                type="button"
+                                className="admin-primary-button"
+                                disabled={accionando !== null}
+                                onClick={() => ejecutar('validar', it.id)}
+                              >
+                                {it.pasoActual === 'contabilidad' ? 'Aprobar solicitud' : 'Validar y avanzar'}
+                              </button>
+                              <button type="button" className="admin-ghost-button" disabled={accionando !== null}
+                                onClick={() => ejecutar('devolver', it.id)}>
+                                Devolver al solicitante
+                              </button>
+                              <button type="button" className="admin-ghost-button bandeja-rechazar" disabled={accionando !== null}
+                                onClick={() => ejecutar('rechazar', it.id)}>
+                                Rechazar
+                              </button>
+                              {isAdmin ? (
+                                <button type="button" className="admin-ghost-button bandeja-rechazar"
+                                  title="Eliminar definitivamente (solo administradores)"
+                                  onClick={() => eliminarSolicitud(it)}>
+                                  Eliminar
+                                </button>
+                              ) : null}
+                            </div>
+                          </>
+                        );
+                      })()}
                       <div className="bandeja-remitir-row">
                         <label htmlFor={`remitir-${it.id}`}>Remitir a otra area:</label>
                         <select

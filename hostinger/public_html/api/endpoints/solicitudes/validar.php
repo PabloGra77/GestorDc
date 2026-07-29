@@ -23,6 +23,73 @@ if (strlen($firma) > 300_000) {
     Response::error('La firma excede el tamaño máximo permitido (300 KB)', 413);
 }
 
+// Bloqueo OPS: rechazar si hay discrepancias activas entre lo declarado y el informe
+if (($sol['tipo_slug'] ?? '') === 'cuenta-cobro-ops') {
+    $datosOps = json_decode((string)($sol['datos_formulario'] ?? '{}'), true) ?: [];
+    $ccOps    = preg_replace('/[^0-9]/', '', (string)($datosOps['numeroDocumento'] ?? $datosOps['numero_documento'] ?? ''));
+    if ($ccOps !== '') {
+        $piniOps = trim((string)($datosOps['periodoInicio'] ?? '')) ?: '1900-01-01';
+        $pfinOps = trim((string)($datosOps['periodoFin']    ?? '')) ?: '2999-12-31';
+        $tipoPlanOps = trim((string)($datosOps['tipoPlantillaAtenciones'] ?? 'ppl'));
+        $infChk = $pdo->prepare(
+            "SELECT id FROM informes_ops
+             WHERE (periodo_inicio IS NULL OR periodo_fin IS NULL
+                    OR (periodo_inicio <= :pfin AND periodo_fin >= :pini))
+             ORDER BY subido_en DESC LIMIT 1"
+        );
+        $infChk->execute([':pini' => $piniOps, ':pfin' => $pfinOps]);
+        $infIdOps = (int)($infChk->fetchColumn() ?: 0);
+        if ($infIdOps > 0) {
+            $hayDiscOps = false;
+            if ($tipoPlanOps === 'servicio') {
+                $filasOps = json_decode((string)($datosOps['atencionesServicioJson'] ?? '[]'), true) ?: [];
+                foreach ($filasOps as $fd) {
+                    $ccPac   = preg_replace('/[^0-9]/', '', (string)($fd['numId'] ?? ''));
+                    $sv      = mb_strtoupper(trim((string)($fd['servicio'] ?? '')));
+                    $sesDecl = max(1, (int)($fd['sesiones'] ?? 1));
+                    if (!$ccPac || !$sv) continue;
+                    $stOps = $pdo->prepare(
+                        "SELECT COALESCE(SUM(d.numero_sesiones),0)
+                         FROM informe_atenciones_detalle d
+                         WHERE d.informe_id=:inf AND d.cc_profesional=:cc AND d.cc_paciente=:cp AND UPPER(TRIM(d.servicio))=:sv"
+                    );
+                    $stOps->execute([':inf'=>$infIdOps,':cc'=>$ccOps,':cp'=>$ccPac,':sv'=>$sv]);
+                    if ((int)$stOps->fetchColumn() !== $sesDecl) { $hayDiscOps = true; break; }
+                }
+            } else {
+                $filasOps = json_decode((string)($datosOps['atencionesJson'] ?? '[]'), true) ?: [];
+                foreach ($filasOps as $fd) {
+                    $fecha   = trim((string)($fd['fecha']    ?? ''));
+                    $hcDecl  = (int)($fd['hc']      ?? 0);
+                    $sv      = mb_strtoupper(trim((string)($fd['servicio'] ?? '')));
+                    if (!$fecha || $hcDecl <= 0) continue;
+                    if ($sv) {
+                        $stOps = $pdo->prepare(
+                            "SELECT COUNT(*) FROM informe_atenciones_detalle d
+                             WHERE d.informe_id=:inf AND d.cc_profesional=:cc AND d.fecha_atencion=:f AND UPPER(TRIM(COALESCE(d.servicio,'')))=:sv"
+                        );
+                        $stOps->execute([':inf'=>$infIdOps,':cc'=>$ccOps,':f'=>$fecha,':sv'=>$sv]);
+                    } else {
+                        $stOps = $pdo->prepare(
+                            "SELECT COUNT(*) FROM informe_atenciones_detalle d
+                             WHERE d.informe_id=:inf AND d.cc_profesional=:cc AND d.fecha_atencion=:f"
+                        );
+                        $stOps->execute([':inf'=>$infIdOps,':cc'=>$ccOps,':f'=>$fecha]);
+                    }
+                    if ((int)$stOps->fetchColumn() !== $hcDecl) { $hayDiscOps = true; break; }
+                }
+            }
+            if ($hayDiscOps) {
+                Response::error(
+                    'No se puede validar: las atenciones declaradas no coinciden con el informe de atenciones OPS registrado en plataforma. ' .
+                    'Corrija el informe y vuelva a intentarlo.',
+                    422
+                );
+            }
+        }
+    }
+}
+
 $siguiente = FlujoHelpers::siguientePaso($sol['flujo_aprobacion'] ?? '[]', $sol['paso_actual']);
 
 // Asignar firma al rol actual (analista/coordinador/contabilidad)

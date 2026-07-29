@@ -9,6 +9,7 @@ interface SolicitudResumen {
   numeroRadicado: string;
   tipoSolicitudId: number;
   tipoNombre: string;
+  tipoSlug?: string;
   areaId: number;
   areaNombre: string;
   solicitanteNombre: string | null;
@@ -320,14 +321,15 @@ export function MisSolicitudesPanel({ refresco, initialOpenId }: { refresco?: nu
   const [legalizar, setLegalizar] = useState<SolicitudResumen | null>(null);
   const [verDetalle, setVerDetalle] = useState<SolicitudResumen | null>(null);
   const [msg, setMsg] = useState('');
-  const [pdfPreview, setPdfPreview] = useState<{ id: number; url: string | null; cargando: boolean } | null>(null);
+  const [pdfPreview, setPdfPreview] = useState<{ id: number; url: string | null; cargando: boolean; hayDiscrepancias?: boolean } | null>(null);
 
   async function verPdf(s: SolicitudResumen) {
     setPdfPreview({ id: s.id, url: null, cargando: true });
     try {
       const r = await api.get(`/solicitudes/${s.id}`);
       const url = await generarFormatoBlobUrl(r.data);
-      setPdfPreview({ id: s.id, url, cargando: false });
+      const disc = !!(r.data.comparacionOps?.hayDiscrepancias && !r.data.comparacionOps?.sinInforme);
+      setPdfPreview({ id: s.id, url, cargando: false, hayDiscrepancias: disc });
     } catch {
       setPdfPreview(null);
     }
@@ -443,6 +445,14 @@ export function MisSolicitudesPanel({ refresco, initialOpenId }: { refresco?: nu
                     {s.estado === 'en_legalizacion' ? '↻ Re-enviar legalización' : '💸 Legalizar'}
                   </button>
                 ) : null}
+                {s.estado === 'en_validacion' && s.tipoSlug === 'cuenta-cobro-ops' ? (
+                  <div style={{ width: '100%', marginBottom: 8, padding: '8px 12px', borderRadius: 8, background: 'rgba(234,88,12,.1)', border: '1.5px solid rgba(234,88,12,.4)', fontSize: 12 }}>
+                    <strong style={{ color: '#c2410c' }}>⚠ En revisión por el área administrativa.</strong>
+                    <span style={{ color: '#7c2d12', marginLeft: 6 }}>
+                      Abre el PDF para ver si el valor es parcial o está sujeto a revisión de atenciones.
+                    </span>
+                  </div>
+                ) : null}
                 {s.estado === 'en_validacion' ? (
                   <>
                     <button
@@ -515,6 +525,16 @@ export function MisSolicitudesPanel({ refresco, initialOpenId }: { refresco?: nu
                 ✕ Cerrar
               </button>
             </div>
+            {pdfPreview.hayDiscrepancias && !pdfPreview.cargando && (
+              <div style={{ padding: '12px 18px', background: '#dc2626', color: '#fff', flexShrink: 0 }}>
+                <strong style={{ fontSize: 14 }}>⚠ VALOR PARCIAL — REVISIÓN DE ATENCIONES PENDIENTE</strong>
+                <p style={{ margin: '4px 0 0', fontSize: 12, opacity: 0.92 }}>
+                  Las atenciones que registraste no coinciden con el informe de atenciones de la plataforma.
+                  El personal administrativo debe corregir el informe antes de que esta solicitud pueda avanzar.
+                  El valor mostrado puede cambiar.
+                </p>
+              </div>
+            )}
             {pdfPreview.cargando ? (
               <p className="admin-help-text" style={{ textAlign: 'center', padding: '40px 0' }}>Generando PDF…</p>
             ) : pdfPreview.url ? (
