@@ -120,9 +120,9 @@ export function ConfigCuentaCobroPanel() {
     try {
       const cols = [
         'radicado','fecha','aprobado','solicitante','documento','correo','area','estado','paso',
-        'dato:profesion','dato:banco','dato:numeroCuenta',
-        'dato:periodoInicio','dato:periodoFin',
-        'monto_total',
+        'ops_profesion','ops_banco','ops_cuenta','ops_tipo_cuenta',
+        'ops_periodo',
+        'ops_atenciones','ops_desglose','ops_total',
       ].join(',');
       const params = new URLSearchParams({ tipo: String(tipoId), columnas: cols });
       if (infDesde)              params.set('desde',       infDesde);

@@ -63,6 +63,15 @@ $FIJAS = [
     'firmado'         => 'Firmado por el solicitante',
     'alertas'         => 'Alertas IA',
     'adjuntos'        => 'Adjuntos cargados',
+    // Columnas específicas cuenta-cobro OPS
+    'ops_profesion'      => 'Profesión / Cargo',
+    'ops_banco'          => 'Banco',
+    'ops_cuenta'         => 'Número de cuenta',
+    'ops_tipo_cuenta'    => 'Tipo de cuenta',
+    'ops_periodo'        => 'Período cobrado',
+    'ops_atenciones'     => 'Total atenciones / sesiones',
+    'ops_desglose'       => 'Detalle servicios OPS',
+    'ops_total'          => 'Total a cobrar',
 ];
 
 $cols = array_values(array_filter(array_map('trim', explode(',', $columnasRaw))));
@@ -172,6 +181,75 @@ $valorCol = static function (string $col, array $r, array $datos, array $documen
             }
             return implode(' | ', $partes);
     }
+    // Columnas OPS estructuradas
+    switch ($col) {
+        case 'ops_profesion':
+            return (string)($datos['profesion'] ?? '');
+
+        case 'ops_banco':
+            return (string)($datos['banco'] ?? '');
+
+        case 'ops_cuenta':
+            // Forzar texto en Excel usando prefijo de fórmula ="..." para evitar notación científica
+            $num = preg_replace('/\D/', '', (string)($datos['numeroCuenta'] ?? ''));
+            return $num !== '' ? ('="' . $num . '"') : '';
+
+        case 'ops_tipo_cuenta':
+            return (string)($datos['tipoCuenta'] ?? '');
+
+        case 'ops_periodo':
+            $ini = (string)($datos['periodoInicio'] ?? '');
+            $fin = (string)($datos['periodoFin']    ?? '');
+            if ($ini || $fin) return trim($ini . ' / ' . $fin, '/ ');
+            return '';
+
+        case 'ops_atenciones':
+            // Sumar desde desglosePago primero
+            $rawDes = (string)($datos['desglosePago'] ?? '');
+            if ($rawDes !== '') {
+                $des = json_decode($rawDes, true);
+                if (is_array($des) && count($des) > 0) {
+                    return (string)array_sum(array_column($des, 'cantidad'));
+                }
+            }
+            // Fallback PPL
+            $rawAt = (string)($datos['atencionesJson'] ?? '');
+            if ($rawAt !== '') {
+                $ats = json_decode($rawAt, true);
+                if (is_array($ats)) {
+                    return (string)array_sum(array_map(fn($a) => (int)($a['hc'] ?? 0), $ats));
+                }
+            }
+            // Fallback servicio
+            $rawSv = (string)($datos['atencionesServicioJson'] ?? '');
+            if ($rawSv !== '') {
+                $svs = json_decode($rawSv, true);
+                if (is_array($svs)) {
+                    return (string)array_sum(array_map(fn($s) => max(1, (int)($s['sesiones'] ?? 1)), $svs));
+                }
+            }
+            return '';
+
+        case 'ops_desglose':
+            $rawDes = (string)($datos['desglosePago'] ?? '');
+            if ($rawDes === '') return '';
+            $des = json_decode($rawDes, true);
+            if (!is_array($des) || count($des) === 0) return '';
+            $partes = [];
+            foreach ($des as $d) {
+                $sv   = (string)($d['servicio'] ?? '');
+                $cant = (int)($d['cantidad']  ?? 0);
+                $sub  = (float)($d['subtotal'] ?? 0);
+                if ($sv) $partes[] = $sv . ' x' . $cant . ' = ' . $fmtPesos($sub);
+            }
+            return implode(' | ', $partes);
+
+        case 'ops_total':
+            $v = (string)($datos['valorCobrar'] ?? '');
+            if ($v !== '' && is_numeric($v) && (float)$v > 0) return $fmtPesos((float)$v);
+            return '';
+    }
+
     if (strncmp($col, 'dato:', 5) === 0) {
         $k = substr($col, 5);
         $v = $datos[$k] ?? '';

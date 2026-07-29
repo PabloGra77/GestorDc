@@ -2115,6 +2115,11 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
   padding: 20px;
   z-index: 120;
 }
+@media (max-width: 600px) {
+  .admin-permissions-overlay {
+    padding: 0;
+  }
+}
 
 .admin-permissions-modal {
   width: min(760px, 100%);
@@ -5892,13 +5897,23 @@ button.mail-tracking-search-button,
   background: #e9ecf1;
 }
 .msp-pdf-modal {
-  width: 90vw;
-  max-width: 900px;
-  max-height: 92vh;
+  width: min(96vw, 1100px);
+  height: min(94vh, 94dvh);
   display: flex;
   flex-direction: column;
   padding: 0;
   overflow: hidden;
+}
+@media (max-width: 600px) {
+  .msp-pdf-modal {
+    width: 100vw;
+    width: 100dvw;
+    height: 100vh;
+    height: 100dvh;
+    border-radius: 0 !important;
+    max-width: none;
+    max-height: none;
+  }
 }
 .msp-pdf-modal-head {
   display: flex;
@@ -5911,10 +5926,10 @@ button.mail-tracking-search-button,
   flex-shrink: 0;
 }
 .msp-pdf-iframe {
-  flex: 1;
+  flex: 1 1 0;
   width: 100%;
   border: none;
-  min-height: 500px;
+  min-height: 0;
   background: #e9ecf1;
 }
 .bandeja-comparacion {
