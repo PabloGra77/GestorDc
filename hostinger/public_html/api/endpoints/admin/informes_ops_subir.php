@@ -89,49 +89,52 @@ $parseDate = function(string $v): ?string {
 
 $pdo = Db::pdo();
 
+// Detectar columnas disponibles (migración 017 puede estar pendiente)
+$colsOps = array_column($pdo->query("SHOW COLUMNS FROM informes_ops")->fetchAll(), 'Field');
+$tienePlataforma = in_array('plataforma', $colsOps, true);
+
+$colsDet = array_column($pdo->query("SHOW COLUMNS FROM informe_atenciones_detalle")->fetchAll(), 'Field');
+$tieneHistoria = in_array('numero_historia', $colsDet, true);
+
 // Insertar registro padre
-$stmt = $pdo->prepare(
-    "INSERT INTO informes_ops (nombre, periodo_inicio, periodo_fin, total_filas, subido_por_id, tipo_plantilla, plataforma)
-     VALUES (:nom, :pi, :pf, 0, :uid, 'servicio', :pl)"
-);
-$stmt->execute([
-    ':nom' => $nombre,
-    ':pi'  => $periodoInicio ?: null,
-    ':pf'  => $periodoFin    ?: null,
-    ':uid' => $uid           ?: null,
-    ':pl'  => $plataforma,
-]);
+$sqlInsOps = $tienePlataforma
+    ? "INSERT INTO informes_ops (nombre, periodo_inicio, periodo_fin, total_filas, subido_por_id, tipo_plantilla, plataforma) VALUES (:nom, :pi, :pf, 0, :uid, 'servicio', :pl)"
+    : "INSERT INTO informes_ops (nombre, periodo_inicio, periodo_fin, total_filas, subido_por_id, tipo_plantilla) VALUES (:nom, :pi, :pf, 0, :uid, 'servicio')";
+$stmt = $pdo->prepare($sqlInsOps);
+$params = [':nom' => $nombre, ':pi' => $periodoInicio ?: null, ':pf' => $periodoFin ?: null, ':uid' => $uid ?: null];
+if ($tienePlataforma) $params[':pl'] = $plataforma;
+$stmt->execute($params);
 $informeId = (int)$pdo->lastInsertId();
 
 // Insertar filas en lotes de 500 — cada fila = 1 atención
-// INSERT IGNORE evita duplicados por numero_historia único
+// INSERT IGNORE evita duplicados por numero_historia único (si la columna existe)
 $total = 0;
 $batch = [];
 
-$insSQL = "INSERT IGNORE INTO informe_atenciones_detalle
-    (informe_id, cc_profesional, fecha_atencion, nombres_paciente, apellidos_paciente, cc_paciente, servicio, numero_historia, numero_sesiones)
-    VALUES ";
+$insSQL = $tieneHistoria
+    ? "INSERT IGNORE INTO informe_atenciones_detalle (informe_id, cc_profesional, fecha_atencion, nombres_paciente, apellidos_paciente, cc_paciente, servicio, numero_historia, numero_sesiones) VALUES "
+    : "INSERT INTO informe_atenciones_detalle (informe_id, cc_profesional, fecha_atencion, nombres_paciente, apellidos_paciente, cc_paciente, servicio, numero_sesiones) VALUES ";
 
-$flush = function() use (&$batch, &$total, $pdo, $insSQL, $informeId) {
+$flush = function() use (&$batch, &$total, $pdo, $insSQL, $informeId, $tieneHistoria) {
     if (!$batch) return;
     $ph = [];
     $pm = [];
     foreach ($batch as $i => $r) {
-        $ph[] = "(:inf{$i},:cc{$i},:fa{$i},:np{$i},:ap{$i},:cp{$i},:sv{$i},:nh{$i},1)";
-        $pm  += [
-            ":inf{$i}" => $informeId,
-            ":cc{$i}"  => $r['cc'],
-            ":fa{$i}"  => $r['fa'],
-            ":np{$i}"  => $r['np'],
-            ":ap{$i}"  => $r['ap'],
-            ":cp{$i}"  => $r['cp'],
-            ":sv{$i}"  => $r['sv'],
-            ":nh{$i}"  => $r['nh'],
-        ];
+        if ($tieneHistoria) {
+            $ph[] = "(:inf{$i},:cc{$i},:fa{$i},:np{$i},:ap{$i},:cp{$i},:sv{$i},:nh{$i},1)";
+            $pm  += [":inf{$i}"=>$informeId,":cc{$i}"=>$r['cc'],":fa{$i}"=>$r['fa'],
+                     ":np{$i}"=>$r['np'],":ap{$i}"=>$r['ap'],":cp{$i}"=>$r['cp'],
+                     ":sv{$i}"=>$r['sv'],":nh{$i}"=>$r['nh']];
+        } else {
+            $ph[] = "(:inf{$i},:cc{$i},:fa{$i},:np{$i},:ap{$i},:cp{$i},:sv{$i},1)";
+            $pm  += [":inf{$i}"=>$informeId,":cc{$i}"=>$r['cc'],":fa{$i}"=>$r['fa'],
+                     ":np{$i}"=>$r['np'],":ap{$i}"=>$r['ap'],":cp{$i}"=>$r['cp'],
+                     ":sv{$i}"=>$r['sv']];
+        }
     }
     $stmt = $pdo->prepare($insSQL . implode(',', $ph));
     $stmt->execute($pm);
-    $total += $stmt->rowCount(); // solo cuenta filas realmente insertadas (no duplicados)
+    $total += $stmt->rowCount();
     $batch  = [];
 };
 

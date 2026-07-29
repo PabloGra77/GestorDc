@@ -7,15 +7,28 @@ Auth::requireAdmin();
 
 $pdo = Db::pdo();
 
-$stmt = $pdo->query(
-    "SELECT i.id, i.nombre, i.periodo_inicio, i.periodo_fin,
-            i.total_filas, i.subido_en, i.plataforma,
-            u.nombre_completo AS subido_por
-     FROM informes_ops i
-     LEFT JOIN usuarios u ON u.id = i.subido_por_id
-     ORDER BY i.subido_en DESC
-     LIMIT 100"
-);
+// Intenta con columna plataforma; si no existe (migración pendiente), hace fallback
+try {
+    $stmt = $pdo->query(
+        "SELECT i.id, i.nombre, i.periodo_inicio, i.periodo_fin,
+                i.total_filas, i.subido_en, i.plataforma,
+                u.nombre_completo AS subido_por
+         FROM informes_ops i
+         LEFT JOIN usuarios u ON u.id = i.subido_por_id
+         ORDER BY i.subido_en DESC
+         LIMIT 100"
+    );
+} catch (PDOException $e) {
+    $stmt = $pdo->query(
+        "SELECT i.id, i.nombre, i.periodo_inicio, i.periodo_fin,
+                i.total_filas, i.subido_en, NULL AS plataforma,
+                u.nombre_completo AS subido_por
+         FROM informes_ops i
+         LEFT JOIN usuarios u ON u.id = i.subido_por_id
+         ORDER BY i.subido_en DESC
+         LIMIT 100"
+    );
+}
 
 $rows = $stmt->fetchAll();
 
