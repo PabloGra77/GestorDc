@@ -13309,4 +13309,39 @@ body[data-weather="tormenta"]::after {
 .ruta-ciudad-col { display: flex; flex-direction: column; gap: 4px; }
 .ruta-ciudad-col select { width: 100%; }
 .ruta-flecha { font-size: 22px; font-weight: 700; color: var(--text-secondary); padding-bottom: 8px; align-self: end; text-align: center; }
+
+/* ── Portal de Pagos ───────────────────────────────────────── */
+.pagos-module-header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 16px; }
+.pagos-module-subtitle { color: var(--text-secondary); margin: 4px 0 0; font-size: 14px; }
+.pagos-module-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.pagos-nuevo-form, .pagos-correo-form { background: rgba(212,175,55,0.06); border: 1px solid var(--border-soft); border-radius: 10px; padding: 16px; margin-bottom: 18px; display: flex; flex-direction: column; gap: 12px; max-width: 480px; }
+[data-theme="light"] .pagos-nuevo-form, [data-theme="light"] .pagos-correo-form { background: rgba(212,175,55,0.05); }
+.pagos-nuevo-form-actions { display: flex; gap: 8px; }
+
+.pagos-tabla { width: 100%; border-collapse: collapse; font-size: 13px; }
+.pagos-tabla th { text-align: left; padding: 8px 10px; border-bottom: 2px solid var(--border-soft); color: var(--text-muted); font-weight: 600; white-space: nowrap; }
+.pagos-tabla td { padding: 7px 10px; border-bottom: 1px solid var(--border-soft); }
+.pagos-tabla-row { cursor: pointer; transition: background .12s ease; }
+.pagos-tabla-row:hover { background: var(--royal-blue-soft); }
+.pagos-tabla input, .pagos-tabla select { font-size: 12px; padding: 5px 7px; margin: 0; }
+
+.pagos-lote-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 8px; }
+.pagos-lote-resumen { display: flex; gap: 24px; flex-wrap: wrap; margin-bottom: 16px; }
+.pagos-lote-resumen div { display: flex; flex-direction: column; gap: 2px; }
+.pagos-lote-resumen span { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .03em; }
+.pagos-lote-resumen strong { font-size: 18px; color: var(--text-gold); }
+
+.pagos-lote-toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 14px 0; }
+.pagos-lote-toolbar-final { border-top: 1px solid var(--border-soft); padding-top: 14px; margin-top: 18px; }
+.pagos-file-label { cursor: pointer; display: inline-flex; align-items: center; }
+
+.pagos-celda-error { background: rgba(239, 68, 68, 0.12); }
+.pagos-celda-aviso { background: rgba(245, 158, 11, 0.12); }
+
+.pagos-avisos { background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.4); color: #f59e0b; border-radius: 10px; padding: 10px 14px; font-size: 14px; margin-bottom: 12px; }
+.pagos-avisos ul, .admin-error ul { margin: 6px 0 0; padding-left: 18px; }
+
+.pagos-clave-banner code { background: rgba(0,0,0,0.25); padding: 3px 8px; border-radius: 6px; font-size: 14px; user-select: all; }
+[data-theme="light"] .pagos-clave-banner code { background: rgba(0,0,0,0.08); }
 @media (max-width: 600px) { .ruta-ciudades-grid { grid-template-columns: 1fr; } .ruta-flecha { display: none; } }

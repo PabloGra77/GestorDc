@@ -5,6 +5,7 @@ interface AppLayoutProps {
 	nombre: string;
 	rol: string;
 	esAdmin: boolean;
+	mostrarPortalPagos?: boolean;
 	activeSection: string;
 	onSelectSection: (section: string) => void;
 	onNavigateRadicaciones?: (vista: 'nueva' | 'misSolicitudes' | 'bandeja' | 'tablero', solicitudId?: number) => void;
@@ -16,6 +17,7 @@ export function AppLayout({
 	nombre,
 	rol,
 	esAdmin,
+	mostrarPortalPagos,
 	activeSection,
 	onSelectSection,
 	onNavigateRadicaciones,
@@ -26,6 +28,7 @@ export function AppLayout({
 		<div className="admin-shell">
 			<Sidebar
 				esAdmin={esAdmin}
+				mostrarPortalPagos={mostrarPortalPagos}
 				activeSection={activeSection}
 				onSelectSection={onSelectSection}
 				onNavigateRadicaciones={onNavigateRadicaciones}

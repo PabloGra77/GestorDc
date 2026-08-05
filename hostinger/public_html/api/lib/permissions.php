@@ -10,6 +10,10 @@ final class Permissions
     public const CATALOG = [
         'inicio'             => ['realizarSolicitudes', 'verificarRadicados'],
         'panelAdministrador' => ['crearUsuarios', 'crearRoles'],
+        'pagos'              => [
+            'verLotes', 'verTodosLosLotes', 'crearLotes', 'generarArchivo',
+            'anularLotes', 'reabrirLotes', 'gestionarConfiguracion', 'verAuditoria',
+        ],
     ];
 
     public static function normalize($input): array

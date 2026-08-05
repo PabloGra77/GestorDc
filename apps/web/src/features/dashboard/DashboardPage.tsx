@@ -15,6 +15,8 @@ import { ConfiguracionSmtpPanel } from '../admin/ConfiguracionSmtpPanel';
 import { ConfigViaticosPanel } from '../admin/ConfigViaticosPanel';
 import { ConfigCuentaCobroPanel } from '../admin/ConfigCuentaCobroPanel';
 import { ConfigLegalizacionPanel } from '../admin/ConfigLegalizacionPanel';
+import { ConfigPagosPanel } from '../admin/ConfigPagosPanel';
+import { PagosModule } from '../pagos/PagosModule';
 import { ProfilePanel } from '../admin/ProfilePanel';
 import { HistorialPanel } from '../admin/HistorialPanel';
 import { InformesOpsPanel } from '../admin/InformesOpsPanel';
@@ -24,7 +26,7 @@ import type { Role } from '../../types/role';
 import type { Radicado, VerificarRadicadoResponse } from '../../types/radicado';
 import type { Usuario } from '../../types/usuario';
 
-type AdminModule = 'Usuarios' | 'Personal autorizado' | 'Roles' | 'Areas' | 'Usuarios en linea' | 'Configuracion' | 'Config. Viáticos' | 'Config. Cuenta de Cobro' | 'Config. Legalización' | 'Historial' | 'Informes OPS';
+type AdminModule = 'Usuarios' | 'Personal autorizado' | 'Roles' | 'Areas' | 'Usuarios en linea' | 'Configuracion' | 'Config. Viáticos' | 'Config. Cuenta de Cobro' | 'Config. Legalización' | 'Config. Portal de Pagos' | 'Historial' | 'Informes OPS';
 
 const ROLE_PERMISSIONS_CATALOG = {
 	inicio: {
@@ -49,6 +51,19 @@ const ROLE_PERMISSIONS_CATALOG = {
 		permissions: [
 			{ key: 'crearUsuarios', label: 'Crear usuarios' },
 			{ key: 'crearRoles', label: 'Crear roles' },
+		],
+	},
+	pagos: {
+		label: 'Portal de Pagos',
+		permissions: [
+			{ key: 'verLotes', label: 'Ver lotes propios' },
+			{ key: 'verTodosLosLotes', label: 'Ver lotes de todos los usuarios' },
+			{ key: 'crearLotes', label: 'Crear y editar lotes' },
+			{ key: 'generarArchivo', label: 'Generar archivo definitivo' },
+			{ key: 'anularLotes', label: 'Anular lotes' },
+			{ key: 'reabrirLotes', label: 'Reabrir lotes generados' },
+			{ key: 'gestionarConfiguracion', label: 'Gestionar empresas y entidades bancarias' },
+			{ key: 'verAuditoria', label: 'Ver auditoría del módulo' },
 		],
 	},
 } as const;
@@ -181,6 +196,14 @@ export function DashboardPage() {
 		const permisosModulo = permisosEfectivosSesion[modulo] || [];
 		return permisosModulo.includes(permiso);
 	};
+
+	// El Portal de Pagos mueve dinero: a diferencia de tienePermiso(), NUNCA
+	// hereda el atajo "nadie configuró nada = ve todo". Solo lo ve
+	// Administrador o quien tenga el permiso concreto asignado en su rol o
+	// como override individual.
+	const tienePermisoPagos = (permiso: string) =>
+		esAdmin || (permisosEfectivosSesion.pagos ?? []).includes(permiso);
+	const canVerPortalPagos = tienePermisoPagos('verLotes');
 
 	const canCrearUsuarios = esAdmin || tienePermiso('panelAdministrador', 'crearUsuarios');
 	const canCrearRoles = tienePermiso('panelAdministrador', 'crearRoles');
@@ -957,6 +980,7 @@ export function DashboardPage() {
 			nombre={session.usuario.nombreCompleto}
 			rol={rol}
 			esAdmin={esAdmin}
+			mostrarPortalPagos={canVerPortalPagos}
 			activeSection={activeSection}
 			onSelectSection={setActiveSection}
 			onNavigateRadicaciones={(vista, solicitudId) => { setRadicacionesVista(vista); setSolicitudAbierta(solicitudId); setActiveSection('Radicaciones'); }}
@@ -1311,7 +1335,7 @@ export function DashboardPage() {
 					</div>
 
 					<div className="admin-module-nav" role="tablist" aria-label="Módulos administrativos">
-						{(['Usuarios', 'Personal autorizado', 'Roles', 'Areas', 'Usuarios en linea', 'Configuracion', 'Config. Viáticos', 'Config. Cuenta de Cobro', 'Config. Legalización', 'Historial', 'Informes OPS'] as AdminModule[]).map((module) => (
+						{(['Usuarios', 'Personal autorizado', 'Roles', 'Areas', 'Usuarios en linea', 'Configuracion', 'Config. Viáticos', 'Config. Cuenta de Cobro', 'Config. Legalización', 'Config. Portal de Pagos', 'Historial', 'Informes OPS'] as AdminModule[]).map((module) => (
 							<button
 								key={module}
 								type="button"
@@ -1701,6 +1725,10 @@ export function DashboardPage() {
 							<ConfigLegalizacionPanel />
 						) : null}
 
+						{activeAdminModule === 'Config. Portal de Pagos' ? (
+							<ConfigPagosPanel />
+						) : null}
+
 						{activeAdminModule === 'Historial' ? (
 							<HistorialPanel />
 						) : null}
@@ -1824,7 +1852,11 @@ export function DashboardPage() {
 				</div>
 			) : null}
 
-			{activeSection !== 'Inicio' && activeSection !== 'Panel administrador' && activeSection !== 'Radicaciones' && activeSection !== 'Mi perfil' ? (
+			{activeSection === 'Portal de Pagos' && canVerPortalPagos ? (
+				<PagosModule tienePermiso={tienePermisoPagos} />
+			) : null}
+
+			{activeSection !== 'Inicio' && activeSection !== 'Panel administrador' && activeSection !== 'Radicaciones' && activeSection !== 'Mi perfil' && activeSection !== 'Portal de Pagos' ? (
 				<section className="card-surface module-card">
 					<h3>{activeSection}</h3>
 					<p>Vista en construcción. Este módulo se conectará en el siguiente paso.</p>

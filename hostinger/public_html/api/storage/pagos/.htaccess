@@ -1,0 +1,5 @@
+# Archivos generados del Portal de Pagos (.txt/.csv/.zip) — acceso solo via API (pagos/lote_descargar.php)
+Options -Indexes
+<FilesMatch ".*">
+    Require all denied
+</FilesMatch>
