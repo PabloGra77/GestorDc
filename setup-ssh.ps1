@@ -4,7 +4,7 @@
 
 $ErrorActionPreference = "Stop"
 $RepoRoot  = $PSScriptRoot
-$KeyPath   = "$RepoRoot\deploy-key"
+$KeyPath   = "$RepoRoot\deploy-key-nueva"
 $SSH_HOST  = "187.124.72.3"
 $SSH_PORT  = "65002"
 $SSH_USER  = "u315763484_LqhlHlMdz"

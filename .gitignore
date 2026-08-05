@@ -58,11 +58,11 @@ Thumbs.db
 
 # ── Docker ─────────────────────────────────────────────────────────────────────
 .dockerenv
-# ── Deploy ───────────────────────────────────────────────────────────────────────────────
-deploy-key
-deploy-key.pub
-deploy-key2
-deploy-key2.pub
+# ── Deploy — NUNCA commitear claves SSH (privadas ni públicas) ───────────────
+# Patrón genérico para que cualquier archivo de clave nuevo quede ignorado
+# por defecto, sin depender de que alguien recuerde actualizar esta lista
+# cada vez que se rota la clave (deploy-key2 se filtró exactamente así).
+deploy-key*
 # ── Miscelánea ─────────────────────────────────────────────────────────────────
 *.bak
 *.tmp
